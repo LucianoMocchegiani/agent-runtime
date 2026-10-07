@@ -1,0 +1,55 @@
+import { useState, useEffect } from 'react';
+import client from './client.js';
+
+export default function ConversationList({ activeId, onSelect }) {
+  const [convs, setConvs] = useState([]);
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function load() {
+    try {
+      const items = await client.conversations.list();
+      setConvs(items);
+    } catch {
+      setConvs([]);
+    }
+  }
+
+  async function handleNew() {
+    const conv = await client.conversations.create();
+    onSelect(conv.id);
+  }
+
+  async function handleArchive(id) {
+    await client.conversations.archive(id);
+    if (activeId === id) onSelect(null);
+    load();
+  }
+
+  return (
+    <div id="sidebar">
+      <h2>
+        <span>Chat</span>
+        <button onClick={handleNew} style={{ padding: '4px 10px', fontSize: 12 }}>+</button>
+      </h2>
+      <div id="conv-list">
+        {convs.length === 0 && <div style={{ padding: 16, color: '#666', textAlign: 'center' }}>Sin conversaciones</div>}
+        {convs.map(c => (
+          <div key={c.id} className={`conv-item ${c.id === activeId ? 'active' : ''}`}>
+            <span className="conv-title" onClick={() => onSelect(c.id)}>{c.title || 'Sin título'}</span>
+            <span className="conv-date">{fmtDate(c.updatedAt)}</span>
+            <button onClick={() => handleArchive(c.id)} style={{ padding: '2px 6px', fontSize: 11, marginLeft: 4 }}>×</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+}

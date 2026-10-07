@@ -1,0 +1,23 @@
+{
+  "name": "agent-runtime-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": "./dist/core.js",
+    "./browser": "./dist/browser.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "bundle": "esbuild src/core.ts --bundle --outfile=dist/browser.js --format=esm --target=es2024 --platform=browser",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.9.2"
+  }
+}

@@ -1,0 +1,42 @@
+// Memory MCP default — dueño único de la database `memory`.
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Hilo del identificado (aislado por user_id).
+model Conversation {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String?  @map("tenant_id")
+  userId     String    @map("user_id")
+  title      String?
+  archivedAt DateTime? @map("archived_at") @db.Timestamptz
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  messages   Message[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+/// Turno persistido (user / assistant / tool). La ventana de contexto recorta el prompt, no las filas.
+model Message {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role           String
+  content        String       @db.Text
+  toolName       String?      @map("tool_name")
+  toolArgs       Json?        @map("tool_args")
+  toolResult     Json?        @map("tool_result")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}

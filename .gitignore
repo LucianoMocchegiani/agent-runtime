@@ -1,0 +1,24 @@
+# Dependencias
+node_modules/
+
+# Builds (apps/*/dist, packages/*/dist; se regeneran con npm run build)
+dist/
+*.tsbuildinfo
+.vite/
+
+# Secretos: solo se versiona el ejemplo
+.env
+.env.*
+!.env.example
+
+# Logs y coverage
+*.log
+npm-debug.log*
+coverage/
+
+# Editor y sistema
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
