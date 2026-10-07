@@ -1,0 +1,54 @@
+# agent-runtime sin clonar el repo: usa las imágenes publicadas en ghcr.io.
+#   1. Bajá este archivo y el .env.example (ver README, "Usar sin clonar").
+#   2. Completá .env (AI_CONFIG como mínimo).
+#   3. docker compose up -d   →   http://localhost:3010
+#
+# Versión fija: AGENT_RUNTIME_VERSION=0.1.0 en .env (default: latest).
+
+name: agent-runtime
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agent
+      POSTGRES_DB: memory
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  # Memory MCP default: único dueño de la database `memory`. Sin auth propia, solo red interna.
+  memory-mcp:
+    image: ghcr.io/lucianomocchegiani/agent-runtime-memory-mcp:${AGENT_RUNTIME_VERSION:-latest}
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
+      - MEMORY_MCP_PORT=3012
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  # API + UI nativa. Solo esta máquina: la UI no pide login.
+  agent-runtime:
+    image: ghcr.io/lucianomocchegiani/agent-runtime:${AGENT_RUNTIME_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3010:3010"
+    # MCPs que corren en el host (fuera de Docker): http://host.docker.internal:<puerto>/mcp
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      memory-mcp:
+        condition: service_healthy
+    env_file: ./.env
+    environment:
+      - MEMORY_MCP_URL=http://memory-mcp:3012/mcp
+
+volumes:
+  pgdata:

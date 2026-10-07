@@ -2,7 +2,7 @@
 
 ## Qué es
 
-`agent-runtime` es el **motor del asistente**: conversaciones, historial, stream del modelo y cliente MCP. Es **infra portable** (como Redis): el huésped se enchufa con env; este paquete **no** conoce el dominio del huésped.
+`agent-runtime` es el **motor del asistente**: conversaciones, historial, stream del modelo y cliente MCP. Es **infra portable** : el huésped se enchufa con env; este paquete **no** conoce el dominio del huésped.
 
 Otra plataforma = **otra instancia** (otro Compose + env). Misma imagen.
 
@@ -26,12 +26,6 @@ Bearer anon:<uuid> (lo genera y guarda el cliente)
 La API **no tiene database**. Hilos y mensajes los guarda el Memory MCP (default `apps/memory-mcp`, reemplazable).
 
 La UI, el login y las tools viven en el **huésped**. El chat solo pide identidad (`AUTH_INTROSPECT_URL`) y tools (`MCP_CONFIG`).
-
-## Qué no hace
-
-- No mezcla usuarios: `userId` sale del principal autenticado, nunca del body.
-- No implementa las tools: las descubre en runtime (`tools/list` del MCP).
-- Tope de uso por identificado: pendiente.
 
 ## Stack
 
