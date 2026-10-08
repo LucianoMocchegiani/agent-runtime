@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import client from './client.js';
+import Icon from './Icon.jsx';
 
 export default function ConversationList({ activeId, onSelect }) {
   const [convs, setConvs] = useState([]);
@@ -32,7 +33,7 @@ export default function ConversationList({ activeId, onSelect }) {
     <div id="sidebar">
       <h2>
         <span>Chat</span>
-        <button onClick={handleNew} style={{ padding: '4px 10px', fontSize: 12 }}>+</button>
+        <button className="sidebar-action" onClick={handleNew} aria-label="Nuevo chat" title="Crear un nuevo chat"><Icon name="plus" /></button>
       </h2>
       <div id="conv-list">
         {convs.length === 0 && <div style={{ padding: 16, color: '#666', textAlign: 'center' }}>Sin conversaciones</div>}
@@ -40,7 +41,7 @@ export default function ConversationList({ activeId, onSelect }) {
           <div key={c.id} className={`conv-item ${c.id === activeId ? 'active' : ''}`}>
             <span className="conv-title" onClick={() => onSelect(c.id)}>{c.title || 'Sin título'}</span>
             <span className="conv-date">{fmtDate(c.updatedAt)}</span>
-            <button onClick={() => handleArchive(c.id)} style={{ padding: '2px 6px', fontSize: 11, marginLeft: 4 }}>×</button>
+            <button className="archive-button" onClick={() => handleArchive(c.id)} aria-label={`Archivar ${c.title || 'conversación'}`} title={`Archivar ${c.title || 'conversación'}`}><Icon name="archive" /></button>
           </div>
         ))}
       </div>

@@ -4,6 +4,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
 import { MEMORY_TOOLS, type JsonValue } from 'agent-runtime-memory-contract';
 import { z } from 'zod/v4';
+import { searchMemory } from './search/service.js';
 import {
   getContext,
   saveMessage,
@@ -209,6 +210,29 @@ function registerTools(server: McpServer): void {
         userText: args.userText,
       });
       return { content: [{ type: 'text', text: JSON.stringify(title) }] };
+    },
+  );
+
+  server.registerTool(
+    MEMORY_TOOLS.searchMemory,
+    {
+      title: 'Search Memory',
+      description: 'Busca recuerdos relevantes en los mensajes del usuario.',
+      inputSchema: z.object({
+        userId: z.string(),
+        query: z.string(),
+        conversationId: z.string().optional(),
+        limit: z.number().int().min(1).max(20).optional(),
+      }),
+    },
+    async (args) => {
+      const result = await searchMemory({
+        userId: args.userId,
+        query: args.query,
+        conversationId: args.conversationId,
+        limit: args.limit,
+      });
+      return { content: [{ type: 'text', text: JSON.stringify(result) }] };
     },
   );
 }

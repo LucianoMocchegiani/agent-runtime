@@ -9,7 +9,8 @@ name: agent-runtime
 
 services:
   postgres:
-    image: postgres:17-alpine
+    # pgvector is required by the Memory search migration (CREATE EXTENSION vector).
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: agent
@@ -17,16 +18,23 @@ services:
       POSTGRES_DB: memory
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d memory"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
 
   # Memory MCP default: único dueño de la database `memory`. Sin auth propia, solo red interna.
   memory-mcp:
     image: ghcr.io/lucianomocchegiani/agent-runtime-memory-mcp:${AGENT_RUNTIME_VERSION:-latest}
     restart: unless-stopped
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
       - MEMORY_MCP_PORT=3012
+      - MEMORY_EMBEDDING_CONFIG=${MEMORY_EMBEDDING_CONFIG:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
       interval: 5s

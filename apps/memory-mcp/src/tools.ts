@@ -99,9 +99,11 @@ export async function getContext(
   await assertConversationOwner(conversationId, userId);
   const rows = await prisma.message.findMany({
     where: { conversationId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: MESSAGES_TAKE,
   });
+  // La consulta trae los mensajes más recientes; el contexto se devuelve cronológicamente.
+  rows.reverse();
 
   const budget = tokenBudget ?? 10_000;
   let used = 0;
@@ -144,9 +146,11 @@ export async function listMessages(
   await assertConversationOwner(conversationId, userId);
   const rows = await prisma.message.findMany({
     where: { conversationId },
-    orderBy: { createdAt: 'asc' },
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: MESSAGES_TAKE,
   });
+  // La UI recibe los 500 mensajes más recientes en orden cronológico.
+  rows.reverse();
   return rows.map(toMessageDto);
 }
 

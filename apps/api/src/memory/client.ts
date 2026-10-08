@@ -16,6 +16,8 @@ import {
   type UpdateConversationParams,
   type ArchiveConversationParams,
   type ApplyTitleParams,
+  type MemorySearchParams,
+  type MemorySearchResult,
 } from 'agent-runtime-memory-contract';
 import { MemoryError, MemoryUnavailableError } from './errors.js';
 
@@ -129,6 +131,11 @@ export async function createMemoryMcpClient(): Promise<MemoryMcp> {
       params: ApplyTitleParams,
     ): Promise<string | null> {
       return callTool<string | null>(TOOL_NAMES.applyAutomaticTitle, params);
+    },
+    async searchMemory(
+      params: MemorySearchParams,
+    ): Promise<MemorySearchResult> {
+      return callTool<MemorySearchResult>(TOOL_NAMES.searchMemory, params);
     },
     close,
   };

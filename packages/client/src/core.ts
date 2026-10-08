@@ -47,6 +47,8 @@ export type ModelList = {
 export type SendOptions = {
   /** `proveedor/modelo`. Sin él, el server usa su default. */
   model?: string | null;
+  /** Data URL temporal de una imagen; el servidor no la persiste. */
+  image?: string | null;
 };
 
 export type StreamHandlers = {
@@ -185,7 +187,11 @@ export function createClient(config: ClientConfig) {
                 'Content-Type': 'application/json',
                 Accept: 'text/event-stream',
               }),
-              body: JSON.stringify(options.model ? { text, model: options.model } : { text }),
+              body: JSON.stringify({
+                text,
+                ...(options.model ? { model: options.model } : {}),
+                ...(options.image ? { image: options.image } : {}),
+              }),
               signal,
             },
           );
@@ -236,6 +242,7 @@ export async function consumeUiMessageStream(
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
+  const toolNames = new Map<string, string>();
 
   while (true) {
     const { done, value } = await reader.read();
@@ -246,15 +253,19 @@ export async function consumeUiMessageStream(
     const parts = buffer.split('\n\n');
     buffer = parts.pop() ?? '';
     for (const part of parts) {
-      dispatchSseBlock(part, handlers);
+      dispatchSseBlock(part, handlers, toolNames);
     }
   }
   if (buffer.trim()) {
-    dispatchSseBlock(buffer, handlers);
+    dispatchSseBlock(buffer, handlers, toolNames);
   }
 }
 
-function dispatchSseBlock(block: string, handlers: StreamHandlers): void {
+function dispatchSseBlock(
+  block: string,
+  handlers: StreamHandlers,
+  toolNames: Map<string, string>,
+): void {
   const lines = block.split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
@@ -271,11 +282,15 @@ function dispatchSseBlock(block: string, handlers: StreamHandlers): void {
     } catch {
       continue;
     }
-    applyStreamEvent(event, handlers);
+    applyStreamEvent(event, handlers, toolNames);
   }
 }
 
-function applyStreamEvent(event: unknown, handlers: StreamHandlers): void {
+function applyStreamEvent(
+  event: unknown,
+  handlers: StreamHandlers,
+  toolNames: Map<string, string>,
+): void {
   if (typeof event !== 'object' || event === null) {
     return;
   }
@@ -291,7 +306,10 @@ function applyStreamEvent(event: unknown, handlers: StreamHandlers): void {
   const type = typeof rec.type === 'string' ? rec.type : '';
   if (type === 'tool-input-start') {
     const id = typeof rec.toolCallId === 'string' ? rec.toolCallId : '';
-    const name = typeof rec.toolName === 'string' ? rec.toolName : 'tool';
+    const name = typeof rec.toolName === 'string' && rec.toolName.length > 0
+      ? rec.toolName
+      : 'tool';
+    if (id) toolNames.set(id, name);
     if (id && handlers.onToolStart) {
       handlers.onToolStart(id, name);
     }
@@ -299,10 +317,14 @@ function applyStreamEvent(event: unknown, handlers: StreamHandlers): void {
   }
   if (type === 'tool-output-available') {
     const id = typeof rec.toolCallId === 'string' ? rec.toolCallId : '';
-    const name = typeof rec.toolName === 'string' ? rec.toolName : 'tool';
+    const eventName = typeof rec.toolName === 'string' && rec.toolName.length > 0
+      ? rec.toolName
+      : undefined;
+    const name = eventName ?? toolNames.get(id) ?? 'tool';
     if (id && handlers.onToolDone) {
       handlers.onToolDone(id, name, rec.output ?? rec.result);
     }
+    if (id) toolNames.delete(id);
     return;
   }
   if (type === 'text-delta' && typeof rec.delta === 'string') {

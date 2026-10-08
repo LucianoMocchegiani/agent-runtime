@@ -1,4 +1,4 @@
-import { streamText, type Tool } from 'ai';
+import { jsonSchema, streamText, tool, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
 import { config } from '../config.js';
 import { isAbortError, identifiedFacingLlmError } from '../llm/errors.js';
@@ -13,6 +13,8 @@ import {
 } from 'agent-runtime-memory-contract';
 import { buildModelMessages, shrinkToolContent } from './window.js';
 import type { Principal } from '../auth/principal.js';
+
+type IncomingImage = { data: Uint8Array; mediaType: string };
 
 type LooseTool = {
   toolName?: string;
@@ -60,7 +62,19 @@ async function persistAgentTurn(
   text: string | undefined,
   steps: LooseStep[],
 ): Promise<void> {
+  let savedStepText = false;
   for (const step of steps) {
+    const stepText = step.text?.trim();
+    if (stepText) {
+      await memory.saveMessage({
+        conversationId,
+        userId,
+        role: 'assistant',
+        content: stepText,
+      });
+      savedStepText = true;
+    }
+
     const calls = step.toolCalls ?? [];
     const results = step.toolResults ?? [];
     const n = Math.max(calls.length, results.length);
@@ -82,13 +96,13 @@ async function persistAgentTurn(
     }
   }
   const trimmed = text?.trim();
-  if (trimmed && trimmed.length > 0) {
-      await memory.saveMessage({
-        conversationId,
-        userId,
-        role: 'assistant',
-        content: trimmed,
-      });
+  if (!savedStepText && trimmed) {
+    await memory.saveMessage({
+      conversationId,
+      userId,
+      role: 'assistant',
+      content: trimmed,
+    });
   }
 }
 
@@ -107,6 +121,7 @@ export async function streamAgentTurn(
   model: ResolvedModel,
   abortSignal?: AbortSignal,
   mcpTokens?: Record<string, string>,
+  image?: IncomingImage,
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
 
@@ -138,6 +153,55 @@ export async function streamAgentTurn(
     throw new HTTPException(502, { message: failMessage });
   }
 
+  const memorySearchToolName = 'memory__searchMemory';
+  if (Object.hasOwn(tools, memorySearchToolName)) {
+    await registry.close().catch(() => undefined);
+    await memory.close().catch(() => undefined);
+    throw new HTTPException(502, { message: failMessage });
+  }
+  tools[memorySearchToolName] = tool({
+    description:
+      'Busca en los recuerdos y mensajes anteriores del usuario autenticado. Usala cuando la respuesta dependa de conversaciones previas o cuando el usuario pregunte qué se habló o decidió antes. Para buscar en todas las conversaciones, omití por completo conversationId; no lo envíes como cadena vacía. Incluilo solo si el usuario pide limitar la búsqueda a una conversación concreta y tenés su ID.',
+    inputSchema: jsonSchema<{
+      query: string;
+      conversationId?: string;
+      limit?: number;
+    }>({
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Qué información o tema buscar en recuerdos anteriores.',
+        },
+        conversationId: {
+          type: 'string',
+          description:
+            'Opcional. Incluilo solo para limitar la búsqueda a una conversación concreta. Para buscar en todas las conversaciones, omití este campo por completo; nunca envíes "".',
+        },
+        limit: {
+          type: 'integer',
+          minimum: 1,
+          maximum: 20,
+          description: 'Cantidad máxima de resultados (1 a 20).',
+        },
+      },
+      required: ['query'],
+      additionalProperties: false,
+    }),
+    execute: async ({ query, conversationId: searchConversationId, limit }) => {
+      console.info('tool memory__searchMemory invoked');
+      const normalizedConversationId = searchConversationId?.trim() || undefined;
+      return memory.searchMemory({
+        userId: principal.userId,
+        query,
+        ...(normalizedConversationId
+          ? { conversationId: normalizedConversationId }
+          : {}),
+        limit,
+      });
+    },
+  });
+
   await memory.saveMessage({
     conversationId,
     userId: principal.userId,
@@ -165,6 +229,21 @@ export async function streamAgentTurn(
   }
 
   const messages = buildModelMessages(context.messages);
+  if (image) {
+    const lastUserIndex = messages.map((message) => message.role).lastIndexOf('user');
+    const currentUserMessage = messages[lastUserIndex];
+    if (currentUserMessage?.role === 'user') {
+      const text = typeof currentUserMessage.content === 'string' ? currentUserMessage.content : '';
+      const multimodalMessage: ModelMessage = {
+        role: 'user',
+        content: [
+          ...(text ? [{ type: 'text' as const, text }] : []),
+          { type: 'image', image: image.data, mediaType: image.mediaType },
+        ],
+      };
+      messages[lastUserIndex] = multimodalMessage;
+    }
+  }
 
   let closed = false;
   const closeAll = async () => {

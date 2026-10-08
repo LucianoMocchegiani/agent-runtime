@@ -9,9 +9,17 @@ import { getConversation } from '../conversations/service.js';
 import { resolveModel, type ResolvedModel } from '../llm/provider.js';
 
 const TEXT_MAX = 8000;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_BODY_CHARS = 7_500_000;
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+type IncomingImage = { data: Uint8Array; mediaType: string };
 
 async function readJsonBody(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
   const text = await c.req.text();
+  if (text.length > MAX_BODY_CHARS) {
+    throw new HTTPException(413, { message: 'La solicitud supera el tamaño máximo permitido.' });
+  }
   if (!text.trim()) {
     return {};
   }
@@ -22,22 +30,46 @@ async function readJsonBody(c: { req: { text: () => Promise<string> } }): Promis
   }
 }
 
-function readText(body: unknown): string {
+function bodyRecord(body: unknown): Record<string, unknown> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
     throw new HTTPException(400, { message: 'Body must be a JSON object' });
   }
-  const text = (body as { text?: unknown }).text;
-  if (typeof text !== 'string') {
+  return body as Record<string, unknown>;
+}
+
+function readText(body: unknown): string {
+  const raw = bodyRecord(body).text;
+  if (raw === undefined) return '';
+  if (typeof raw !== 'string') {
     throw new HTTPException(400, { message: 'text must be a string' });
   }
-  const trimmed = text.trim();
-  if (trimmed.length === 0) {
-    throw new HTTPException(400, { message: 'text is required' });
-  }
+  const trimmed = raw.trim();
   if (trimmed.length > TEXT_MAX) {
     throw new HTTPException(400, { message: `text max ${TEXT_MAX} chars` });
   }
   return trimmed;
+}
+
+function readImage(body: unknown): IncomingImage | undefined {
+  const raw = bodyRecord(body).image;
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== 'string') {
+    throw new HTTPException(400, { message: 'image must be a base64 data URL' });
+  }
+  const match = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/]*={0,2})$/i.exec(raw);
+  if (!match) {
+    throw new HTTPException(400, { message: 'Formato de imagen inválido. Usá JPEG, PNG, WebP o GIF.' });
+  }
+  const mediaType = match[1].toLowerCase();
+  const encoded = match[2];
+  if (!SUPPORTED_IMAGE_TYPES.has(mediaType) || !encoded || encoded.length % 4 !== 0) {
+    throw new HTTPException(400, { message: 'Imagen inválida o vacía.' });
+  }
+  const buffer = Buffer.from(encoded, 'base64');
+  if (buffer.toString('base64') !== encoded || buffer.byteLength > MAX_IMAGE_BYTES) {
+    throw new HTTPException(413, { message: 'La imagen supera el límite de 5 MB o no es válida.' });
+  }
+  return { data: new Uint8Array(buffer), mediaType };
 }
 
 /** `model` opcional (`proveedor/modelo`); sin él, el default de `AI_CONFIG`. */
@@ -82,16 +114,25 @@ messageRoutes.post('/', async (c) => {
   }
   const body = await readJsonBody(c);
   const text = readText(body);
+  const image = readImage(body);
+  if (!text && !image) {
+    throw new HTTPException(400, { message: 'Escribí un mensaje o adjuntá una imagen.' });
+  }
+  // Solo guardamos el texto y una nota; los bytes de la imagen viven únicamente durante este turno.
+  const messageText = image
+    ? `${text}${text ? '\n\n' : ''}[Imagen adjunta; no almacenada]`
+    : text;
   const model = readModel(body);
   const principal = c.get('principal');
   return streamAgentTurn(
     id,
     principal,
     c.get('accessToken'),
-    text,
+    messageText,
     config.chatSystemPrompt,
     model,
     c.req.raw.signal,
     c.get('mcpAuth') ?? undefined,
+    image,
   );
 });

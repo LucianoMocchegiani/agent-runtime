@@ -15,6 +15,7 @@ export const MEMORY_TOOLS = {
   updateConversation: 'updateConversation',
   archiveConversation: 'archiveConversation',
   applyAutomaticTitle: 'applyAutomaticTitle',
+  searchMemory: 'searchMemory',
 } as const;
 
 export type MemoryToolName = (typeof MEMORY_TOOLS)[keyof typeof MEMORY_TOOLS];
@@ -112,6 +113,29 @@ export type ApplyTitleParams = {
   userText: string;
 };
 
+export type MemorySearchParams = {
+  userId: string;
+  query: string;
+  conversationId?: string;
+  limit?: number;
+};
+
+export type MemorySearchHit = {
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  role: 'user' | 'assistant';
+  content: string;
+  createdAt: string;
+  title: string | null;
+  score: number;
+};
+
+export type MemorySearchResult = {
+  mode: 'text' | 'hybrid';
+  items: MemorySearchHit[];
+};
+
 export function toJsonValue(value: unknown): JsonValue | undefined {
   if (value === undefined) {
     return undefined;
@@ -142,5 +166,6 @@ export interface MemoryMcp {
   applyAutomaticTitle(
     params: ApplyTitleParams,
   ): Promise<string | null>;
+  searchMemory(params: MemorySearchParams): Promise<MemorySearchResult>;
   close(): Promise<void>;
 }
