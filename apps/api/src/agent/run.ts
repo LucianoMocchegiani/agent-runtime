@@ -14,7 +14,7 @@ import {
   type MessageDto,
 } from 'agent-runtime-memory-contract';
 import {
-  resolveTokenReserves,
+  resolveOutputTokenLimits,
   selectModelContext,
   shrinkToolContent,
 } from './window.js';
@@ -509,16 +509,17 @@ export async function streamAgentTurn(
     console.warn('No se pudieron recuperar las preferencias del usuario.', error);
   }
 
-  const tokenReserves = resolveTokenReserves(
+  const outputTokenLimits = resolveOutputTokenLimits(
     model.contextWindowTokens,
-    runtimeSettings.responseTokenReserve,
+    runtimeSettings.maxOutputTokens,
+    runtimeSettings.reserveOutputTokens,
     runtimeSettings.contextSafetyTokens,
   );
   const selectionOptions = {
     contextWindowTokens: model.contextWindowTokens,
     maxMessages: runtimeSettings.maxContextMessages,
-    responseTokenReserve: tokenReserves.responseTokenReserve,
-    safetyTokens: tokenReserves.safetyTokens,
+    reserveOutputTokens: outputTokenLimits.reserveOutputTokens,
+    safetyTokens: outputTokenLimits.safetyTokens,
     systemPrompt: turnSystemPrompt,
     tools,
     imageCount: images.length,
@@ -623,7 +624,7 @@ export async function streamAgentTurn(
   try {
     const result = streamText({
       model: model.languageModel,
-      maxOutputTokens: tokenReserves.responseTokenReserve,
+      maxOutputTokens: outputTokenLimits.maxOutputTokens,
       system: promptWithSummary,
       messages,
       tools,
@@ -638,7 +639,7 @@ export async function streamAgentTurn(
             conversationId,
             step: event.stepNumber + 1,
             model: model.id,
-            maxOutputTokens: tokenReserves.responseTokenReserve,
+            maxOutputTokens: outputTokenLimits.maxOutputTokens,
             system: event.system,
             messages: event.messages,
             tools: event.tools,

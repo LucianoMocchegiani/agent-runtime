@@ -1,12 +1,13 @@
 # Módulos de la API (`apps/api/src/`)
 
-No es un monolito por bounded context. Es un servicio chico partido por **capa técnica del chat**. Cada carpeta es un módulo con un trabajo claro. **Sin database**: todo lo persistente vive en el Memory MCP.
+No es un monolito por bounded context. Es un servicio chico partido por **capa técnica del chat**. Cada carpeta es un módulo con un trabajo claro. La API no persiste conversaciones ni mensajes: eso vive en Memory MCP. Sí administra la configuración funcional cifrada y versionada en PostgreSQL, bajo `runtime.config`.
 
 ```text
 src/
   index.ts          arranque HTTP
   app.ts            Hono: CORS, /health, /v1 autenticado, UI en /
-  config.ts         env; falla el boot si falta required
+  config.ts         infraestructura/env y seed mínimo de runtime
+  runtime-config/   configuración cifrada, validación y API administrativa
   cors.ts           allowlist + *.localhost + CORS_APP_DOMAIN
   ui.ts             UI nativa (apps/ui/dist) + fallback SPA
   auth/             quién sos
@@ -24,7 +25,7 @@ src/
 |---------|----------|
 | `index.ts` | `serve` en `PORT` (default 3010). |
 | `app.ts` | CORS; `GET /health` (handshake MCP con el Memory MCP, timeout 3 s); monta `/v1` con `requirePrincipal`, conversaciones, mensajes y modelos. `onError` serializa `HTTPException`. |
-| `config.ts` | Parseo estricto. `AI_CONFIG` sin ningún proveedor con `apiKey` real (o con default deshabilitado) no arranca. Prompt por default en español. |
+| `config.ts` | Lee solo infraestructura/env de ejecución. Define el seed funcional mínimo; la API crea `runtime.config` y arranca incluso sin provider de IA. |
 | `cors.ts` | Refleja `Origin` si está en `CORS_ORIGIN`, es `*.localhost` o cae bajo `CORS_APP_DOMAIN`. |
 
 `/health` no pide Bearer. Si el Memory MCP no responde: `503` y `status: degraded`.
@@ -61,7 +62,7 @@ El `POST` no espera un JSON de respuesta de chat: **devuelve el stream** del AI 
 
 | Archivo | Qué hace |
 |---------|----------|
-| `run.ts` | Abre MCP con `MCP_CONFIG` + `X-MCP-Auth`, lista tools, persiste user, título automático, arma historial, `streamText`, persiste tools + assistant al terminar / abortar / error. Cierra el cliente MCP una vez. |
+| `run.ts` | Abre MCP con `runtime.config.mcpConfig` + `X-MCP-Auth`, lista tools, persiste user, título automático, arma historial, `streamText`, persiste tools + assistant al terminar / abortar / error. Cierra el cliente MCP una vez. |
 | `window.ts` | Recorte de prompt (tokens + shrink de tools viejas). |
 
 Abort del cliente (`AbortSignal` del request): corta el LLM y guarda lo ya generado (`onAbort` / `onError`).
@@ -72,7 +73,7 @@ Abort del cliente (`AbortSignal` del request): corta el LLM y guarda lo ya gener
 |---------|----------|
 | `registry.ts` | `McpRegistry` con pool de clientes. `connect(accessToken, mcpTokens)`. Tools namespaced (`mcpName__toolName`: OpenAI no acepta puntos). |
 
-`MCP_CONFIG`: JSON `{"nombre":{"url":"...","auth":"...","headers":{...},"optional":false}}`. Con `auth`, el runtime reenvía el Bearer del usuario (o el de `X-MCP-Auth`) y cada MCP valida. `headers` son fijos del servidor (secretos de MCPs propios, como `pc-mcp`).
+Cada entrada de `runtime.config.mcpConfig` define un MCP con `url`, `auth`, `headers` y `optional`. Con `auth`, el runtime reenvía el Bearer del usuario (o el de `X-MCP-Auth`) y cada MCP valida. `headers` son fijos del servidor (secretos de MCPs propios, como `pc-mcp`).
 
 Si un MCP requerido no arranca o `tools()` falla → **502**. Uno `optional` se saltea con un warning en el log.
 
@@ -104,7 +105,7 @@ Otro proceso, otra imagen (`--target memory-mcp`). Único dueño de la DB `memor
 
 | Archivo | Qué hace |
 |---------|----------|
-| `provider.ts` | `listModels()` y `resolveModel("proveedor/modelo")` contra la lista de `AI_CONFIG`; cachea un modelo por id. |
+| `provider.ts` | `listModels()` y `resolveModel("proveedor/modelo")` contra los providers guardados en runtime.config; cachea un modelo por id. |
 | `routes.ts` | `GET /v1/models` → `{ default, items }` para el selector del cliente. |
 | `openai.ts` / `openrouter.ts` | Un adapter por proveedor: `(apiKey, model) → LanguageModel`. |
 | `errors.ts` | Mapea 402/401/429/contexto/timeout a frases para el drawer. Sin bodies ni claves en el mensaje al usuario. Abort → string vacío (no mostrar error). |
@@ -115,8 +116,8 @@ Otro proceso, otra imagen (`--target memory-mcp`). Único dueño de la DB `memor
 |--------|---------|--------|
 | Identificado | HTTP GET introspect | Contrato: JSON con `userId`, `email?`, `name?` |
 | Identidad pública | `anon:<uuid>` del cliente | Sin introspect ni persistencia |
-| Tools | MCP HTTP vía `MCP_CONFIG` | Catálogo dinámico, auth por MCP |
-| Modelo | OpenRouter / OpenAI | `AI_CONFIG` |
+| Tools | MCP HTTP vía runtime.config | Catálogo dinámico, auth por MCP |
+| Modelo | OpenRouter / OpenAI | Providers en runtime.config |
 | Persistencia | Memory MCP (`MEMORY_MCP_URL`) | Default: `apps/memory-mcp` → Prisma → Postgres `memory` |
 
 [← Diseño](./01-diseno-y-modelo.md) · [Índice](./00-indice.md) · [Flujos →](./03-flujos.md)

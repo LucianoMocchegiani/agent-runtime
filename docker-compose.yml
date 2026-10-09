@@ -41,7 +41,6 @@ services:
       - MEMORY_MCP_PORT=3012
       - AGENT_RUNTIME_CONFIG_URL=http://agent-runtime:3010/internal/runtime-config/embedding
       - RUNTIME_CONFIG_INTERNAL_TOKEN=${RUNTIME_CONFIG_INTERNAL_TOKEN:-}
-      - MEMORY_EMBEDDING_CONFIG=${MEMORY_EMBEDDING_CONFIG:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
       interval: 5s

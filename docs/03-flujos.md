@@ -44,7 +44,7 @@ Identificado (JWT) / Público (anon:<uuid>)  agent-runtime              MCP + Op
 5. **Enviar.** `POST /v1/conversations/:id/messages` con `{ "text": "…" }`. Si no había id, la UI crea el hilo **antes**. Texto 1–100.000 caracteres. Archivado → 409.
 6. **Persistir el usuario.** Se inserta `role=user`. Si `title` era `null`, se recorta ese texto (sin LLM) y queda el título del sidebar.
 7. **Prompt.** Se leen hasta 500 mensajes del hilo, se recortan al presupuesto de tokens, se antepone el system prompt.
-8. **Modelo.** OpenRouter genera. Puede intercalar tools (MCP con Bearer + X-MCP-Auth). Tope `CHAT_MAX_TOOL_STEPS`. El HTTP **no** es un JSON final: es stream.
+8. **Modelo.** El provider elegido genera. Puede intercalar tools (MCP con Bearer + X-MCP-Auth). Tope `maxToolSteps` de runtime.config. El HTTP **no** es un JSON final: es stream.
 9. **Pantalla.** La UI consume el stream y va pegando texto. "Parar" aborta el request; lo ya generado se guarda igual.
 10. **Cierre.** Al terminar (o abortar): filas `tool` si hubo llamadas + `assistant` con el texto. Se cierra el cliente MCP. `updated_at` del hilo.
 
@@ -160,7 +160,7 @@ Session anónima: dura lo que dure `chat_session_id` en el `localStorage` del na
 ```text
 DB (completo)                    Prompt (recortado)
 ─────────────                    ──────────────────
-user: "buscá a Juan"             system (env, siempre)
+user: "buscá a Juan"             system (runtime.config, siempre)
 tool: JSON de 80 resultados        →  "search → 80 hits"  (si es viejo)
 assistant: "Hay varios…"         assistant igual
 user: "el DNI 123"               user igual (si entra en el presupuesto)

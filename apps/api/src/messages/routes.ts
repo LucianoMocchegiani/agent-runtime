@@ -89,7 +89,7 @@ function readImages(body: unknown): IncomingImage[] {
   return [parseImage(record.image)];
 }
 
-/** `model` opcional (`proveedor/modelo`); sin él, el default de `AI_CONFIG`. */
+/** `model` opcional (`proveedor/modelo`); sin él, se usa el modelo default de runtime.config. */
 function readModel(body: unknown): ResolvedModel {
   const raw = (body as { model?: unknown }).model;
   if (raw !== undefined && raw !== null && typeof raw !== 'string') {
@@ -97,6 +97,9 @@ function readModel(body: unknown): ResolvedModel {
   }
   const resolved = resolveModel(raw);
   if (!resolved) {
+    if (!resolveModel()) {
+      throw new HTTPException(503, { message: 'No hay un proveedor de IA configurado. Abrí Administración → Configuración del runtime → Providers y agregá uno.' });
+    }
     throw new HTTPException(400, { message: `Unknown model: ${raw}. See GET /v1/models` });
   }
   return resolved;

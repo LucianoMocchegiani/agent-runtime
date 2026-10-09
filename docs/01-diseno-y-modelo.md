@@ -10,7 +10,7 @@ Otra plataforma = **otra instancia** (otro Compose + env). Misma imagen.
 Identificado (JWT)                   agent-runtime                     MCP + OpenRouter
        │  Bearer                    │
        ▼                            ▼
-  introspect ──→ Principal    MCP_CONFIG → pool MCP multi-conexión
+  introspect ──→ Principal    runtime.config → pool MCP multi-conexión
        │                            │
        ▼                            ▼
   Principal {userId}         Memory MCP + tools del MCP
@@ -25,7 +25,7 @@ Bearer anon:<uuid> (lo genera y guarda el cliente)
 
 La API no posee los datos de conversación: hilos y mensajes los guarda Memory MCP (default `apps/memory-mcp`, reemplazable). Para configuración dinámica, agent-runtime usa el esquema PostgreSQL separado `runtime`; Memory MCP conserva sus tablas propias en `public`. Ambos procesos pueden conectarse a la misma base, con pools independientes.
 
-La UI, el login y las tools viven en el **huésped**. El chat solo pide identidad (`AUTH_INTROSPECT_URL`) y tools (`MCP_CONFIG`).
+La UI, el login y las tools viven en el **huésped**. El chat pide identidad (`AUTH_INTROSPECT_URL`); los MCPs se administran en `runtime.config` (`mcpConfig`).
 
 ## Stack
 
@@ -33,8 +33,8 @@ La UI, el login y las tools viven en el **huésped**. El chat solo pide identida
 |-------|--------|
 | HTTP | Hono + `@hono/node-server`, Node 24 |
 | Persistencia | Memory MCP. El default (`apps/memory-mcp`) usa Prisma 6 sobre la database **`memory`** |
-| LLM | Vercel AI SDK + OpenRouter / OpenAI (`AI_CONFIG`) |
-| Tools | `@ai-sdk/mcp` HTTP hacia `MCP_CONFIG` |
+| LLM | Vercel AI SDK + OpenRouter / OpenAI, proveedores en `runtime.config` |
+| Tools | `@ai-sdk/mcp` HTTP hacia los MCPs de `runtime.config` |
 | Stream | UI Message Stream (`toUIMessageStreamResponse`) |
 
 Arranque: la API hace `node dist/index.js` (sin migraciones). El Memory MCP default corre `setup-db` (crea la database + `prisma migrate deploy`) y después `node dist/index.js`. En dev: `npm run dev` levanta los dos.
@@ -142,16 +142,16 @@ PII de negocio (nombre, documento, deuda) **puede** quedar en `content` / `tool_
 
 ## Ventana de contexto (prompt)
 
-`CHAT_CONTEXT_TOKENS` (default 10 000; estimación `ceil(chars / 4)`) y `CHAT_CONTEXT_MESSAGES` (default 20) limitan juntos el historial recuperado para iniciar el turno. El tope cuenta mensajes user/assistant; excluye el system prompt, las definiciones de tools y las interacciones de tools que ocurren durante el turno activo (necesarias para continuar esa ejecución).
+`contextTokenBudget` (default 10 000; estimación `ceil(chars / 4)`) y `maxContextMessages` (default 20), guardados en `runtime.config`, limitan juntos el historial recuperado para iniciar el turno. El tope cuenta mensajes user/assistant; excluye el system prompt, las definiciones de tools y las interacciones de tools que ocurren durante el turno activo (necesarias para continuar esa ejecución).
 
 - Los resultados históricos de tools quedan persistidos para memoria/auditoría, pero no se reenvían como mensajes de historial.
 - Se seleccionan turnos recientes completos de atrás hacia adelante, respetando ambos límites; el límite por cantidad puede dejar fuera mensajes aunque aún haya presupuesto de tokens.
 - Los turnos omitidos se compactan en un resumen persistente breve; no se borran de la base de datos. Para detalles más profundos se puede usar `memory__searchMemory`.
 
-`CHAT_MAX_TOOL_STEPS` (default 8) corta round-trips del agente.
+`maxToolSteps` (default 8) en `runtime.config` corta round-trips del agente.
 
 ## Configuración de instancia
 
-Ver `.env.example`. Lo que cambia entre productos: URLs de introspect y MCP, CORS, prompts, clave OpenRouter. Lo que no: código de hilos/stream.
+La configuración de infraestructura (URLs de introspect, CORS y servicios) va en `.env`; proveedores, MCPs, prompts y límites viven en `runtime.config` y se editan desde Administración.
 
 [Índice](./00-indice.md) · [Módulos →](./02-modulos.md)

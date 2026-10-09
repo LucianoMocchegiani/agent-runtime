@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Tool } from 'ai';
 import type { MessageDto } from 'agent-runtime-memory-contract';
-import { buildModelMessages, resolveTokenReserves, selectModelContext } from './window.js';
+import { buildModelMessages, resolveOutputTokenLimits, selectModelContext } from './window.js';
 
 function message(
   id: string,
@@ -26,7 +26,7 @@ function message(
 function build(rows: MessageDto[], contextWindowTokens: number) {
   return buildModelMessages(rows, {
     contextWindowTokens,
-    responseTokenReserve: 0,
+    reserveOutputTokens: 0,
     safetyTokens: 0,
     systemPrompt: '',
     tools: {} as Record<string, Tool>,
@@ -59,7 +59,7 @@ test('reports only the contiguous older turns omitted from the model context', (
   ];
   const selected = selectModelContext(rows, {
     contextWindowTokens: 11,
-    responseTokenReserve: 0,
+    reserveOutputTokens: 0,
     safetyTokens: 0,
     systemPrompt: '',
     tools: {},
@@ -100,7 +100,7 @@ test('caps context at 20 messages, keeping the newest complete turns and current
 
   const selected = selectModelContext(rows, {
     contextWindowTokens: 100_000,
-    responseTokenReserve: 0,
+    reserveOutputTokens: 0,
     safetyTokens: 0,
     systemPrompt: '',
     tools: {},
@@ -141,7 +141,7 @@ test('accounts for system instructions, tools, and response/safety reserves befo
   ];
   const result = buildModelMessages(rows, {
     contextWindowTokens: 24,
-    responseTokenReserve: 5,
+    reserveOutputTokens: 5,
     safetyTokens: 2,
     systemPrompt: 'system prompt',
     tools: { lookup: { description: 'tool definition' } as Tool },
@@ -150,13 +150,26 @@ test('accounts for system instructions, tools, and response/safety reserves befo
   assert.deepEqual(result, [{ role: 'user', content: 'new' }]);
 });
 
-test('normalizes output and safety reserves for small model windows', () => {
-  assert.deepEqual(resolveTokenReserves(10_000, 2_048, 512), {
-    responseTokenReserve: 2_048,
+test('keeps the output maximum independent from the context reservation', () => {
+  assert.deepEqual(resolveOutputTokenLimits(10_000, 2_048, 4_096, 512), {
+    maxOutputTokens: 2_048,
+    reserveOutputTokens: 4_096,
     safetyTokens: 512,
   });
-  assert.deepEqual(resolveTokenReserves(500, 2_048, 512), {
-    responseTokenReserve: 1,
+});
+
+test('caps output and reservation coherently for small model windows', () => {
+  assert.deepEqual(resolveOutputTokenLimits(500, 2_048, 4_096, 512), {
+    maxOutputTokens: 1,
+    reserveOutputTokens: 1,
     safetyTokens: 499,
+  });
+});
+
+test('caps reservation to the window while retaining the lower output maximum', () => {
+  assert.deepEqual(resolveOutputTokenLimits(3_000, 2_048, 4_096, 512), {
+    maxOutputTokens: 2_048,
+    reserveOutputTokens: 2_488,
+    safetyTokens: 512,
   });
 });

@@ -3,7 +3,7 @@ import AdminConfigHelp from './AdminConfigHelp.jsx';
 
 const TABS = ['Chat', 'Providers', 'Embeddings', 'MCP'];
 const API = import.meta.env.VITE_BASE_URL || '';
-const CHAT_FIELDS = ['chatSystemPrompt', 'contextTokenBudget', 'maxContextMessages', 'responseTokenReserve', 'contextSafetyTokens', 'maxToolSteps', 'llmTraceRequests', 'summariesEnabled', 'summaryTokenBudget'];
+const CHAT_FIELDS = ['chatSystemPrompt', 'contextTokenBudget', 'maxContextMessages', 'maxOutputTokens', 'reserveOutputTokens', 'contextSafetyTokens', 'maxToolSteps', 'llmTraceRequests', 'summariesEnabled', 'summaryTokenBudget'];
 async function errorText(res) { try { return (await res.json()).error || `HTTP ${res.status}`; } catch { return `HTTP ${res.status}`; } }
 function tabValue(config, tab) {
   if (tab === 'Chat') return Object.fromEntries(CHAT_FIELDS.map((key) => [key, config[key]]));
@@ -26,7 +26,15 @@ export default function AdminConfig({ onBack }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
-  function loadData(data) { setConfig(data.settings); setVersion(data.version); setDraft(JSON.stringify(tabValue(data.settings, tab), null, 2)); setNotice(`Configuración activa · versión ${data.version}`); }
+  function loadData(data) {
+    const needsProvider = Object.keys(data.settings.ai?.providers ?? {}).length === 0;
+    const nextTab = needsProvider ? 'Providers' : tab;
+    setConfig(data.settings);
+    setVersion(data.version);
+    setTab(nextTab);
+    setDraft(JSON.stringify(tabValue(data.settings, nextTab), null, 2));
+    setNotice(`Configuración activa · versión ${data.version}`);
+  }
   function makeBasicHeader(user, secret) {
     const bytes = new TextEncoder().encode(`${user}:${secret}`);
     const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
@@ -78,6 +86,7 @@ export default function AdminConfig({ onBack }) {
   return <main className="admin-page">
     <header className="admin-header"><div><p className="admin-eyebrow">ADMINISTRACIÓN</p><h1>Configuración del runtime</h1><p className="admin-subtitle">Cambios versionados, aplicados sin reiniciar.</p></div><button className="admin-secondary" onClick={onBack}>Volver al chat</button></header>
     {!config ? <section className="admin-card admin-auth-card"><h2>Acceso administrativo</h2><div className="admin-tabs"><button className={loginMode === 'bootstrap' ? 'active' : ''} onClick={() => setLoginMode('bootstrap')}>Admin inicial</button><button className={loginMode === 'user' ? 'active' : ''} onClick={() => setLoginMode('user')}>Usuario autenticado</button></div>{loginMode === 'bootstrap' ? <><p>Acceso inicial clásico. Usuario y contraseña predeterminados: <code>admin</code> / <code>admin</code>. Se desactiva al configurar el primer usuario administrador.</p><label className="admin-field">Usuario<input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></label><label className="admin-field">Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label></> : <><p>Ingresá el access token de una cuenta autenticada incluida en <code>RUNTIME_CONFIG_ADMIN_USERS</code>. No uses el token administrativo del runtime.</p><label className="admin-field">Access token del usuario<input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></label></>}<button className="admin-primary" disabled={busy || (loginMode === 'bootstrap' ? !username.trim() || !password : !token.trim())} onClick={signIn}>{busy ? 'Verificando…' : 'Continuar'}</button></section> : <>
+      {Object.keys(config.ai?.providers ?? {}).length === 0 && <p className="admin-notice" role="status">Instalación nueva: no hay proveedores de IA configurados. Agregá una clave y un modelo en Providers para habilitar el chat. MCP y embeddings son opcionales.</p>}
       <nav className="admin-tabs">{TABS.map((name) => <button key={name} className={tab === name ? 'active' : ''} onClick={() => changeTab(name)}>{name}</button>)}</nav>
       <section className="admin-card admin-form"><h2>{tab}</h2>
         <AdminConfigHelp tab={tab} />

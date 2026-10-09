@@ -3,33 +3,11 @@ import { Pool } from 'pg';
 import { config, type ChatConfig } from '../config.js';
 
 export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
-export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'responseTokenReserve' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
+export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
 type Settings = RuntimeSettings;
 
-function bootstrapEmbeddingConfig(): EmbeddingConfig {
-  const raw = process.env.MEMORY_EMBEDDING_CONFIG?.trim();
-  let value: Record<string, unknown> = {};
-  if (raw) {
-    try {
-      const parsed: unknown = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('MEMORY_EMBEDDING_CONFIG must be an object');
-      }
-      value = parsed as Record<string, unknown>;
-    } catch {
-      throw new Error('MEMORY_EMBEDDING_CONFIG is not valid JSON');
-    }
-  }
-  // Keep compatibility with deployments that still use the original split env vars.
-  const apiKey = (typeof value.apiKey === 'string' ? value.apiKey : process.env.MEMORY_EMBEDDING_API_KEY ?? '').trim();
-  if (!apiKey || apiKey === 'replace-me') return null;
-  return {
-    apiKey,
-    baseUrl: (typeof value.baseUrl === 'string' ? value.baseUrl : process.env.MEMORY_EMBEDDING_BASE_URL)?.trim() || 'https://api.openai.com/v1',
-    model: (typeof value.model === 'string' ? value.model : process.env.MEMORY_EMBEDDING_MODEL)?.trim() || 'text-embedding-3-small',
-  };
-}
-let embeddingConfig = bootstrapEmbeddingConfig();
+// Embeddings are opt-in and can only be configured in runtime.config.
+let embeddingConfig: EmbeddingConfig = null;
 let pool: Pool | undefined;
 let key: Buffer | undefined;
 let version = 0;
@@ -37,7 +15,8 @@ let version = 0;
 function settings(): Settings {
   return { ai: config.ai, mcpConfig: config.mcpConfig, chatSystemPrompt: config.chatSystemPrompt,
     contextTokenBudget: config.contextTokenBudget, maxContextMessages: config.maxContextMessages,
-    responseTokenReserve: config.responseTokenReserve, contextSafetyTokens: config.contextSafetyTokens,
+    maxOutputTokens: config.maxOutputTokens, reserveOutputTokens: config.reserveOutputTokens,
+    contextSafetyTokens: config.contextSafetyTokens,
     maxToolSteps: config.maxToolSteps, llmTraceRequests: config.llmTraceRequests,
     summariesEnabled: config.summariesEnabled, summaryTokenBudget: config.summaryTokenBudget,
     embeddingConfig };
@@ -68,8 +47,11 @@ async function reload(): Promise<void> {
 
 /** Runtime owns this schema; memory-mcp keeps its own tables and migrations separate. */
 export async function startRuntimeConfigStore(): Promise<void> {
-  const url = process.env.DATABASE_URL?.trim(), rawKey = process.env.RUNTIME_CONFIG_ENCRYPTION_KEY?.trim();
-  if (!url || !rawKey) { console.warn('Dynamic runtime config disabled: configure DATABASE_URL and RUNTIME_CONFIG_ENCRYPTION_KEY'); return; }
+  const url = process.env.DATABASE_URL?.trim();
+  const rawKey = process.env.RUNTIME_CONFIG_ENCRYPTION_KEY?.trim();
+  if (!url || !rawKey) {
+    throw new Error('DATABASE_URL and RUNTIME_CONFIG_ENCRYPTION_KEY are required; runtime.config is the only configuration source');
+  }
   key = /^[\da-f]{64}$/i.test(rawKey) ? Buffer.from(rawKey, 'hex') : createHash('sha256').update(rawKey).digest();
   const connectionUrl = new URL(url);
   connectionUrl.searchParams.delete('schema'); // Prisma-specific option; node-postgres does not need it.
@@ -79,8 +61,7 @@ export async function startRuntimeConfigStore(): Promise<void> {
   await pool.query('CREATE TABLE IF NOT EXISTS runtime.config_history (id text NOT NULL, version integer NOT NULL, payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (id, version))');
   const existing = await pool.query('SELECT 1 FROM runtime.config WHERE id = $1', ['active']);
   if (existing.rowCount === 0) {
-    // Validate env only for the one-time bootstrap. Once a row exists, provider config
-    // can be removed from env and the database is the source of truth.
+    // New installations start from the code-defined minimum seed, without credentials.
     const initial = validateSettings(settings());
     await pool.query('INSERT INTO runtime.config (id, version, payload) VALUES ($1, 1, $2) ON CONFLICT (id) DO NOTHING', ['active', JSON.stringify(encrypt(initial))]);
   }
@@ -94,10 +75,9 @@ export async function startRuntimeConfigStore(): Promise<void> {
 function validateSettings(value: unknown): Settings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Settings must be an object');
   const v = value as Record<string, any>;
-  if (!v.ai || typeof v.ai !== 'object' || !v.ai.providers || typeof v.ai.providers !== 'object') throw new Error('ai.providers is required');
+  if (!v.ai || typeof v.ai !== 'object' || Array.isArray(v.ai) || !v.ai.providers || typeof v.ai.providers !== 'object' || Array.isArray(v.ai.providers)) throw new Error('ai.providers is required');
   if (typeof v.ai.defaultModel !== 'string') throw new Error('ai.defaultModel is required');
   const providers = Object.entries(v.ai.providers) as [string, any][];
-  if (!providers.length) throw new Error('At least one provider must be configured');
   for (const [name, provider] of providers) {
     if (!['openai', 'openrouter'].includes(name) || !provider || typeof provider.apiKey !== 'string' || !provider.apiKey.trim() || provider.apiKey === 'replace-me') throw new Error('Invalid provider: ' + name);
     if (!Array.isArray(provider.models) || provider.models.length === 0 || provider.models.some((m: unknown) => typeof m !== 'string' || !m.trim())) throw new Error('Invalid models for ' + name);
@@ -118,7 +98,7 @@ function validateSettings(value: unknown): Settings {
     mcp.auth ??= null;
     mcp.optional ??= false;
   }
-  v.embeddingConfig ??= null; // Backward-compatible with runtime.config payloads created before embeddings moved here.
+  v.embeddingConfig ??= null;
   if (v.embeddingConfig !== null) {
     const embedding = v.embeddingConfig;
     if (!embedding || typeof embedding !== 'object' || typeof embedding.apiKey !== 'string' || !embedding.apiKey.trim() || embedding.apiKey === 'replace-me' || typeof embedding.baseUrl !== 'string' || typeof embedding.model !== 'string' || !embedding.model.trim()) throw new Error('Invalid embeddingConfig');
@@ -127,12 +107,22 @@ function validateSettings(value: unknown): Settings {
     embedding.baseUrl = embedding.baseUrl.replace(/\/+$/, '');
     embedding.model = embedding.model.trim();
   }
-  for (const field of ['contextTokenBudget', 'maxContextMessages', 'responseTokenReserve', 'contextSafetyTokens', 'maxToolSteps', 'summaryTokenBudget']) {
+  if (Object.hasOwn(v, 'responseTokenReserve')) {
+    throw new Error('responseTokenReserve is no longer supported; provide maxOutputTokens and reserveOutputTokens');
+  }
+  for (const field of ['contextTokenBudget', 'maxContextMessages', 'maxOutputTokens', 'reserveOutputTokens', 'contextSafetyTokens', 'maxToolSteps', 'summaryTokenBudget']) {
     if (!Number.isInteger(v[field]) || v[field] < 1) throw new Error(field + ' must be a positive integer');
   }
+  if (v.reserveOutputTokens < v.maxOutputTokens) {
+    throw new Error('reserveOutputTokens must be greater than or equal to maxOutputTokens');
+  }
   if (typeof v.chatSystemPrompt !== 'string' || typeof v.llmTraceRequests !== 'boolean' || typeof v.summariesEnabled !== 'boolean') throw new Error('Invalid chat settings');
-  const [provider, ...model] = v.ai.defaultModel.split('/');
-  if (!v.ai.providers[provider]?.models.includes(model.join('/'))) throw new Error('The default model must be enabled');
+  if (providers.length === 0) {
+    if (v.ai.defaultModel !== '') throw new Error('ai.defaultModel must be empty until a provider is configured');
+  } else {
+    const [provider, ...model] = v.ai.defaultModel.split('/');
+    if (!v.ai.providers[provider]?.models.includes(model.join('/'))) throw new Error('The default model must be enabled');
+  }
   return v as Settings;
 }
 

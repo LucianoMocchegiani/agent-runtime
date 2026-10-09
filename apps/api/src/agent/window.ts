@@ -8,15 +8,22 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-/** Mantiene consistentes la reserva de salida y el margen para cualquier ventana configurada. */
-export function resolveTokenReserves(
+/** Ajusta salida y reserva a la ventana efectiva sin permitir maxOutputTokens > reserveOutputTokens. */
+export function resolveOutputTokenLimits(
   contextWindowTokens: number,
-  responseTokenReserve: number,
+  maxOutputTokens: number,
+  reserveOutputTokens: number,
   safetyTokens: number,
-): { responseTokenReserve: number; safetyTokens: number } {
+): { maxOutputTokens: number; reserveOutputTokens: number; safetyTokens: number } {
   const normalizedSafety = Math.min(safetyTokens, Math.max(0, contextWindowTokens - 1));
-  const normalizedResponse = Math.min(responseTokenReserve, Math.max(1, contextWindowTokens - normalizedSafety));
-  return { responseTokenReserve: normalizedResponse, safetyTokens: normalizedSafety };
+  const availableForOutput = Math.max(1, contextWindowTokens - normalizedSafety);
+  const normalizedReserve = Math.min(reserveOutputTokens, availableForOutput);
+  const normalizedMaxOutput = Math.min(maxOutputTokens, normalizedReserve);
+  return {
+    maxOutputTokens: normalizedMaxOutput,
+    reserveOutputTokens: normalizedReserve,
+    safetyTokens: normalizedSafety,
+  };
 }
 
 function stringifyJson(value: unknown): string {
@@ -59,7 +66,7 @@ export function selectModelContext(
   rows: MessageDto[],
   options: {
     contextWindowTokens: number;
-    responseTokenReserve: number;
+    reserveOutputTokens: number;
     safetyTokens: number;
     systemPrompt: string;
     tools: Record<string, Tool>;
@@ -82,7 +89,7 @@ export function selectModelContext(
 
   const maxMessages = Math.max(1, Math.floor(options.maxMessages ?? 20));
   const fixedCost = promptOverhead(options.systemPrompt, options.tools) + (options.imageCount ?? 0) * IMAGE_TOKEN_ESTIMATE;
-  const messageBudget = Math.max(0, options.contextWindowTokens - options.responseTokenReserve - options.safetyTokens - fixedCost);
+  const messageBudget = Math.max(0, options.contextWindowTokens - options.reserveOutputTokens - options.safetyTokens - fixedCost);
   const kept: TurnGroup[] = [];
   let used = 0;
   let partialGroupPrefix: MessageDto[] = [];

@@ -5,7 +5,8 @@ const guides = {
       ['chatSystemPrompt', 'Instrucción base que recibe el modelo en cada conversación. Definí el comportamiento general; no incluyas claves ni secretos.'],
       ['contextTokenBudget', 'Ventana de contexto en tokens usada como fallback para modelos sin contextWindows. Consultá la documentación del modelo y no superes su límite.'],
       ['maxContextMessages', 'Máximo de mensajes anteriores de usuario/asistente incluidos al iniciar el turno; no cuenta system ni tools. Aumentarlo conserva más historial y usa más contexto.'],
-      ['responseTokenReserve', 'Tokens reservados para generar la respuesta; se descuentan del espacio para historial. Aumentalo si necesitás respuestas más largas.'],
+      ['maxOutputTokens', 'Máximo de tokens que puede generar cada llamada al modelo. Es un techo, no una cantidad que deba consumirse; el modelo o proveedor puede imponer un máximo menor.'],
+      ['reserveOutputTokens', 'Espacio que se aparta de la ventana del modelo para la salida al seleccionar el historial; debe ser mayor o igual que maxOutputTokens. La diferencia entre reserva y máximo queda fuera del historial, pero no aumenta lo que el modelo puede generar. Normalmente conviene que ambos valores sean iguales.'],
       ['contextSafetyTokens', 'Margen para evitar exceder el contexto por variaciones de tokenización. Aumentalo si aparecen errores de contexto excedido.'],
       ['maxToolSteps', 'Máximo de rondas de uso de herramientas por turno. Más rondas pueden aumentar costo y latencia.'],
       ['llmTraceRequests', 'Registra solicitudes detalladas al proveedor; pueden incluir prompts, mensajes y resultados de herramientas con datos privados. Activá solo para depurar y luego desactivá.'],
@@ -14,7 +15,7 @@ const guides = {
     ],
   },
   Providers: {
-    intro: 'Se admiten openai y openrouter. Los secretos se enmascaran: dejá ******** sin modificar para conservar la clave guardada.',
+    intro: 'La instalación nueva arranca sin proveedores ni credenciales. Configurá al menos uno aquí para habilitar el chat. Se admiten openai y openrouter; los secretos se enmascaran: dejá ******** sin modificar para conservar la clave guardada.',
     fields: [
       ['ai.defaultModel', 'Modelo predeterminado, formato proveedor/modelo. Debe existir en la lista models del proveedor. Ejemplos: openai/gpt-4.1-mini y openrouter/anthropic/claude-sonnet-4.'],
       ['ai.providers.<proveedor>.apiKey', 'Clave privada. Creala en OpenAI: https://platform.openai.com/api-keys o OpenRouter: https://openrouter.ai/keys. La cuenta debe tener acceso/crédito. No la compartas ni la pegues en documentación pública.'],

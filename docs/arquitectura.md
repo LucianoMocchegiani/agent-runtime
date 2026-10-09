@@ -52,8 +52,8 @@ Auth (`requirePrincipal`), CORS, rate-limit son middlewares desacoplados del neg
 |---|---|---|
 | Runtime | Node 24 + tsx | Ejecución |
 | HTTP | Hono | Router, middleware, SSE |
-| LLM | AI SDK + OpenRouter | Inferencia, tool calling, streaming |
-| MCP | `@ai-sdk/mcp` | Conexión via `MCP_CONFIG` (url + auth por MCP) |
+| LLM | AI SDK + OpenRouter / OpenAI | Inferencia, tool calling, streaming |
+| MCP | `@ai-sdk/mcp` | Conexión via `mcpConfig` guardado en `runtime.config` (URL y auth por MCP) |
 | DB (default memory) | Prisma + PostgreSQL | Solo Memory MCP default |
 | Auth | Introspección HTTP + HMAC | Bearer token validation |
 | Rate limit | In-memory Map | Por instancia |
@@ -109,23 +109,24 @@ Para múltiples instancias del runtime se necesita:
 | Token estimation `len/4` | Inexacto para tokens reales | AI SDK tiene `countTokens`; usar en futuro |
 | Memory MCP como punto único | Si cae, runtime no persiste ni lee | Retry + circuit breaker (futuro) |
 | Memory MCP sin auth propia | Quien llegue al puerto lee/escribe cualquier `userId` | Red interna (Compose) o `127.0.0.1` (default fuera de Docker) |
-| API key del modelo (`AI_CONFIG.apiKey`) fija en env | No rotación dinámica | Vault / secrets manager (futuro) |
+| Secretos de proveedores en `runtime.config` | Cifrados en PostgreSQL; acceso administrativo con control de identidad/secreto | Mantener la clave de cifrado y restringir acceso a la DB |
 
 ---
 
 ## 8. Estructura actual del código
 
 ```
-apps/api/src/                 # API: sin database
+apps/api/src/                 # API + configuración runtime cifrada en PostgreSQL
   ├── app.ts                  # Hono app, CORS, /health, /v1 autenticado, UI
-  ├── index.ts                # Entry point
-  ├── config.ts               # Env parsing, sin dominio específico
+  ├── index.ts                # Entry point y seed automático de runtime.config
+  ├── config.ts               # Infraestructura/env y defaults mínimos del seed
+  ├── runtime-config/         # Store cifrado, validación, API administrativa y recarga
   ├── ui.ts                   # UI nativa + fallback SPA
   ├── agent/
   │   ├── run.ts              # Agent loop: MCP + LLM + persist
   │   └── window.ts           # Construcción de mensajes para el modelo
   ├── llm/
-  │   ├── provider.ts         # Catálogo AI_CONFIG + resolveModel
+  │   ├── provider.ts         # Catálogo runtime.config + resolveModel
   │   ├── openai.ts / openrouter.ts
   │   ├── routes.ts           # GET /v1/models
   │   └── errors.ts           # Mapeo de errores a mensajes identificado
@@ -184,3 +185,4 @@ User → POST /v1/conversations/:id/messages
 - [ ] Retry policy para Memory MCP caído
 - [ ] Logging/observabilidad de llamadas MCP
 - [ ] Compaction: quién la orquesta (runtime o Memory MCP)
+ta (runtime o Memory MCP)

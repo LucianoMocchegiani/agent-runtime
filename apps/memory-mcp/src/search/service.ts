@@ -20,68 +20,15 @@ export type SearchMemoryOutput = {
   items: SearchHit[];
 };
 
-type EmbeddingConfig = {
-  apiKey?: unknown;
-  baseUrl?: unknown;
-  model?: unknown;
-};
-
-function configuredEmbeddingProvider(): EmbeddingProvider | null {
-  const rawConfig = process.env.MEMORY_EMBEDDING_CONFIG?.trim();
-  let config: EmbeddingConfig = {};
-
-  if (rawConfig) {
-    try {
-      const parsed: unknown = JSON.parse(rawConfig);
-      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-        throw new Error('must be a JSON object');
-      }
-      config = parsed as EmbeddingConfig;
-    } catch (error) {
-      throw new Error(`MEMORY_EMBEDDING_CONFIG is invalid: ${error instanceof Error ? error.message : String(error)}`);
-    }
-  }
-
-  // Keep the legacy variables as a fallback for existing deployments.
-  const apiKey = typeof config.apiKey === 'string'
-    ? config.apiKey.trim()
-    : process.env.MEMORY_EMBEDDING_API_KEY?.trim();
-  if (!apiKey || apiKey === 'replace-me') return null;
-
-  const baseUrl = typeof config.baseUrl === 'string'
-    ? config.baseUrl.trim()
-    : process.env.MEMORY_EMBEDDING_BASE_URL?.trim();
-  const model = typeof config.model === 'string'
-    ? config.model.trim()
-    : process.env.MEMORY_EMBEDDING_MODEL?.trim();
-
-  return new OpenAiCompatibleEmbeddingProvider({
-    apiKey,
-    baseUrl: baseUrl || 'https://api.openai.com/v1',
-    model: model || 'text-embedding-3-small',
-  });
-}
-
 export const searchIndex: SearchIndex = new PostgresSearchIndex();
-export let embeddingProvider: EmbeddingProvider | null = configuredEmbeddingProvider();
+// Embeddings are disabled until the API delivers a saved runtime.config value.
+export let embeddingProvider: EmbeddingProvider | null = null;
 
 let runtimeConfigVersion = -1;
 function normalizeIdentity(baseUrl: string, model: string): string {
   return `${baseUrl.replace(/\/+$/, '')}\u0000${model}`;
 }
-function envEmbeddingIdentity(): string {
-  let parsed: EmbeddingConfig = {};
-  try {
-    const raw = process.env.MEMORY_EMBEDDING_CONFIG?.trim();
-    if (raw) parsed = JSON.parse(raw) as EmbeddingConfig;
-  } catch { /* configuredEmbeddingProvider reports malformed JSON during startup */ }
-  const apiKey = typeof parsed.apiKey === 'string' ? parsed.apiKey.trim() : process.env.MEMORY_EMBEDDING_API_KEY?.trim();
-  if (!apiKey || apiKey === 'replace-me') return '';
-  const baseUrl = typeof parsed.baseUrl === 'string' ? parsed.baseUrl.trim() : process.env.MEMORY_EMBEDDING_BASE_URL?.trim() || 'https://api.openai.com/v1';
-  const model = typeof parsed.model === 'string' ? parsed.model.trim() : process.env.MEMORY_EMBEDDING_MODEL?.trim() || 'text-embedding-3-small';
-  return normalizeIdentity(baseUrl, model);
-}
-let activeEmbeddingIdentity = envEmbeddingIdentity();
+let activeEmbeddingIdentity = '';
 
 async function refreshRuntimeEmbeddingConfig(): Promise<void> {
   const endpoint = process.env.AGENT_RUNTIME_CONFIG_URL?.trim();
