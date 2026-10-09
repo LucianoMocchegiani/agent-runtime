@@ -19,6 +19,11 @@ import {
   type ApplyTitleParams,
   type MemorySearchParams,
   type MemorySearchResult,
+  type SavePreferenceParams,
+  type SearchPreferencesParams,
+  type UserPreferenceDto,
+  type ListPreferencesParams,
+  type DeletePreferenceParams,
 } from 'agent-runtime-memory-contract';
 import { MemoryError, MemoryUnavailableError } from './errors.js';
 
@@ -140,6 +145,18 @@ export async function createMemoryMcpClient(): Promise<MemoryMcp> {
       params: MemorySearchParams,
     ): Promise<MemorySearchResult> {
       return callTool<MemorySearchResult>(TOOL_NAMES.searchMemory, params);
+    },
+    async savePreference(params: SavePreferenceParams): Promise<UserPreferenceDto> {
+      return callTool<UserPreferenceDto>(TOOL_NAMES.savePreference, params);
+    },
+    async listPreferences(params: ListPreferencesParams): Promise<UserPreferenceDto[]> {
+      return callTool<UserPreferenceDto[]>(TOOL_NAMES.listPreferences, params);
+    },
+    async searchPreferences(params: SearchPreferencesParams): Promise<UserPreferenceDto[]> {
+      return callTool<UserPreferenceDto[]>(TOOL_NAMES.searchPreferences, params);
+    },
+    async deletePreference(params: DeletePreferenceParams): Promise<boolean> {
+      return callTool<boolean>(TOOL_NAMES.deletePreference, params);
     },
     close,
   };

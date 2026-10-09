@@ -9,6 +9,7 @@ import { conversationRoutes } from './conversations/routes.js';
 import { modelRoutes } from './llm/routes.js';
 import { createMemoryMcpClient } from './memory/client.js';
 import { messageRoutes } from './messages/routes.js';
+import { internalRuntimeConfigRoutes, runtimeConfigRoutes } from './runtime-config/routes.js';
 import { mountUi } from './ui.js';
 
 type DependencyStatus = 'up' | 'down';
@@ -53,7 +54,7 @@ export function createApp(): Hono<AppEnv> {
         'x-vercel-ai-ui-message-stream',
         'X-MCP-Auth',
       ],
-      allowMethods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }),
   );
 
@@ -66,9 +67,7 @@ export function createApp(): Hono<AppEnv> {
     return c.json({ error: 'Internal Server Error' }, 500);
   });
 
-  /**
-   * Probe de proceso + ping al Memory MCP (el runtime no tiene database propia).
-   */
+  /** Probe de proceso + ping al Memory MCP; la DB de runtime es otra dependencia del proceso. */
   app.get('/health', async (c) => {
     const memory = await pingMemory();
     return c.json(
@@ -80,6 +79,9 @@ export function createApp(): Hono<AppEnv> {
       memory === 'up' ? 200 : 503,
     );
   });
+
+  app.route('/admin/runtime-config', runtimeConfigRoutes);
+  app.route('/internal/runtime-config', internalRuntimeConfigRoutes);
 
   const v1 = new Hono<AppEnv>();
   v1.use('*', requirePrincipal);

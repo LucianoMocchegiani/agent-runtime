@@ -33,6 +33,7 @@ export interface SearchIndex {
   claimPending(batchSize: number): Promise<SearchDocument[]>;
   saveEmbedding(messageId: string, model: string, vector: number[]): Promise<void>;
   retryEmbedding(messageId: string, delayMs: number): Promise<void>;
+  requeueAllEmbeddings(): Promise<void>;
   searchText(query: string, filter: SearchFilter, limit: number): Promise<SearchHit[]>;
-  searchVector(vector: number[], filter: SearchFilter, limit: number): Promise<SearchHit[]>;
+  searchVector(vector: number[], filter: SearchFilter, limit: number, model: string): Promise<SearchHit[]>;
 }

@@ -12,6 +12,7 @@ export default defineConfig({
     host: true,
     proxy: {
       '/v1': runtime,
+      '/admin': runtime,
       '/health': runtime,
     },
   },

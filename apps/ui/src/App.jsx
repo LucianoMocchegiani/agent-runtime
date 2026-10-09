@@ -3,19 +3,27 @@ import ConversationList from './ConversationList.jsx';
 import Chat from './Chat.jsx';
 import client from './client.js';
 import Icon from './Icon.jsx';
+import AdminConfig from './AdminConfig.jsx';
 
 export default function App() {
   const [activeConv, setActiveConv] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   function selectConversation(id) {
     setActiveConv(id);
+    setShowAdmin(false);
+    setIsSidebarOpen(false);
+  }
+
+  function openAdmin() {
+    setShowAdmin(true);
     setIsSidebarOpen(false);
   }
 
   return (
-    <div className={`app-shell${activeConv ? ' has-active-chat' : ''}${isSidebarOpen ? ' sidebar-open' : ''}`}>
-      <ConversationList activeId={activeConv} onSelect={selectConversation} />
+    <div className={`app-shell${activeConv || showAdmin ? ' has-active-chat' : ''}${isSidebarOpen ? ' sidebar-open' : ''}`}>
+      <ConversationList activeId={activeConv} onSelect={selectConversation} onOpenAdmin={openAdmin} />
       {isSidebarOpen && (
         <button
           type="button"
@@ -24,7 +32,9 @@ export default function App() {
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
-      {activeConv ? (
+      {showAdmin ? (
+        <AdminConfig onBack={() => setShowAdmin(false)} />
+      ) : activeConv ? (
         <Chat conversationId={activeConv} onOpenSidebar={() => setIsSidebarOpen(true)} />
       ) : (
         <div id="empty-state">

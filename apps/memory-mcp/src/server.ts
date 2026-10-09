@@ -5,6 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import { MEMORY_TOOLS, type JsonValue } from 'agent-runtime-memory-contract';
 import { z } from 'zod/v4';
 import { searchMemory } from './search/service.js';
+import { deletePreference, listPreferences, savePreference, searchPreferences } from './preferences.js';
 import {
   getContext,
   saveSummary,
@@ -252,6 +253,72 @@ function registerTools(server: McpServer): void {
         limit: args.limit,
       });
       return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+    },
+  );
+
+  server.registerTool(
+    MEMORY_TOOLS.savePreference,
+    {
+      title: 'Save User Preference',
+      description: 'Guarda una preferencia explícita del usuario y la condición en la que debe aplicarse.',
+      inputSchema: z.object({
+        userId: z.string().min(1),
+        preference: z.string().min(1).max(2_000),
+        activationCondition: z.string().min(1).max(1_000),
+        category: z.string().max(100).nullish(),
+      }),
+    },
+    async (args) => {
+      const row = await savePreference(args);
+      return { content: [{ type: 'text', text: JSON.stringify(row) }] };
+    },
+  );
+
+  server.registerTool(
+    MEMORY_TOOLS.listPreferences,
+    {
+      title: 'List User Preferences',
+      description: 'Lista las preferencias guardadas del usuario autenticado.',
+      inputSchema: z.object({
+        userId: z.string().min(1),
+      }),
+    },
+    async (args) => {
+      const rows = await listPreferences(args);
+      return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
+    },
+  );
+
+  server.registerTool(
+    MEMORY_TOOLS.searchPreferences,
+    {
+      title: 'Search User Preferences',
+      description: 'Encuentra preferencias guardadas del usuario aplicables a un objetivo.',
+      inputSchema: z.object({
+        userId: z.string().min(1),
+        query: z.string().min(1),
+        limit: z.number().int().min(1).max(10).optional(),
+      }),
+    },
+    async (args) => {
+      const rows = await searchPreferences(args);
+      return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
+    },
+  );
+
+  server.registerTool(
+    MEMORY_TOOLS.deletePreference,
+    {
+      title: 'Delete User Preference',
+      description: 'Elimina permanentemente una preferencia del usuario por su ID.',
+      inputSchema: z.object({
+        userId: z.string().min(1),
+        id: z.string().uuid(),
+      }),
+    },
+    async (args) => {
+      const deleted = await deletePreference(args);
+      return { content: [{ type: 'text', text: JSON.stringify(deleted) }] };
     },
   );
 }

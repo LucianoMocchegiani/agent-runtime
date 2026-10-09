@@ -55,7 +55,7 @@ Solo hacen falta dos archivos:
 mkdir agent-runtime; cd agent-runtime
 curl.exe -o docker-compose.yml https://raw.githubusercontent.com/LucianoMocchegiani/agent-runtime/main/deploy/docker-compose.yml
 curl.exe -o .env https://raw.githubusercontent.com/LucianoMocchegiani/agent-runtime/main/.env.example
-# completar .env (AI_CONFIG como mínimo)
+# completar .env (AI_CONFIG y, para config dinámica, DATABASE_URL + claves runtime)
 docker compose up -d           # http://localhost:3010
 ```
 
@@ -74,7 +74,7 @@ Puertos publicados solo en `127.0.0.1` (la UI no pide login). Un Dockerfile, dos
 
 - UI: `http://localhost:3010/`
 - Health: `GET http://localhost:3010/health` (proceso + handshake con el Memory MCP)
-- Sin JWT → session anónima (`anon:<uuid>` que guarda el cliente; la API no persiste nada)
+- Sin JWT → session anónima (`anon:<uuid>` que guarda el cliente; la API no persiste conversaciones)
 - Con JWT → introspección → identificado
 - Hilos: `GET/POST /v1/conversations` (JWT identificado)
 - Mensajes: `POST /v1/conversations/:id/messages` → UI Message Stream; **Parar** aborta y persiste lo generado
@@ -112,3 +112,5 @@ Vite proxea `/v1` y `/health` al runtime, así que en dev tampoco hace falta COR
 ## Qué no hace
 
 No cobra, no enrola débito. Las tools y los `links` de chips los trae el MCP. Tope de uso por identificado = pendiente.
+pe de uso por identificado = pendiente.
+ado = pendiente.

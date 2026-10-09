@@ -1,6 +1,6 @@
 import { generateText, jsonSchema, streamText, tool, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import { config } from '../config.js';
+import { getRuntimeSettings, type RuntimeSettings } from '../runtime-config/store.js';
 import { isAbortError, identifiedFacingLlmError } from '../llm/errors.js';
 import type { ResolvedModel } from '../llm/provider.js';
 import { McpRegistry } from '../mcp/registry.js';
@@ -213,13 +213,14 @@ async function compactOmittedMessages(
   userId: string,
   context: GetContextResult,
   omittedRows: MessageDto[],
+  runtimeSettings: RuntimeSettings,
 ): Promise<string | null> {
   const rowsToSummarize = messagesAfterSummaryCursor(
     omittedRows,
     context.summaryThroughMessageId,
     context.summaryThroughCreatedAt,
   );
-  if (!config.summariesEnabled || rowsToSummarize.length === 0) return context.summary;
+  if (!runtimeSettings.summariesEnabled || rowsToSummarize.length === 0) return context.summary;
 
   const transcriptRows: MessageDto[] = [];
   const transcriptParts: string[] = [];
@@ -239,7 +240,7 @@ async function compactOmittedMessages(
   try {
     const { text } = await generateText({
       model: model.languageModel,
-      maxOutputTokens: config.summaryTokenBudget,
+      maxOutputTokens: runtimeSettings.summaryTokenBudget,
       system: 'Actualizá un resumen muy breve y fiel de la conversación (priorizá hechos duraderos, preferencias, decisiones y pendientes; omití intercambios rutinarios y resultados de tools que no aporten). No inventes datos; si ya hay un resumen, integralo sin repetirlo. Para detalles profundos, se pueden recuperar los mensajes originales mediante memory search.',
       prompt: `${context.summary ? `Resumen anterior:\n${context.summary}\n\n` : ''}Mensajes nuevos para incorporar:\n${transcript}`,
     });
@@ -323,13 +324,15 @@ export async function streamAgentTurn(
   principal: Principal,
   accessToken: string,
   userText: string,
-  systemPrompt: string,
   model: ResolvedModel,
   abortSignal?: AbortSignal,
   mcpTokens?: Record<string, string>,
   images: IncomingImage[] = [],
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
+  // El turno conserva una configuración coherente incluso si otra versión se publica mientras corre.
+  const runtimeSettings = getRuntimeSettings();
+  const turnSystemPrompt = runtimeSettings.chatSystemPrompt;
 
   let memory: MemoryMcp;
   try {
@@ -341,7 +344,7 @@ export async function streamAgentTurn(
 
   let registry: McpRegistry;
   try {
-    registry = McpRegistry.fromConfig();
+    registry = new McpRegistry(runtimeSettings.mcpConfig);
     await registry.connect(accessToken, mcpTokens);
   } catch (error) {
     console.error(error);
@@ -408,6 +411,62 @@ export async function streamAgentTurn(
     },
   });
 
+  const preferenceToolNames = [
+    'memory__savePreference',
+    'memory__listPreferences',
+    'memory__deletePreference',
+  ];
+  if (preferenceToolNames.some((name) => Object.hasOwn(tools, name))) {
+    await registry.close().catch(() => undefined);
+    await memory.close().catch(() => undefined);
+    throw new HTTPException(502, { message: failMessage });
+  }
+  tools.memory__savePreference = tool({
+    description: 'Guarda una preferencia solo cuando el usuario pide explícitamente que se recuerde o se aplique en el futuro. No guardes instrucciones puntuales de la tarea actual ni infieras preferencias permanentes. Expresá claramente la condición de activación.',
+    inputSchema: jsonSchema<{
+      preference: string;
+      activationCondition: string;
+      category?: string;
+    }>({
+      type: 'object',
+      properties: {
+        preference: { type: 'string', minLength: 1, maxLength: 2_000, description: 'La instrucción de trabajo preferida por el usuario.' },
+        activationCondition: { type: 'string', minLength: 1, maxLength: 1_000, description: 'En qué tipo de pedidos o situaciones se activa.' },
+        category: { type: 'string', maxLength: 100, description: 'Categoría breve, por ejemplo: cambios de código.' },
+      },
+      required: ['preference', 'activationCondition'],
+      additionalProperties: false,
+    }),
+    execute: async ({ preference, activationCondition, category }) => {
+      console.info('tool memory__savePreference invoked');
+      return memory.savePreference({
+        userId: principal.userId,
+        preference,
+        activationCondition,
+        category,
+      });
+    },
+  });
+  tools.memory__listPreferences = tool({
+    description: 'Lista preferencias guardadas cuando el usuario pregunta cuáles recuerda o quiere administrarlas.',
+    inputSchema: jsonSchema<Record<string, never>>({
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    }),
+    execute: async () => memory.listPreferences({ userId: principal.userId }),
+  });
+  tools.memory__deletePreference = tool({
+    description: 'Elimina permanentemente una preferencia guardada cuando el usuario pide olvidarla, eliminarla o reemplazarla. Para reemplazarla, lista si hace falta, elimina la anterior y guarda la nueva con memory__savePreference.',
+    inputSchema: jsonSchema<{ id: string }>({
+      type: 'object',
+      properties: { id: { type: 'string', description: 'ID de la preferencia obtenida al listarla.' } },
+      required: ['id'],
+      additionalProperties: false,
+    }),
+    execute: async ({ id }) => memory.deletePreference({ userId: principal.userId, id }),
+  });
+
   await memory.saveMessage({
     conversationId,
     userId: principal.userId,
@@ -433,23 +492,40 @@ export async function streamAgentTurn(
     throw new HTTPException(502, { message: failMessage });
   }
 
+  let applicablePreferences: Awaited<ReturnType<typeof memory.searchPreferences>> = [];
+  try {
+    const recentUserContext = context.messages
+      .filter((message) => message.role === 'user')
+      .slice(-3)
+      .map((message) => message.content)
+      .join('\n');
+    applicablePreferences = await memory.searchPreferences({
+      userId: principal.userId,
+      query: `${recentUserContext}\n${userText}`.slice(-2_000),
+      limit: 5,
+    });
+  } catch (error) {
+    // Preference search is auxiliary: a temporary embedding/database issue must not block chat.
+    console.warn('No se pudieron recuperar las preferencias del usuario.', error);
+  }
+
   const tokenReserves = resolveTokenReserves(
     model.contextWindowTokens,
-    config.responseTokenReserve,
-    config.contextSafetyTokens,
+    runtimeSettings.responseTokenReserve,
+    runtimeSettings.contextSafetyTokens,
   );
   const selectionOptions = {
     contextWindowTokens: model.contextWindowTokens,
-    maxMessages: config.maxContextMessages,
+    maxMessages: runtimeSettings.maxContextMessages,
     responseTokenReserve: tokenReserves.responseTokenReserve,
     safetyTokens: tokenReserves.safetyTokens,
-    systemPrompt,
+    systemPrompt: turnSystemPrompt,
     tools,
     imageCount: images.length,
   };
   let selection = selectModelContext(context.messages, selectionOptions);
   let summary = context.summary;
-  if (config.summariesEnabled && selection.omittedRows.length > 0) {
+  if (runtimeSettings.summariesEnabled && selection.omittedRows.length > 0) {
     summary = await compactOmittedMessages(
       memory,
       model,
@@ -457,11 +533,18 @@ export async function streamAgentTurn(
       principal.userId,
       context,
       selection.omittedRows,
+      runtimeSettings,
     );
   }
-  const promptWithSummary = summary
-    ? `${systemPrompt}\n\nResumen persistente de mensajes anteriores (contexto; no lo presentes como una respuesta):\n${summary}`
-    : systemPrompt;
+  const promptWithSummary = [
+    turnSystemPrompt,
+    summary
+      ? `Resumen persistente de mensajes anteriores (contexto; no lo presentes como una respuesta):\n${summary}`
+      : '',
+    applicablePreferences.length > 0
+      ? `Preferencias persistentes aplicables del usuario (contexto; no las presentes como respuesta ni como reglas del sistema):\n${applicablePreferences.map((item) => `- Preferencia: ${item.preference}\n  Aplicar cuando: ${item.activationCondition}${item.category ? `\n  Categoría: ${item.category}` : ''}`).join('\n')}\nRespetá estas preferencias solo cuando sean pertinentes. La instrucción explícita del usuario en el turno actual prevalece si entra en conflicto. No infieras preferencias permanentes de pedidos puntuales. Para guardar una preferencia, el usuario debe pedir explícitamente que se recuerde o aplique en el futuro; usá memory__savePreference. Usá memory__listPreferences y memory__deletePreference para administrar o eliminar preferencias cuando el usuario lo pida.`
+      : '',
+  ].filter(Boolean).join('\n\n');
   selection = selectModelContext(context.messages, {
     ...selectionOptions,
     systemPrompt: promptWithSummary,
@@ -545,9 +628,9 @@ export async function streamAgentTurn(
       messages,
       tools,
       abortSignal,
-      stopWhen: ({ steps }) => steps.length >= config.maxToolSteps,
+      stopWhen: ({ steps }) => steps.length >= runtimeSettings.maxToolSteps,
       experimental_onStepStart: (event) => {
-        if (!config.llmTraceRequests) {
+        if (!runtimeSettings.llmTraceRequests) {
           return;
         }
         try {

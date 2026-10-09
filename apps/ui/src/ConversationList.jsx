@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 
-export default function ConversationList({ activeId, onSelect }) {
+export default function ConversationList({ activeId, onSelect, onOpenAdmin }) {
   const [convs, setConvs] = useState([]);
 
   useEffect(() => {
@@ -33,6 +33,7 @@ export default function ConversationList({ activeId, onSelect }) {
     <div id="sidebar">
       <h2>
         <span>Chat</span>
+        <button className="sidebar-action" onClick={onOpenAdmin} aria-label="Administración" title="Configuración del runtime">⚙</button>
         <button className="sidebar-action" onClick={handleNew} aria-label="Nuevo chat" title="Crear un nuevo chat"><Icon name="plus" /></button>
       </h2>
       <div id="conv-list">

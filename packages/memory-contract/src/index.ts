@@ -17,6 +17,10 @@ export const MEMORY_TOOLS = {
   archiveConversation: 'archiveConversation',
   applyAutomaticTitle: 'applyAutomaticTitle',
   searchMemory: 'searchMemory',
+  savePreference: 'savePreference',
+  listPreferences: 'listPreferences',
+  searchPreferences: 'searchPreferences',
+  deletePreference: 'deletePreference',
 } as const;
 
 export type MemoryToolName = (typeof MEMORY_TOOLS)[keyof typeof MEMORY_TOOLS];
@@ -150,6 +154,37 @@ export type MemorySearchResult = {
   items: MemorySearchHit[];
 };
 
+export type UserPreferenceDto = {
+  id: string;
+  preference: string;
+  activationCondition: string;
+  category: string | null;
+  createdAt: string;
+  score?: number;
+};
+
+export type SavePreferenceParams = {
+  userId: string;
+  preference: string;
+  activationCondition: string;
+  category?: string | null;
+};
+
+export type SearchPreferencesParams = {
+  userId: string;
+  query: string;
+  limit?: number;
+};
+
+export type ListPreferencesParams = {
+  userId: string;
+};
+
+export type DeletePreferenceParams = {
+  userId: string;
+  id: string;
+};
+
 export function toJsonValue(value: unknown): JsonValue | undefined {
   if (value === undefined) {
     return undefined;
@@ -182,5 +217,9 @@ export interface MemoryMcp {
     params: ApplyTitleParams,
   ): Promise<string | null>;
   searchMemory(params: MemorySearchParams): Promise<MemorySearchResult>;
+  savePreference(params: SavePreferenceParams): Promise<UserPreferenceDto>;
+  listPreferences(params: ListPreferencesParams): Promise<UserPreferenceDto[]>;
+  searchPreferences(params: SearchPreferencesParams): Promise<UserPreferenceDto[]>;
+  deletePreference(params: DeletePreferenceParams): Promise<boolean>;
   close(): Promise<void>;
 }

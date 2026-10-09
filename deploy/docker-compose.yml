@@ -1,6 +1,6 @@
 # agent-runtime sin clonar el repo: usa las imágenes publicadas en ghcr.io.
 #   1. Bajá este archivo y el .env.example (ver README, "Usar sin clonar").
-#   2. Completá .env (AI_CONFIG como mínimo).
+#   2. Completá .env (AI_CONFIG y, para config dinámica, claves runtime).
 #   3. docker compose up -d   →   http://localhost:3010
 #
 # Versión fija: AGENT_RUNTIME_VERSION=0.1.0 en .env (default: latest).
@@ -34,6 +34,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
       - MEMORY_MCP_PORT=3012
+      - AGENT_RUNTIME_CONFIG_URL=http://agent-runtime:3010/internal/runtime-config/embedding
+      - RUNTIME_CONFIG_INTERNAL_TOKEN=${RUNTIME_CONFIG_INTERNAL_TOKEN:-}
       - MEMORY_EMBEDDING_CONFIG=${MEMORY_EMBEDDING_CONFIG:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
@@ -57,6 +59,7 @@ services:
     env_file: ./.env
     environment:
       - MEMORY_MCP_URL=http://memory-mcp:3012/mcp
+      - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
 
 volumes:
   pgdata:

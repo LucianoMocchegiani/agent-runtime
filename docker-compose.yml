@@ -24,7 +24,7 @@ services:
       timeout: 3s
       retries: 30
 
-  # Memory MCP default: único dueño de la database `memory`. Sin auth propia, solo red interna.
+  # Memory MCP owns its Memory tables in `public`; runtime config uses schema `runtime`. Sin auth propia, solo red interna.
   memory-mcp:
     build:
       context: .
@@ -39,6 +39,8 @@ services:
     environment:
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
       - MEMORY_MCP_PORT=3012
+      - AGENT_RUNTIME_CONFIG_URL=http://agent-runtime:3010/internal/runtime-config/embedding
+      - RUNTIME_CONFIG_INTERNAL_TOKEN=${RUNTIME_CONFIG_INTERNAL_TOKEN:-}
       - MEMORY_EMBEDDING_CONFIG=${MEMORY_EMBEDDING_CONFIG:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
@@ -65,6 +67,7 @@ services:
     env_file: ./.env
     environment:
       - MEMORY_MCP_URL=http://memory-mcp:3012/mcp
+      - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
 
 volumes:
   pgdata:

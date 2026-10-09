@@ -23,7 +23,7 @@ Bearer anon:<uuid> (lo genera y guarda el cliente)
             → mismo flow
 ```
 
-La API **no tiene database**. Hilos y mensajes los guarda el Memory MCP (default `apps/memory-mcp`, reemplazable).
+La API no posee los datos de conversación: hilos y mensajes los guarda Memory MCP (default `apps/memory-mcp`, reemplazable). Para configuración dinámica, agent-runtime usa el esquema PostgreSQL separado `runtime`; Memory MCP conserva sus tablas propias en `public`. Ambos procesos pueden conectarse a la misma base, con pools independientes.
 
 La UI, el login y las tools viven en el **huésped**. El chat solo pide identidad (`AUTH_INTROSPECT_URL`) y tools (`MCP_CONFIG`).
 
@@ -105,6 +105,7 @@ Database `memory`, dueño único `apps/memory-mcp` (schema y migraciones en `app
 
 ```text
 conversations    1──N messages
+user_id (texto)  1──N memory_user_preferences
 ```
 
 ### `conversations`
@@ -130,6 +131,12 @@ Un hilo del sidebar (como ChatGPT), no un tweet.
 | `created_at` | Orden del hilo |
 
 `ON DELETE CASCADE` desde conversación. Listado tope 500 por hilo.
+
+### `memory_user_preferences`
+
+Preferencias persistentes separadas de los mensajes, siempre filtradas por `user_id`. Cada registro contiene la instrucción preferida, su condición de activación, categoría y embedding opcional. La API recupera hasta cinco preferencias pertinentes antes de llamar al modelo; combina búsqueda semántica (cuando hay proveedor de embeddings) con similitud de texto. Sin embeddings, sigue funcionando la búsqueda textual.
+
+El modelo puede guardar una preferencia solo ante una petición explícita de recordarla/aplicarla en el futuro; también puede listar preferencias y eliminarlas permanentemente cuando el usuario lo pida. No existe un estado inactivo: una preferencia que ya no se usa se borra y deja de ocupar espacio o de participar en búsquedas. El mensaje actual prevalece ante conflictos. Las herramientas de preferencias reciben el `userId` del principal autenticado desde la API, no desde argumentos generados por el modelo.
 
 PII de negocio (nombre, documento, deuda) **puede** quedar en `content` / `tool_result`. Fuente de verdad sigue siendo el huésped.
 

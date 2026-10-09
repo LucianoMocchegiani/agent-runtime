@@ -84,7 +84,7 @@ Auth (`requirePrincipal`), CORS, rate-limit son middlewares desacoplados del neg
 ### What works
 - Hono maneja concurrent requests por event loop (Node.js)
 - Cada request crea su propio MCP client — no hay shared mutable state en el agent loop
-- La API no tiene database ni estado propio: escala sin coordinar nada entre instancias (salvo rate limit)
+- La API mantiene solo un pool y caché de configuración en memoria; la config autoritativa versionada está en PostgreSQL (`runtime.config`), separada de los datos Memory MCP. Múltiples instancias comparten versiones con polling; rate limit sigue local.
 
 ### What doesn't
 - **Rate limit**: `Map<string, Bucket>` en memoria. Solo funciona en una instancia. No sirve para horizontal scaling.

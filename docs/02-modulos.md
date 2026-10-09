@@ -93,7 +93,9 @@ Otro proceso, otra imagen (`--target memory-mcp`). Único dueño de la DB `memor
 |---------|----------|
 | `index.ts` | `serve` en `MEMORY_MCP_HOST:MEMORY_MCP_PORT` (default `127.0.0.1:3012`). |
 | `server.ts` | Hono + McpServer stateless (uno por request). `/health` y `/mcp`. Registra las tools del contrato. |
-| `tools.ts` | Persistencia Prisma. Ownership check por `userId`. `applyAutomaticTitle` solo si `title IS NULL`. |
+| `tools.ts` | Persistencia Prisma de conversaciones y mensajes. Ownership check por `userId`. `applyAutomaticTitle` solo si `title IS NULL`. |
+| `preferences.ts` | Preferencias propias por usuario: guardar/listar/eliminar y recuperar coincidencias híbridas con embeddings o texto. |
+| `search/` | Búsqueda e indexación de mensajes y proveedor de embeddings compartido. |
 | `title.ts` | Primer mensaje → una línea, máx. 60 chars + `…`. Sin LLM. Vacío → `Nuevo chat`. |
 | `setup-db.ts` | Crea la database si no existe y corre `prisma migrate deploy`. |
 | `config.ts` | Solo `DATABASE_URL`, `MEMORY_MCP_HOST`, `MEMORY_MCP_PORT`. |

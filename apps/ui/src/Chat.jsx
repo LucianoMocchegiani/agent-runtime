@@ -356,7 +356,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
         className="messages"
         onScroll={handleMessagesScroll}
       >
-        {messages.map(m => <MessageBubble key={m.id} message={m} />)}
+        {renderMessageList(messages)}
         {isLoading && activity === 'thinking' && <ThinkingIndicator />}
       </div>
       {error && <div className="error-bar" role="alert">{error}</div>}
@@ -459,6 +459,59 @@ function ActivityDots() {
     <span className="activity-dots" aria-hidden="true">
       <span>.</span><span>.</span><span>.</span>
     </span>
+  );
+}
+
+function renderMessageList(messages) {
+  const rendered = [];
+  let index = 0;
+
+  while (index < messages.length) {
+    const message = messages[index];
+    if (!isStackableTool(message)) {
+      rendered.push(<MessageBubble key={message.id} message={message} />);
+      index++;
+      continue;
+    }
+
+    const stack = [message];
+    index++;
+    while (index < messages.length && isStackableTool(messages[index])) {
+      stack.push(messages[index]);
+      index++;
+    }
+
+    rendered.push(stack.length > 1
+      ? <ToolStack key={`tool-stack-${stack[0].id}`} messages={stack} />
+      : <MessageBubble key={stack[0].id} message={stack[0]} />);
+  }
+
+  return rendered;
+}
+
+function isStackableTool(message) {
+  return message?.role === 'tool' && !parseProposal(message.toolResult);
+}
+
+function ToolStack({ messages }) {
+  const names = [...new Set(messages.map(message => message.toolName || 'Herramienta'))];
+  const nameSummary = names.slice(0, 3).join(', ');
+  const remainingNames = names.length - 3;
+  const runningCount = messages.filter(message => message.status === 'running').length;
+  const errorCount = messages.filter(message => message.status === 'error').length;
+
+  return (
+    <details className="tool-stack">
+      <summary className="tool-stack-summary">
+        <span className="tool-stack-count">{messages.length} llamadas</span>
+        <span className="tool-stack-names">{nameSummary}{remainingNames > 0 ? ` y ${remainingNames} más` : ''}</span>
+        {runningCount > 0 && <span className="tool-stack-status"><span className="tool-spinner" />{runningCount} ejecutando</span>}
+        {errorCount > 0 && <span className="tool-stack-status tool-status-error">{errorCount} con error</span>}
+      </summary>
+      <div className="tool-stack-items">
+        {messages.map(message => <MessageBubble key={message.id} message={message} />)}
+      </div>
+    </details>
   );
 }
 

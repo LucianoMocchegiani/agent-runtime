@@ -61,10 +61,16 @@ export function resolveModel(id?: string | null): ResolvedModel | null {
   if (!providerConfig || !providerConfig.models.includes(split.model)) {
     return null;
   }
-  let languageModel = cache.get(fullId);
+  // Provider instances capture credentials; include the key in the cache key so hot credential
+  // rotations cannot keep using a stale model instance. The key itself is never logged or exposed.
+  const cacheKey = `${fullId}\u0000${providerConfig.apiKey}`;
+  for (const key of cache.keys()) {
+    if (key.startsWith(`${fullId}\u0000`) && key !== cacheKey) cache.delete(key);
+  }
+  let languageModel = cache.get(cacheKey);
   if (!languageModel) {
     languageModel = factories[provider](providerConfig.apiKey, split.model);
-    cache.set(fullId, languageModel);
+    cache.set(cacheKey, languageModel);
   }
   return {
     id: fullId,

@@ -2,7 +2,6 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { streamAgentTurn } from '../agent/run.js';
 import type { AppEnv } from '../auth/principal.js';
-import { config } from '../config.js';
 import { createMemoryMcpClient } from '../memory/client.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
@@ -150,7 +149,6 @@ messageRoutes.post('/', async (c) => {
     principal,
     c.get('accessToken'),
     messageText,
-    config.chatSystemPrompt,
     model,
     c.req.raw.signal,
     c.get('mcpAuth') ?? undefined,

@@ -94,6 +94,14 @@ export class PostgresSearchIndex implements SearchIndex {
     `;
   }
 
+  async requeueAllEmbeddings(): Promise<void> {
+    await prisma.$executeRaw`
+      UPDATE memory_search_documents
+      SET embedding = NULL, embedding_model = NULL, status = 'pending', attempts = 0,
+          next_attempt_at = now(), locked_at = NULL, last_error = NULL
+    `;
+  }
+
   async searchText(query: string, filter: SearchFilter, limit: number): Promise<SearchHit[]> {
     const rows = await prisma.$queryRaw<RawHit[]>`
       SELECT m.id AS "messageId", m.conversation_id AS "conversationId",
@@ -117,7 +125,7 @@ export class PostgresSearchIndex implements SearchIndex {
     return rows.map(toHit);
   }
 
-  async searchVector(vector: number[], filter: SearchFilter, limit: number): Promise<SearchHit[]> {
+  async searchVector(vector: number[], filter: SearchFilter, limit: number, model: string): Promise<SearchHit[]> {
     const literal = vectorLiteral(vector);
     const rows = await prisma.$queryRaw<RawHit[]>`
       SELECT m.id AS "messageId", m.conversation_id AS "conversationId",
@@ -128,6 +136,7 @@ export class PostgresSearchIndex implements SearchIndex {
       JOIN conversations c ON c.id = d.conversation_id
       WHERE d.user_id = ${filter.userId}
         AND d.embedding IS NOT NULL
+        AND d.embedding_model = ${model}
         AND (${filter.conversationId ?? null}::uuid IS NULL OR d.conversation_id = ${filter.conversationId ?? null}::uuid)
       ORDER BY d.embedding <=> ${literal}::vector
       LIMIT ${limit}

@@ -59,9 +59,25 @@ function parseModelList(raw: unknown, provider: AiProvider): string[] {
  * Los errores no incluyen el valor crudo: lleva API keys.
  */
 function parseAiConfig(raw: string | undefined): AiConfig {
-  if (!raw?.trim()) {
-    throw new Error('Missing required env AI_CONFIG');
+  const databaseBacked = Boolean(process.env.DATABASE_URL?.trim() && process.env.RUNTIME_CONFIG_ENCRYPTION_KEY?.trim());
+  if (!raw?.trim() && databaseBacked) {
+    // The store loads the persisted config before serving requests. This placeholder
+    // lets operators remove provider credentials from env after the initial bootstrap.
+    return { defaultModel: '', providers: {} };
   }
+  try {
+    return parseAiConfigValue(raw);
+  } catch (error) {
+    // Existing persisted config must remain bootable even if the old bootstrap value
+    // was removed or is now stale. If no DB row exists, store bootstrap validation
+    // below will still fail before the API starts serving requests.
+    if (databaseBacked) return { defaultModel: '', providers: {} };
+    throw error;
+  }
+}
+
+function parseAiConfigValue(raw: string | undefined): AiConfig {
+  if (!raw?.trim()) throw new Error('Missing required env AI_CONFIG');
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -172,7 +188,8 @@ function parseOrigins(raw: string): string[] {
  * `MCP_CONFIG={"pc":{"url":"...","auth":null,"headers":{"Authorization":"Bearer ..."},"optional":true}}`.
  *
  * @remarks `headers` son fijos del servidor (secretos que nunca pasan por el navegador). Si `auth`
- * está seteado, su `Authorization` pisa al de `headers`. Los errores no incluyen valores: llevan secretos.
+ * es un string no vacío, se reenvía el Bearer del usuario y reemplaza `headers.Authorization`; el
+ * valor de `auth` solo activa el reenvío, no se usa como URL ni se envía. Los errores no exponen secretos.
  */
 function parseMcpConfig(raw: string | undefined): McpConfig {
   if (!raw?.trim()) return {};
