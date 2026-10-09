@@ -7,7 +7,7 @@ import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
 import { resolveModel, type ResolvedModel } from '../llm/provider.js';
 
-const TEXT_MAX = 8000;
+const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGES = 10;
 // Hasta diez imágenes de 5 MiB codificadas en base64, más el JSON que las envuelve.
@@ -46,7 +46,7 @@ function readText(body: unknown): string {
   }
   const trimmed = raw.trim();
   if (trimmed.length > TEXT_MAX) {
-    throw new HTTPException(400, { message: `text max ${TEXT_MAX} chars` });
+    throw new HTTPException(400, { message: `El mensaje no puede superar los ${TEXT_MAX.toLocaleString('es-AR')} caracteres.` });
   }
   return trimmed;
 }

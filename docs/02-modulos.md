@@ -53,7 +53,7 @@ src/
 
 | Archivo | Qué hace |
 |---------|----------|
-| `routes.ts` | `GET /` lista DTOs. `POST /` valida texto (1–8000), niega archivado (409), llama `streamAgentTurn`. |
+| `routes.ts` | `GET /` lista DTOs. `POST /` valida texto (1–100.000), niega archivado (409), llama `streamAgentTurn`. |
 
 El `POST` no espera un JSON de respuesta de chat: **devuelve el stream** del AI SDK.
 

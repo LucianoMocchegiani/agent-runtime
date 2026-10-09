@@ -29,7 +29,7 @@ JWT identificado o `anon:<uuid>`. El middleware aplica a todo `/v1`. Sin Bearer 
 | Método | Ruta | Body | Respuesta |
 |--------|------|------|-----------|
 | `GET` | `/v1/conversations/:id/messages` | — | `{ items: Message[] }` cronológico, máx. 500. |
-| `POST` | `/v1/conversations/:id/messages` | `{ text: string }` | **UI Message Stream** (no JSON de chat). Texto 1–8000. |
+| `POST` | `/v1/conversations/:id/messages` | `{ text: string }` | **UI Message Stream** (no JSON de chat). Texto 1–100.000 caracteres. |
 
 `Message`: `id`, `conversationId`, `role`, `content`, `toolName`, `toolArgs`, `toolResult`, `createdAt`.
 

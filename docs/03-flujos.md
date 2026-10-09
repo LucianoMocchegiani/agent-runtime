@@ -41,7 +41,7 @@ Identificado (JWT) / Público (anon:<uuid>)  agent-runtime              MCP + Op
    - Sin Bearer → uuid nuevo por request (backward compat)
 3. **Qué hilo.** `GET /v1/conversations`. La UI reabre el último id local o el más reciente. Si no hay ninguno, el canvas queda vacío hasta el primer envío.
 4. **Historial.** Si hay hilo: `GET /v1/conversations/:id/messages`. La UI muestra `user` / `assistant` / `tool`; el modelo **todavía no corre**.
-5. **Enviar.** `POST /v1/conversations/:id/messages` con `{ "text": "…" }`. Si no había id, la UI crea el hilo **antes**. Texto 1–8000. Archivado → 409.
+5. **Enviar.** `POST /v1/conversations/:id/messages` con `{ "text": "…" }`. Si no había id, la UI crea el hilo **antes**. Texto 1–100.000 caracteres. Archivado → 409.
 6. **Persistir el usuario.** Se inserta `role=user`. Si `title` era `null`, se recorta ese texto (sin LLM) y queda el título del sidebar.
 7. **Prompt.** Se leen hasta 500 mensajes del hilo, se recortan al presupuesto de tokens, se antepone el system prompt.
 8. **Modelo.** OpenRouter genera. Puede intercalar tools (MCP con Bearer + X-MCP-Auth). Tope `CHAT_MAX_TOOL_STEPS`. El HTTP **no** es un JSON final: es stream.

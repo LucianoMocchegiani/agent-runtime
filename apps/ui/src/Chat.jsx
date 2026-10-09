@@ -4,6 +4,7 @@ import Icon from './Icon.jsx';
 
 const MODEL_KEY = 'chat_model';
 const MAX_IMAGES = 10;
+const MAX_MESSAGE_CHARS = 100_000;
 
 function useModels() {
   const [models, setModels] = useState([]);
@@ -418,12 +419,16 @@ export default function Chat({ conversationId, onOpenSidebar }) {
             onKeyDown={handleInputKeyDown}
             placeholder="Escribí un mensaje..."
             disabled={isLoading}
+            maxLength={MAX_MESSAGE_CHARS}
             rows={1}
             aria-label="Mensaje"
           />
           <button className="send-button" type="submit" disabled={isLoading || (!input.trim() && images.length === 0)} title="Enviar mensaje" aria-label="Enviar mensaje"><Icon name="send" /><span>Enviar</span></button>
           <button className="stop-button" type="button" disabled={!isLoading} onClick={handleAbort} title="Detener la respuesta" aria-label="Detener la respuesta"><Icon name="stop" /><span>Parar</span></button>
         </div>
+        <small className="message-length" aria-label="Longitud del mensaje">
+          {input.length.toLocaleString('es-AR')} / {MAX_MESSAGE_CHARS.toLocaleString('es-AR')} caracteres · el límite de contexto del modelo también aplica
+        </small>
       </form>
     </main>
   );
