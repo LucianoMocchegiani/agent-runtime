@@ -7,6 +7,7 @@ import { z } from 'zod/v4';
 import { searchMemory } from './search/service.js';
 import {
   getContext,
+  saveSummary,
   saveMessage,
   listMessages,
   listConversations,
@@ -27,7 +28,6 @@ function registerTools(server: McpServer): void {
         conversationId: z.string(),
         userId: z.string(),
         task: z.string().optional(),
-        tokenBudget: z.number().optional(),
       }),
     },
     async (args) => {
@@ -35,11 +35,30 @@ function registerTools(server: McpServer): void {
         conversationId: args.conversationId,
         userId: args.userId,
         task: args.task,
-        tokenBudget: args.tokenBudget,
       });
       return {
         content: [{ type: 'text', text: JSON.stringify(result) }],
       };
+    },
+  );
+
+  server.registerTool(
+    MEMORY_TOOLS.saveSummary,
+    {
+      title: 'Save Conversation Summary',
+      description: 'Guarda de forma versionada el resumen acumulado y su cursor de mensajes.',
+      inputSchema: z.object({
+        conversationId: z.string().uuid(),
+        userId: z.string(),
+        summary: z.string().min(1),
+        throughMessageId: z.string().uuid(),
+        throughCreatedAt: z.string().datetime(),
+        expectedRevision: z.number().int().min(0),
+      }),
+    },
+    async (args) => {
+      const saved = await saveSummary(args);
+      return { content: [{ type: 'text', text: JSON.stringify(saved) }] };
     },
   );
 

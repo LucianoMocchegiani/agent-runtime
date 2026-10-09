@@ -23,6 +23,8 @@ export type ModelInfo = {
 
 export type ResolvedModel = ModelInfo & {
   languageModel: LanguageModel;
+  /** Ventana total configurada; el límite común es fallback para modelos sin entrada explícita. */
+  contextWindowTokens: number;
 };
 
 const cache = new Map<string, LanguageModel>();
@@ -70,5 +72,7 @@ export function resolveModel(id?: string | null): ResolvedModel | null {
     providerLabel: providerLabels[provider],
     model: split.model,
     languageModel,
+    contextWindowTokens:
+      providerConfig.contextWindows[split.model] ?? config.contextTokenBudget,
   };
 }

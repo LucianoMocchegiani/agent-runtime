@@ -47,7 +47,9 @@ export type ModelList = {
 export type SendOptions = {
   /** `proveedor/modelo`. Sin él, el server usa su default. */
   model?: string | null;
-  /** Data URL temporal de una imagen; el servidor no la persiste. */
+  /** Data URLs temporales de imágenes; el servidor no las persiste. */
+  images?: string[];
+  /** Compatibilidad con clientes antiguos que envían una sola imagen. */
   image?: string | null;
 };
 
@@ -190,7 +192,8 @@ export function createClient(config: ClientConfig) {
               body: JSON.stringify({
                 text,
                 ...(options.model ? { model: options.model } : {}),
-                ...(options.image ? { image: options.image } : {}),
+                ...(options.images?.length ? { images: options.images } : {}),
+                ...(!options.images?.length && options.image ? { image: options.image } : {}),
               }),
               signal,
             },

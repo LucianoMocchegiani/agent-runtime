@@ -10,7 +10,9 @@ import { resolveModel, type ResolvedModel } from '../llm/provider.js';
 
 const TEXT_MAX = 8000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_BODY_CHARS = 7_500_000;
+const MAX_IMAGES = 10;
+// Hasta diez imágenes de 5 MiB codificadas en base64, más el JSON que las envuelve.
+const MAX_BODY_CHARS = 72_000_000;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 type IncomingImage = { data: Uint8Array; mediaType: string };
@@ -50,11 +52,9 @@ function readText(body: unknown): string {
   return trimmed;
 }
 
-function readImage(body: unknown): IncomingImage | undefined {
-  const raw = bodyRecord(body).image;
-  if (raw === undefined || raw === null) return undefined;
+function parseImage(raw: unknown): IncomingImage {
   if (typeof raw !== 'string') {
-    throw new HTTPException(400, { message: 'image must be a base64 data URL' });
+    throw new HTTPException(400, { message: 'Cada imagen debe ser una data URL base64.' });
   }
   const match = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/]*={0,2})$/i.exec(raw);
   if (!match) {
@@ -70,6 +70,24 @@ function readImage(body: unknown): IncomingImage | undefined {
     throw new HTTPException(413, { message: 'La imagen supera el límite de 5 MB o no es válida.' });
   }
   return { data: new Uint8Array(buffer), mediaType };
+}
+
+function readImages(body: unknown): IncomingImage[] {
+  const record = bodyRecord(body);
+  if (record.images !== undefined && record.image !== undefined) {
+    throw new HTTPException(400, { message: 'Enviá images o image, no ambos.' });
+  }
+  if (record.images !== undefined) {
+    if (!Array.isArray(record.images)) {
+      throw new HTTPException(400, { message: 'images must be an array' });
+    }
+    if (record.images.length > MAX_IMAGES) {
+      throw new HTTPException(400, { message: `Podés adjuntar hasta ${MAX_IMAGES} imágenes por mensaje.` });
+    }
+    return record.images.map(parseImage);
+  }
+  if (record.image === undefined || record.image === null) return [];
+  return [parseImage(record.image)];
 }
 
 /** `model` opcional (`proveedor/modelo`); sin él, el default de `AI_CONFIG`. */
@@ -114,13 +132,16 @@ messageRoutes.post('/', async (c) => {
   }
   const body = await readJsonBody(c);
   const text = readText(body);
-  const image = readImage(body);
-  if (!text && !image) {
+  const images = readImages(body);
+  if (!text && images.length === 0) {
     throw new HTTPException(400, { message: 'Escribí un mensaje o adjuntá una imagen.' });
   }
-  // Solo guardamos el texto y una nota; los bytes de la imagen viven únicamente durante este turno.
-  const messageText = image
-    ? `${text}${text ? '\n\n' : ''}[Imagen adjunta; no almacenada]`
+  // Solo guardamos el texto y una nota; los bytes de las imágenes viven durante este turno.
+  const imageNote = images.length === 1
+    ? '[Imagen adjunta; no almacenada]'
+    : `[${images.length} imágenes adjuntas; no almacenadas]`;
+  const messageText = images.length
+    ? `${text}${text ? '\n\n' : ''}${imageNote}`
     : text;
   const model = readModel(body);
   const principal = c.get('principal');
@@ -133,6 +154,6 @@ messageRoutes.post('/', async (c) => {
     model,
     c.req.raw.signal,
     c.get('mcpAuth') ?? undefined,
-    image,
+    images,
   );
 });

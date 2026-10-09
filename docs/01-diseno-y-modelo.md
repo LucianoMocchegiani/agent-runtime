@@ -135,11 +135,11 @@ PII de negocio (nombre, documento, deuda) **puede** quedar en `content` / `tool_
 
 ## Ventana de contexto (prompt)
 
-`CHAT_CONTEXT_TOKENS` (default 10 000). Estimación: `ceil(chars / 4)`.
+`CHAT_CONTEXT_TOKENS` (default 10 000; estimación `ceil(chars / 4)`) y `CHAT_CONTEXT_MESSAGES` (default 20) limitan juntos el historial recuperado para iniciar el turno. El tope cuenta mensajes user/assistant; excluye el system prompt, las definiciones de tools y las interacciones de tools que ocurren durante el turno activo (necesarias para continuar esa ejecución).
 
-- Se mapean filas a mensajes del modelo (tools y user van como `user`; assistant como `assistant`).
-- Las **dos** tools más recientes se dejan más enteras (tope ~1500 chars); las viejas → una línea (`tool → N hits` o `tool → ok`).
-- Se llena de **atrás hacia adelante** hasta el presupuesto; lo que no entra **no se borra** de DB.
+- Los resultados históricos de tools quedan persistidos para memoria/auditoría, pero no se reenvían como mensajes de historial.
+- Se seleccionan turnos recientes completos de atrás hacia adelante, respetando ambos límites; el límite por cantidad puede dejar fuera mensajes aunque aún haya presupuesto de tokens.
+- Los turnos omitidos se compactan en un resumen persistente breve; no se borran de la base de datos. Para detalles más profundos se puede usar `memory__searchMemory`.
 
 `CHAT_MAX_TOOL_STEPS` (default 8) corta round-trips del agente.
 

@@ -4,6 +4,7 @@ import {
   type ConversationDto,
   type GetContextParams,
   type GetContextResult,
+  type SaveSummaryParams,
   type SaveMessageParams,
   type CreateConversationParams,
   type UpdateConversationPatch,
@@ -95,31 +96,56 @@ const MESSAGES_TAKE = 500;
 export async function getContext(
   params: GetContextParams,
 ): Promise<GetContextResult> {
-  const { conversationId, userId, tokenBudget } = params;
+  const { conversationId, userId } = params;
   await assertConversationOwner(conversationId, userId);
-  const rows = await prisma.message.findMany({
-    where: { conversationId },
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: MESSAGES_TAKE,
+  const [conversation, descendingRows] = await Promise.all([
+    prisma.conversation.findFirst({
+      where: { id: conversationId, userId },
+      select: {
+        summary: true,
+        summaryRevision: true,
+        summaryThroughMessageId: true,
+        summaryThroughCreatedAt: true,
+      },
+    }),
+    prisma.message.findMany({
+      where: { conversationId },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: MESSAGES_TAKE + 1,
+    }),
+  ]);
+  if (!conversation) throw new ConversationNotFoundError();
+  const hasMore = descendingRows.length > MESSAGES_TAKE;
+  const rows = descendingRows.slice(0, MESSAGES_TAKE).reverse();
+
+  return {
+    messages: rows.map(toMessageDto),
+    hasMore,
+    summary: conversation.summary,
+    summaryRevision: conversation.summaryRevision,
+    summaryThroughMessageId: conversation.summaryThroughMessageId,
+    summaryThroughCreatedAt: conversation.summaryThroughCreatedAt?.toISOString() ?? null,
+    checkpoint: null,
+  };
+}
+
+export async function saveSummary(params: SaveSummaryParams): Promise<boolean> {
+  const throughCreatedAt = new Date(params.throughCreatedAt);
+  if (!Number.isFinite(throughCreatedAt.getTime()) || !params.summary.trim()) return false;
+  const result = await prisma.conversation.updateMany({
+    where: {
+      id: params.conversationId,
+      userId: params.userId,
+      summaryRevision: params.expectedRevision,
+    },
+    data: {
+      summary: params.summary.trim(),
+      summaryRevision: { increment: 1 },
+      summaryThroughMessageId: params.throughMessageId,
+      summaryThroughCreatedAt: throughCreatedAt,
+    },
   });
-  // La consulta trae los mensajes más recientes; el contexto se devuelve cronológicamente.
-  rows.reverse();
-
-  const budget = tokenBudget ?? 10_000;
-  let used = 0;
-  const kept: MessageDto[] = [];
-  for (let i = rows.length - 1; i >= 0; i -= 1) {
-    const row = rows[i];
-    const text = row.content ?? '';
-    const cost = Math.max(1, Math.ceil(text.length / 4));
-    if (kept.length > 0 && used + cost > budget) {
-      continue;
-    }
-    kept.unshift(toMessageDto(row));
-    used += cost;
-  }
-
-  return { messages: kept, summary: null, checkpoint: null };
+  return result.count === 1;
 }
 
 export async function saveMessage(

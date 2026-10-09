@@ -39,6 +39,7 @@ Copy-Item .env.example .env
 | `CORS_ORIGIN` / `CORS_APP_DOMAIN` | Orígenes de UIs externas (huéspedes con el SDK). La UI nativa no lo necesita |
 | `SYSTEM_PROMPT` | Texto de instancia |
 | `CHAT_CONTEXT_TOKENS` | Ventana del prompt (default 10000) |
+| `CHAT_CONTEXT_MESSAGES` | Máximo de mensajes conversacionales históricos al iniciar el turno (default 20; no cuenta system/tools ni pasos de tools en curso) |
 | `CHAT_MAX_TOOL_STEPS` | Tope de round-trips con tools (default 8) |
 
 ## Usar sin clonar

@@ -17,6 +17,10 @@ model Conversation {
   userId     String    @map("user_id")
   title      String?
   archivedAt DateTime? @map("archived_at") @db.Timestamptz
+  summary    String?   @db.Text
+  summaryRevision Int  @default(0) @map("summary_revision")
+  summaryThroughMessageId String? @map("summary_through_message_id") @db.Uuid
+  summaryThroughCreatedAt DateTime? @map("summary_through_created_at") @db.Timestamptz
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   messages   Message[]

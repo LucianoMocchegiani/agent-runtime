@@ -7,6 +7,7 @@ import {
   type GetContextParams,
   type GetContextResult,
   type SaveMessageParams,
+  type SaveSummaryParams,
   type CreateConversationParams,
   type ConversationDto,
   type UpdateConversationPatch,
@@ -95,6 +96,9 @@ export async function createMemoryMcpClient(): Promise<MemoryMcp> {
   return {
     async getContext(params: GetContextParams): Promise<GetContextResult> {
       return callTool<GetContextResult>(TOOL_NAMES.getContext, params);
+    },
+    async saveSummary(params: SaveSummaryParams): Promise<boolean> {
+      return callTool<boolean>(TOOL_NAMES.saveSummary, params);
     },
     async saveMessage(params: SaveMessageParams): Promise<void> {
       await callTool<void>(TOOL_NAMES.saveMessage, params);

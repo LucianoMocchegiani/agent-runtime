@@ -1,4 +1,4 @@
-import { jsonSchema, streamText, tool, type ModelMessage, type Tool } from 'ai';
+import { generateText, jsonSchema, streamText, tool, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
 import { config } from '../config.js';
 import { isAbortError, identifiedFacingLlmError } from '../llm/errors.js';
@@ -9,9 +9,15 @@ import {
 } from '../memory/client.js';
 import {
   toJsonValue,
+  type GetContextResult,
   type MemoryMcp,
+  type MessageDto,
 } from 'agent-runtime-memory-contract';
-import { buildModelMessages, shrinkToolContent } from './window.js';
+import {
+  resolveTokenReserves,
+  selectModelContext,
+  shrinkToolContent,
+} from './window.js';
 import type { Principal } from '../auth/principal.js';
 
 type IncomingImage = { data: Uint8Array; mediaType: string };
@@ -53,6 +59,206 @@ function assistantTextOf(text: string | undefined, steps: LooseStep[]): string {
     .filter(Boolean)
     .join('\n')
     .trim();
+}
+
+function traceValue(value: unknown): string {
+  const seen = new WeakSet<object>();
+  return JSON.stringify(value, (key, item: unknown) => {
+    if (typeof item === 'function') {
+      return `[Function${item.name ? ` ${item.name}` : ''} omitted]`;
+    }
+    if (typeof item === 'bigint') {
+      return item.toString();
+    }
+    if (item instanceof Uint8Array) {
+      return `[Binary omitted: ${item.byteLength} bytes]`;
+    }
+    if (item instanceof ArrayBuffer) {
+      return `[Binary omitted: ${item.byteLength} bytes]`;
+    }
+    if (ArrayBuffer.isView(item)) {
+      return `[Binary omitted: ${item.byteLength} bytes]`;
+    }
+    if (item instanceof URL) {
+      return `${item.origin}${item.pathname}?<query-redacted>`;
+    }
+    if (typeof item === 'string' && (key === 'image' || key === 'data' || key === 'base64')) {
+      if (item.startsWith('data:') || item.length > 2_000) {
+        return `[Image/data omitted: ${item.length} characters]`;
+      }
+    }
+    if (typeof item === 'object' && item !== null) {
+      if (seen.has(item)) {
+        return '[Circular/reference omitted]';
+      }
+      seen.add(item);
+    }
+    return item;
+  }) ?? 'null';
+}
+
+function traceText(value: unknown, maxLength = 4_000): string {
+  const text = typeof value === 'string' ? value : traceValue(value);
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}… [truncado; ${text.length} caracteres]`;
+}
+
+function formatMessageContent(content: unknown): string {
+  if (typeof content === 'string') return traceText(content);
+  if (!Array.isArray(content)) return traceText(content);
+  return content.map((part) => {
+    if (typeof part !== 'object' || part === null) return traceText(part, 1_000);
+    const item = part as Record<string, unknown>;
+    if (item.type === 'text' && typeof item.text === 'string') return traceText(item.text);
+    if (item.type === 'image') {
+      const image = item.image;
+      const size = image instanceof Uint8Array ? image.byteLength : undefined;
+      return `[imagen${typeof item.mediaType === 'string' ? ` ${item.mediaType}` : ''}${size ? `, ${size} bytes` : ''}]`;
+    }
+    return traceText(item, 1_000);
+  }).join('\n');
+}
+
+function schemaObject(toolValue: unknown): Record<string, unknown> | undefined {
+  if (typeof toolValue !== 'object' || toolValue === null) return undefined;
+  const toolObject = toolValue as Record<string, unknown>;
+  const input = toolObject.inputSchema;
+  if (typeof input !== 'object' || input === null) return undefined;
+  const schema = (input as Record<string, unknown>).jsonSchema ?? input;
+  return typeof schema === 'object' && schema !== null ? schema as Record<string, unknown> : undefined;
+}
+
+function formatTool(name: string, value: unknown): string[] {
+  if (typeof value !== 'object' || value === null) return [`- ${name}`];
+  const item = value as Record<string, unknown>;
+  const schema = schemaObject(item);
+  const properties = schema?.properties;
+  const required = new Set(Array.isArray(schema?.required) ? schema.required.filter((key): key is string => typeof key === 'string') : []);
+  const params = typeof properties === 'object' && properties !== null
+    ? Object.entries(properties as Record<string, unknown>).map(([key, definition]) => {
+      const field = typeof definition === 'object' && definition !== null ? definition as Record<string, unknown> : {};
+      const type = typeof field.type === 'string' ? field.type : 'any';
+      return `${key}${required.has(key) ? '' : '?'}: ${type}`;
+    })
+    : [];
+  const lines = [`- ${name}(${params.join(', ')})`];
+  if (typeof item.description === 'string' && item.description.trim()) {
+    lines.push(`  ${traceText(item.description, 500)}`);
+  }
+  return lines;
+}
+
+function formatLlmRequestTrace(request: {
+  conversationId: string;
+  step: number;
+  model: string;
+  maxOutputTokens: number;
+  system: unknown;
+  messages: unknown;
+  tools: unknown;
+  activeTools: unknown;
+}): string {
+  const lines = [
+    `[llm-request] ${request.model} | paso ${request.step} | maxOutputTokens=${request.maxOutputTokens} | conversation=${request.conversationId}`,
+    '',
+    'SYSTEM:',
+    traceText(request.system),
+    '',
+  ];
+  const messages = Array.isArray(request.messages) ? request.messages : [];
+  lines.push(`MENSAJES (${messages.length}):`);
+  messages.forEach((entry, index) => {
+    if (typeof entry !== 'object' || entry === null) {
+      lines.push(`  [${index + 1}] ${traceText(entry, 1_000)}`);
+      return;
+    }
+    const message = entry as Record<string, unknown>;
+    const role = typeof message.role === 'string' ? message.role.toUpperCase() : 'MENSAJE';
+    lines.push(`  [${index + 1}] ${role}:`);
+    const content = formatMessageContent(message.content);
+    for (const line of content.split('\n')) lines.push(`      ${line}`);
+  });
+  const tools = typeof request.tools === 'object' && request.tools !== null
+    ? Object.entries(request.tools as Record<string, unknown>)
+    : [];
+  lines.push('', `HERRAMIENTAS (${tools.length}):`);
+  for (const [name, value] of tools) lines.push(...formatTool(name, value));
+  if (Array.isArray(request.activeTools)) {
+    lines.push(`Activas: ${request.activeTools.join(', ') || 'ninguna'}`);
+  }
+  return lines.join('\n');
+}
+
+function messagesAfterSummaryCursor(
+  rows: MessageDto[],
+  throughMessageId: string | null,
+  throughCreatedAt: string | null,
+): MessageDto[] {
+  if (throughMessageId) {
+    const cursorIndex = rows.findIndex((row) => row.id === throughMessageId);
+    if (cursorIndex >= 0) return rows.slice(cursorIndex + 1);
+  }
+  if (!throughCreatedAt) return rows;
+  const cursorTime = Date.parse(throughCreatedAt);
+  return rows.filter((row) => {
+    const rowTime = Date.parse(row.createdAt);
+    return rowTime > cursorTime || (rowTime === cursorTime && throughMessageId !== null && row.id > throughMessageId);
+  });
+}
+
+async function compactOmittedMessages(
+  memory: MemoryMcp,
+  model: ResolvedModel,
+  conversationId: string,
+  userId: string,
+  context: GetContextResult,
+  omittedRows: MessageDto[],
+): Promise<string | null> {
+  const rowsToSummarize = messagesAfterSummaryCursor(
+    omittedRows,
+    context.summaryThroughMessageId,
+    context.summaryThroughCreatedAt,
+  );
+  if (!config.summariesEnabled || rowsToSummarize.length === 0) return context.summary;
+
+  const transcriptRows: MessageDto[] = [];
+  const transcriptParts: string[] = [];
+  let transcriptLength = 0;
+  for (const row of rowsToSummarize) {
+    const role = row.role === 'tool' ? `tool:${row.toolName ?? 'tool'}` : row.role;
+    const content = row.role === 'tool' ? shrinkToolContent(row.toolName ?? 'tool', row.toolResult, true) : row.content;
+    const part = `${role}: ${content}`;
+    const nextLength = transcriptLength + (transcriptParts.length > 0 ? 1 : 0) + part.length;
+    // Capamos por mensajes completos para que el cursor nunca saltee contenido no enviado al resumidor.
+    if (transcriptRows.length > 0 && nextLength > 60_000) break;
+    transcriptRows.push(row);
+    transcriptParts.push(part);
+    transcriptLength = nextLength;
+  }
+  const transcript = transcriptParts.join('\n');
+  try {
+    const { text } = await generateText({
+      model: model.languageModel,
+      maxOutputTokens: config.summaryTokenBudget,
+      system: 'Actualizá un resumen muy breve y fiel de la conversación (priorizá hechos duraderos, preferencias, decisiones y pendientes; omití intercambios rutinarios y resultados de tools que no aporten). No inventes datos; si ya hay un resumen, integralo sin repetirlo. Para detalles profundos, se pueden recuperar los mensajes originales mediante memory search.',
+      prompt: `${context.summary ? `Resumen anterior:\n${context.summary}\n\n` : ''}Mensajes nuevos para incorporar:\n${transcript}`,
+    });
+    const summary = text.trim();
+    const lastRow = transcriptRows.at(-1);
+    if (!summary || !lastRow) return context.summary;
+    const saved = await memory.saveSummary({
+      conversationId,
+      userId,
+      summary,
+      throughMessageId: lastRow.id,
+      throughCreatedAt: lastRow.createdAt,
+      expectedRevision: context.summaryRevision,
+    });
+    return saved ? summary : context.summary;
+  } catch (error) {
+    console.warn('No se pudo actualizar el resumen persistente de la conversación.', error);
+    return context.summary;
+  }
 }
 
 async function persistAgentTurn(
@@ -121,7 +327,7 @@ export async function streamAgentTurn(
   model: ResolvedModel,
   abortSignal?: AbortSignal,
   mcpTokens?: Record<string, string>,
-  image?: IncomingImage,
+  images: IncomingImage[] = [],
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
 
@@ -219,7 +425,6 @@ export async function streamAgentTurn(
     context = await memory.getContext({
       conversationId,
       userId: principal.userId,
-      tokenBudget: config.contextTokenBudget,
     });
   } catch (error) {
     await registry.close().catch(() => undefined);
@@ -228,8 +433,41 @@ export async function streamAgentTurn(
     throw new HTTPException(502, { message: failMessage });
   }
 
-  const messages = buildModelMessages(context.messages);
-  if (image) {
+  const tokenReserves = resolveTokenReserves(
+    model.contextWindowTokens,
+    config.responseTokenReserve,
+    config.contextSafetyTokens,
+  );
+  const selectionOptions = {
+    contextWindowTokens: model.contextWindowTokens,
+    maxMessages: config.maxContextMessages,
+    responseTokenReserve: tokenReserves.responseTokenReserve,
+    safetyTokens: tokenReserves.safetyTokens,
+    systemPrompt,
+    tools,
+    imageCount: images.length,
+  };
+  let selection = selectModelContext(context.messages, selectionOptions);
+  let summary = context.summary;
+  if (config.summariesEnabled && selection.omittedRows.length > 0) {
+    summary = await compactOmittedMessages(
+      memory,
+      model,
+      conversationId,
+      principal.userId,
+      context,
+      selection.omittedRows,
+    );
+  }
+  const promptWithSummary = summary
+    ? `${systemPrompt}\n\nResumen persistente de mensajes anteriores (contexto; no lo presentes como una respuesta):\n${summary}`
+    : systemPrompt;
+  selection = selectModelContext(context.messages, {
+    ...selectionOptions,
+    systemPrompt: promptWithSummary,
+  });
+  const messages = selection.messages;
+  if (images.length > 0) {
     const lastUserIndex = messages.map((message) => message.role).lastIndexOf('user');
     const currentUserMessage = messages[lastUserIndex];
     if (currentUserMessage?.role === 'user') {
@@ -238,7 +476,11 @@ export async function streamAgentTurn(
         role: 'user',
         content: [
           ...(text ? [{ type: 'text' as const, text }] : []),
-          { type: 'image', image: image.data, mediaType: image.mediaType },
+          ...images.map(({ data, mediaType }) => ({
+            type: 'image' as const,
+            image: data,
+            mediaType,
+          })),
         ],
       };
       messages[lastUserIndex] = multimodalMessage;
@@ -298,11 +540,32 @@ export async function streamAgentTurn(
   try {
     const result = streamText({
       model: model.languageModel,
-      system: systemPrompt,
+      maxOutputTokens: tokenReserves.responseTokenReserve,
+      system: promptWithSummary,
       messages,
       tools,
       abortSignal,
       stopWhen: ({ steps }) => steps.length >= config.maxToolSteps,
+      experimental_onStepStart: (event) => {
+        if (!config.llmTraceRequests) {
+          return;
+        }
+        try {
+          console.info(formatLlmRequestTrace({
+            conversationId,
+            step: event.stepNumber + 1,
+            model: model.id,
+            maxOutputTokens: tokenReserves.responseTokenReserve,
+            system: event.system,
+            messages: event.messages,
+            tools: event.tools,
+            activeTools: event.activeTools,
+          }));
+        } catch {
+          // No hacer fallar una llamada al proveedor por un problema al serializar el trace.
+          console.warn('[llm-request] no se pudo serializar el payload de depuración');
+        }
+      },
       onStepFinish: (step) => {
         acc.push(step as LooseStep);
       },

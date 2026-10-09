@@ -3,6 +3,7 @@ import client from './client.js';
 import Icon from './Icon.jsx';
 
 const MODEL_KEY = 'chat_model';
+const MAX_IMAGES = 10;
 
 function useModels() {
   const [models, setModels] = useState([]);
@@ -81,8 +82,11 @@ function reconcileLiveTurn(liveMessages, persistedMessages, turnStartIndex) {
 export default function Chat({ conversationId, onOpenSidebar }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
-  const [image, setImage] = useState(null);
+  const [images, setImages] = useState([]);
+  const [pendingImageReads, setPendingImageReads] = useState(0);
   const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
+  const imagesRef = useRef([]);
+  const imageReadQueueRef = useRef(Promise.resolve());
   const [isLoading, setIsLoading] = useState(false);
   const [activity, setActivity] = useState('idle');
   const [error, setError] = useState(null);
@@ -104,31 +108,62 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
   }, [input]);
 
-  async function handleImageFile(file) {
-    if (!file) return;
+  function replaceImages(nextImages) {
+    const next = typeof nextImages === 'function' ? nextImages(imagesRef.current) : nextImages;
+    imagesRef.current = next;
+    setImages(next);
+  }
+
+  function handleImageFiles(files) {
+    if (!files?.length) return;
     setError(null);
-    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
-      setError('Formato no compatible. Adjuntá una imagen JPEG, PNG, WebP o GIF.');
-      return;
+    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    const accepted = [];
+    for (const file of files) {
+      if (!supportedTypes.includes(file.type)) {
+        setError('Formato no compatible. Adjuntá imágenes JPEG, PNG, WebP o GIF.');
+        continue;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`La imagen ${file.name || ''} supera el límite de 5 MB.`.trim());
+        continue;
+      }
+      accepted.push(file);
     }
-    if (file.size > 5 * 1024 * 1024) {
-      setError('La imagen supera el límite de 5 MB.');
-      return;
-    }
-    try {
-      setImage({ dataUrl: await fileAsDataUrl(file), name: file.name || 'Imagen pegada' });
-    } catch {
-      setError('No se pudo leer la imagen. Probá con otro archivo.');
-    }
+    if (!accepted.length) return;
+
+    setPendingImageReads(count => count + 1);
+    const task = imageReadQueueRef.current.then(async () => {
+      const remaining = Math.max(0, MAX_IMAGES - imagesRef.current.length);
+      if (remaining === 0) {
+        setError(`Podés adjuntar hasta ${MAX_IMAGES} imágenes por mensaje.`);
+        return;
+      }
+      if (accepted.length > remaining) {
+        setError(`Podés adjuntar hasta ${MAX_IMAGES} imágenes por mensaje; se agregaron las primeras ${remaining}.`);
+      }
+      const selected = accepted.slice(0, remaining);
+      const loaded = await Promise.all(selected.map(async file => ({
+        dataUrl: await fileAsDataUrl(file),
+        name: file.name || 'Imagen pegada',
+      })));
+      replaceImages(current => [...current, ...loaded]);
+    }).catch(() => {
+      setError('No se pudo leer una imagen. Probá con otro archivo.');
+    });
+    imageReadQueueRef.current = task;
+    void task.finally(() => setPendingImageReads(count => Math.max(0, count - 1)));
   }
 
   function handleInputPaste(e) {
     if (isLoading) return;
-    const imageItem = [...(e.clipboardData?.items ?? [])].find(item => item.type.startsWith('image/'));
-    const file = imageItem?.getAsFile();
-    if (!file) return;
+    const files = [...(e.clipboardData?.items ?? [])]
+      .filter(item => item.type.startsWith('image/'))
+      .map(item => item.getAsFile())
+      .filter(Boolean);
+    if (!files.length) return;
     e.preventDefault();
-    void handleImageFile(file);
+    void handleImageFiles(files);
   }
 
   function handleInputChange(e) {
@@ -136,10 +171,10 @@ export default function Chat({ conversationId, onOpenSidebar }) {
   }
 
   function handleImageSelection(e) {
-    const file = e.target.files?.[0];
+    const files = [...(e.target.files ?? [])];
     e.target.value = '';
     setIsAttachMenuOpen(false);
-    if (file) void handleImageFile(file);
+    if (files.length) void handleImageFiles(files);
   }
 
   function handleInputKeyDown(e) {
@@ -170,7 +205,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
         const previewIndex = previews.findIndex(preview => preview.content === message.content);
         if (previewIndex < 0) return message;
         const [preview] = previews.splice(previewIndex, 1);
-        return { ...message, imageDataUrl: preview.dataUrl };
+        return { ...message, imageDataUrls: preview.dataUrls };
       });
       setMessages(current => turnStartIndex === null
         ? withLocalPreviews
@@ -203,15 +238,18 @@ export default function Chat({ conversationId, onOpenSidebar }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if ((!input.trim() && !image) || isLoading) return;
+    if ((!input.trim() && images.length === 0) || isLoading || pendingImageReads > 0) return;
 
     const text = input.trim();
-    const selectedImage = image;
-    const persistedContent = selectedImage
-      ? `${text}${text ? '\n\n' : ''}[Imagen adjunta; no almacenada]`
+    const selectedImages = images;
+    const imageNote = selectedImages.length === 1
+      ? '[Imagen adjunta; no almacenada]'
+      : `[${selectedImages.length} imágenes adjuntas; no almacenadas]`;
+    const persistedContent = selectedImages.length
+      ? `${text}${text ? '\n\n' : ''}${imageNote}`
       : text;
     setInput('');
-    setImage(null);
+    replaceImages([]);
     setIsLoading(true);
     setActivity('thinking');
     setError(null);
@@ -220,12 +258,12 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     const assistantKey = `assistant-${Date.now()}`;
     turnStartIndexRef.current = messages.length;
 
-    if (selectedImage) {
-      imagePreviewsRef.current.push({ content: persistedContent, dataUrl: selectedImage.dataUrl });
+    if (selectedImages.length) {
+      imagePreviewsRef.current.push({ content: persistedContent, dataUrls: selectedImages.map(image => image.dataUrl) });
     }
     setMessages(prev => [...prev, {
       id: userKey, conversationId, role: 'user',
-      content: persistedContent, imageDataUrl: selectedImage?.dataUrl,
+      content: persistedContent, imageDataUrls: selectedImages.map(image => image.dataUrl),
       toolName: null, toolArgs: null, toolResult: null,
       createdAt: new Date().toISOString(),
     }]);
@@ -276,7 +314,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     try {
       await client.messages.send(conversationId, text, handlers, controller.signal, {
         model,
-        image: selectedImage?.dataUrl,
+        images: selectedImages.map(image => image.dataUrl),
       });
     } catch (e) {
       const wasAborted = e.name === 'AbortError';
@@ -323,15 +361,19 @@ export default function Chat({ conversationId, onOpenSidebar }) {
       </div>
       {error && <div className="error-bar" role="alert">{error}</div>}
       <form onSubmit={handleSubmit} className="composer">
-        {image && (
-          <div className="image-attachment-preview">
-            <img src={image.dataUrl} alt={`Vista previa: ${image.name}`} />
-            <div className="image-attachment-details">
-              <span className="attachment-type">Imagen</span>
-              <span className="attachment-name" title={image.name}>{image.name}</span>
-              <small>No se guardará en el historial</small>
-            </div>
-            <button type="button" onClick={() => setImage(null)} disabled={isLoading} aria-label="Quitar imagen" title="Quitar imagen"><Icon name="close" /></button>
+        {images.length > 0 && (
+          <div className="image-attachments-preview">
+            {images.map((image, index) => (
+              <div className="image-attachment-preview" key={`${image.name}-${index}`}>
+                <img src={image.dataUrl} alt={`Vista previa: ${image.name}`} />
+                <div className="image-attachment-details">
+                  <span className="attachment-type">Imagen {index + 1}</span>
+                  <span className="attachment-name" title={image.name}>{image.name}</span>
+                  <small>No se guardará en el historial</small>
+                </div>
+                <button type="button" onClick={() => replaceImages(current => current.filter((_, imageIndex) => imageIndex !== index))} disabled={isLoading} aria-label={`Quitar ${image.name}`} title="Quitar imagen"><Icon name="close" /></button>
+              </div>
+            ))}
           </div>
         )}
         <input
@@ -339,6 +381,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
           className="attachment-file-input"
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif"
+          multiple
           onChange={handleImageSelection}
           tabIndex={-1}
           aria-hidden="true"
@@ -355,7 +398,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
               onClick={() => setIsAttachMenuOpen(open => !open)}
             >
               <Icon name="attach" />
-              Adjuntar
+              Adjuntar{images.length > 0 ? ` (${images.length}/${MAX_IMAGES})` : ''}
             </button>
             {isAttachMenuOpen && (
               <div className="attachment-menu" role="menu" aria-label="Tipo de archivo">
@@ -378,7 +421,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
             rows={1}
             aria-label="Mensaje"
           />
-          <button className="send-button" type="submit" disabled={isLoading || (!input.trim() && !image)} title="Enviar mensaje" aria-label="Enviar mensaje"><Icon name="send" /><span>Enviar</span></button>
+          <button className="send-button" type="submit" disabled={isLoading || (!input.trim() && images.length === 0)} title="Enviar mensaje" aria-label="Enviar mensaje"><Icon name="send" /><span>Enviar</span></button>
           <button className="stop-button" type="button" disabled={!isLoading} onClick={handleAbort} title="Detener la respuesta" aria-label="Detener la respuesta"><Icon name="stop" /><span>Parar</span></button>
         </div>
       </form>
@@ -449,7 +492,9 @@ function MessageBubble({ message }) {
       {message.role === 'assistant'
         ? <MarkdownContent content={message.content} />
         : message.content}
-      {message.imageDataUrl && <img className="message-image" src={message.imageDataUrl} alt="Imagen adjunta" />}
+      {(message.imageDataUrls ?? (message.imageDataUrl ? [message.imageDataUrl] : [])).map((imageDataUrl, index) => (
+        <img className="message-image" src={imageDataUrl} alt={`Imagen adjunta ${index + 1}`} key={`${message.id}-image-${index}`} />
+      ))}
     </div>
   );
 }

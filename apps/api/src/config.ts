@@ -53,7 +53,7 @@ function parseModelList(raw: unknown, provider: AiProvider): string[] {
 }
 
 /**
- * `AI_CONFIG={"default":"openrouter/openai/gpt-4.1-mini","providers":{"openrouter":{"apiKey":"...","models":[...]},"openai":{...}}}`.
+ * `AI_CONFIG={"default":"openrouter/openai/gpt-4.1-mini","providers":{"openrouter":{"apiKey":"...","models":[...],"contextWindows":{"openai/gpt-4.1-mini":128000}},"openai":{...}}}`.
  *
  * @remarks Proveedor sin `apiKey` o con `replace-me` queda deshabilitado; solo falla el boot si el default no es usable.
  * Los errores no incluyen el valor crudo: lleva API keys.
@@ -88,10 +88,27 @@ function parseAiConfig(raw: string | undefined): AiConfig {
     const entry = value as Record<string, unknown>;
     const apiKey = typeof entry.apiKey === 'string' ? entry.apiKey.trim() : '';
     const models = parseModelList(entry.models, name);
+    const rawContextWindows = entry.contextWindows;
+    const contextWindows: Record<string, number> = {};
+    if (rawContextWindows !== undefined) {
+      if (
+        typeof rawContextWindows !== 'object' ||
+        rawContextWindows === null ||
+        Array.isArray(rawContextWindows)
+      ) {
+        throw new Error(`AI_CONFIG.providers.${name}.contextWindows must be an object`);
+      }
+      for (const [model, tokens] of Object.entries(rawContextWindows as Record<string, unknown>)) {
+        if (!model.trim() || typeof tokens !== 'number' || !Number.isInteger(tokens) || tokens < 1) {
+          throw new Error(`AI_CONFIG.providers.${name}.contextWindows values must be positive integers`);
+        }
+        contextWindows[model] = tokens;
+      }
+    }
     if (!apiKey || apiKey === 'replace-me') {
       continue;
     }
-    providers[name] = { apiKey, models };
+    providers[name] = { apiKey, models, contextWindows };
   }
 
   const enabled = AI_PROVIDERS.filter((name) => providers[name]);
@@ -267,6 +284,8 @@ export type AiProviderConfig = {
   apiKey: string;
   /** Modelos ofrecidos en el selector (ids del proveedor, sin prefijo). */
   models: string[];
+  /** Ventanas explícitas en tokens, indexadas por id del modelo del proveedor. */
+  contextWindows: Record<string, number>;
 };
 
 export type AiConfig = {
@@ -287,8 +306,18 @@ export type ChatConfig = {
   corsOrigins: string[];
   corsAppDomain: string | null;
   chatSystemPrompt: string;
+  /** Ventana total por defecto y compatibilidad para modelos sin contextoWindows configurado. */
   contextTokenBudget: number;
+  /** Máximo de mensajes conversacionales enviados, sin contar system/tools disponibles. */
+  maxContextMessages: number;
+  responseTokenReserve: number;
+  contextSafetyTokens: number;
   maxToolSteps: number;
+  /** Emite en logs el contexto y las herramientas enviados al proveedor; puede contener datos sensibles. */
+  llmTraceRequests: boolean;
+  /** Resume y persiste turnos que quedaron fuera de la ventana de contexto. */
+  summariesEnabled: boolean;
+  summaryTokenBudget: number;
   ui: {
     enabled: boolean;
     /** Absoluta; null si no hay build. */
@@ -308,7 +337,13 @@ export const config: ChatConfig = {
   corsAppDomain: process.env.CORS_APP_DOMAIN?.trim().toLowerCase() || null,
   chatSystemPrompt: process.env.CHAT_SYSTEM_PROMPT?.trim() || DEFAULT_SYSTEM_PROMPT,
   contextTokenBudget: parsePositiveInt(process.env.CHAT_CONTEXT_TOKENS, 10_000),
+  maxContextMessages: parsePositiveInt(process.env.CHAT_CONTEXT_MESSAGES, 20),
+  responseTokenReserve: parsePositiveInt(process.env.CHAT_RESPONSE_TOKENS, 2_048),
+  contextSafetyTokens: parsePositiveInt(process.env.CHAT_CONTEXT_SAFETY_TOKENS, 512),
   maxToolSteps: parsePositiveInt(process.env.CHAT_MAX_TOOL_STEPS, 8),
+  llmTraceRequests: parseBool(process.env.LLM_TRACE_REQUESTS, false),
+  summariesEnabled: parseBool(process.env.CHAT_SUMMARIES_ENABLED, true),
+  summaryTokenBudget: parsePositiveInt(process.env.CHAT_SUMMARY_TOKENS, 300),
   ui: {
     enabled: parseBool(process.env.UI_ENABLED, true),
     dir: resolveUiDir(process.env.UI_DIR),

@@ -7,6 +7,7 @@
 
 export const MEMORY_TOOLS = {
   getContext: 'getContext',
+  saveSummary: 'saveSummary',
   saveMessage: 'saveMessage',
   listMessages: 'listMessages',
   listConversations: 'listConversations',
@@ -52,13 +53,26 @@ export type GetContextParams = {
   conversationId: string;
   userId: string;
   task?: string;
-  tokenBudget?: number;
 };
 
 export type GetContextResult = {
   messages: MessageDto[];
   summary: string | null;
+  summaryRevision: number;
+  summaryThroughMessageId: string | null;
+  summaryThroughCreatedAt: string | null;
   checkpoint: JsonValue | null;
+  /** True si existen mensajes anteriores a la página devuelta. */
+  hasMore: boolean;
+};
+
+export type SaveSummaryParams = {
+  conversationId: string;
+  userId: string;
+  summary: string;
+  throughMessageId: string;
+  throughCreatedAt: string;
+  expectedRevision: number;
 };
 
 export type SaveMessageParams = {
@@ -150,6 +164,7 @@ export function toJsonValue(value: unknown): JsonValue | undefined {
 
 export interface MemoryMcp {
   getContext(params: GetContextParams): Promise<GetContextResult>;
+  saveSummary(params: SaveSummaryParams): Promise<boolean>;
   saveMessage(params: SaveMessageParams): Promise<void>;
   listMessages(params: ListMessagesParams): Promise<MessageDto[]>;
   listConversations(params: ListConversationsParams): Promise<ConversationDto[]>;
