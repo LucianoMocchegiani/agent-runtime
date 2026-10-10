@@ -54,7 +54,29 @@ Un segundo mensaje en el **mismo** hilo salta 1–3: mismo Bearer, mismo `:id`, 
 
 Detalle interno del `POST` (auth, MCP, persist): sección 1.
 
-## 0.1. Contrato Bearer y MCP Auth
+## 0.1. Memory: búsqueda de recuerdos y preferencias
+
+Runtime usa el **Memory MCP integrado** para sus operaciones de memoria. Aunque el componente corre como proceso separado, forma parte de Agent Runtime y no se configura como un MCP externo reemplazable. La API se comunica con él mediante el contrato MCP compartido (`packages/memory-contract`); MCP es la interfaz interna entre ambos componentes.
+
+```text
+Inicio de cada turno
+  ├── Runtime pide a Memory las preferencias pertinentes
+  │     ├── búsqueda por usuario, mensaje actual y hasta 3 mensajes recientes
+  │     ├── límite de 5 resultados
+  │     └── las agrega al contexto del modelo; si la búsqueda falla, el chat sigue
+  │
+  └── Runtime expone herramientas al modelo
+        ├── memory__searchMemory       → buscar recuerdos/mensajes anteriores bajo demanda
+        ├── memory__savePreference     → guardar ante petición explícita
+        ├── memory__listPreferences    → listar cuando el usuario lo pide
+        └── memory__deletePreference  → eliminar cuando el usuario lo pide
+```
+
+La búsqueda amplia `memory__searchMemory` queda disponible como herramienta: el modelo decide cuándo usarla según la solicitud. La búsqueda de preferencias es distinta: Runtime la ejecuta automáticamente en cada turno y agrega al prompt las coincidencias pertinentes. Guardar, listar y borrar preferencias sí son acciones explícitas mediadas por herramientas. En todas estas operaciones Runtime envía el `userId` del principal autenticado; no se toma de argumentos generados por el modelo.
+
+El contrato MCP de Memory es parte de la arquitectura interna de Agent Runtime; las herramientas de Memory que se exponen al modelo son capacidades del mismo componente integrado. No se plantea sustituir Memory por un servidor de terceros ni separar ahora una API alternativa.
+
+## 0.2. Contrato Bearer y MCP Auth
 
 ### Authorization header
 

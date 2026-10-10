@@ -86,9 +86,9 @@ Si un MCP requerido no arranca o `tools()` falla → **502**. Uno `optional` se 
 
 El contrato (nombres de tools, DTOs, interfaz `MemoryMcp`) vive en `packages/memory-contract`.
 
-## Memory MCP default (`apps/memory-mcp/src/`)
+## Memory MCP integrado (`apps/memory-mcp/src/`)
 
-Otro proceso, otra imagen (`--target memory-mcp`). Único dueño de la DB `memory`.
+Componente propio de Agent Runtime, desplegado como proceso/imagen separado (`--target memory-mcp`). Único dueño de la DB `memory`; no es un MCP externo seleccionable.
 
 | Archivo | Qué hace |
 |---------|----------|
@@ -118,6 +118,6 @@ Otro proceso, otra imagen (`--target memory-mcp`). Único dueño de la DB `memor
 | Identidad pública | `anon:<uuid>` del cliente | Sin introspect ni persistencia |
 | Tools | MCP HTTP vía runtime.config | Catálogo dinámico, auth por MCP |
 | Modelo | OpenRouter / OpenAI | Providers en runtime.config |
-| Persistencia | Memory MCP (`MEMORY_MCP_URL`) | Default: `apps/memory-mcp` → Prisma → Postgres `memory` |
+| Persistencia | Memory MCP integrado (`MEMORY_MCP_URL`) | `apps/memory-mcp` → Prisma → Postgres `memory` |
 
 [← Diseño](./01-diseno-y-modelo.md) · [Índice](./00-indice.md) · [Flujos →](./03-flujos.md)

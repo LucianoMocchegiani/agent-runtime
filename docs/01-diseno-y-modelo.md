@@ -23,7 +23,7 @@ Bearer anon:<uuid> (lo genera y guarda el cliente)
             → mismo flow
 ```
 
-La API no posee los datos de conversación: hilos y mensajes los guarda Memory MCP (default `apps/memory-mcp`, reemplazable). Para configuración dinámica, agent-runtime usa el esquema PostgreSQL separado `runtime`; Memory MCP conserva sus tablas propias en `public`. Ambos procesos pueden conectarse a la misma base, con pools independientes.
+La API no persiste directamente los datos de conversación: hilos y mensajes los administra el Memory MCP integrado al proyecto (`apps/memory-mcp`), usando un contrato interno compartido. Es un componente propio de Agent Runtime, no un MCP externo o intercambiable. Para configuración dinámica, agent-runtime usa el esquema PostgreSQL separado `runtime`; Memory MCP conserva sus tablas propias en `public`. Ambos procesos pueden conectarse a la misma base, con pools independientes.
 
 La UI, el login y las tools viven en el **huésped**. El chat pide identidad (`AUTH_INTROSPECT_URL`); los MCPs se administran en `runtime.config` (`mcpConfig`).
 
@@ -32,12 +32,12 @@ La UI, el login y las tools viven en el **huésped**. El chat pide identidad (`A
 | Pieza | Valor |
 |-------|--------|
 | HTTP | Hono + `@hono/node-server`, Node 24 |
-| Persistencia | Memory MCP. El default (`apps/memory-mcp`) usa Prisma 6 sobre la database **`memory`** |
+| Persistencia | Memory MCP integrado (`apps/memory-mcp`), Prisma 6 sobre la database **`memory`** |
 | LLM | Vercel AI SDK + OpenRouter / OpenAI, proveedores en `runtime.config` |
 | Tools | `@ai-sdk/mcp` HTTP hacia los MCPs de `runtime.config` |
 | Stream | UI Message Stream (`toUIMessageStreamResponse`) |
 
-Arranque: la API hace `node dist/index.js` (sin migraciones). El Memory MCP default corre `setup-db` (crea la database + `prisma migrate deploy`) y después `node dist/index.js`. En dev: `npm run dev` levanta los dos.
+Arranque: la API hace `node dist/index.js` (sin migraciones). El Memory MCP integrado corre `setup-db` (crea la database + `prisma migrate deploy`) y después `node dist/index.js`. En dev: `npm run dev` levanta los dos componentes.
 
 ## Principios
 
@@ -99,7 +99,7 @@ agent-runtime  requirePrincipal
 
 **Qué no es.** No es OAuth introspection RFC 7662. No hay tabla de passwords. El **refresh** lo hace `web/` contra el huésped. Logout del Admin tira la sesión: el próximo introspect da 401.
 
-## Modelo de datos (Memory MCP default)
+## Modelo de datos (Memory MCP integrado)
 
 Database `memory`, dueño único `apps/memory-mcp` (schema y migraciones en `apps/memory-mcp/prisma`). Sin FKs al schema del huésped. IDs de tenant/user son **texto** copiado del huésped.
 

@@ -4,28 +4,27 @@
 
 ## 1. Idea general
 
-**Agent Runtime** es un runtime genérico para ejecutar agentes de IA sin acoplarlos a una aplicación, dominio, base de datos o sistema de memoria específico.
+**Agent Runtime** es un runtime genérico para ejecutar agentes de IA sin acoplarlos a una aplicación o dominio de negocio específico. Incluye su propio componente Memory MCP para conversaciones, mensajes y recuerdos; este componente es parte de Runtime y no se configura como una memoria externa intercambiable.
 
-El objetivo es que una aplicación que quiera incorporar capacidades de IA **no tenga que implementar su propio agente, integrar directamente un LLM, manejar el agent loop, implementar memoria, RAG u orquestación**.
+El objetivo es que una aplicación que quiera incorporar capacidades de IA **no tenga que implementar su propio agente, integrar directamente un LLM, manejar el agent loop ni construir un sistema de memoria**.
 
-La aplicación solamente debe exponer sus capacidades mediante **MCP**.
-
-El Agent Runtime se encarga de ejecutar el agente y conectarse con uno o varios MCP.
+La aplicación expone sus capacidades de dominio mediante **MCP**. Agent Runtime ejecuta el agente, integra su Memory MCP interno y se conecta con los MCP externos que la aplicación configure.
 
 ```text
                          AGENT RUNTIME
-                              |
-                         MCP Client
-                              |
-              +---------------+---------------+
-              |               |               |
-              v               v               v
-          Application       Memory          Tools
-             MCP              MCP             MCP
-              |                |               |
-              v                v               v
-           Domain          Memory DB        External
-           System          / RAG            Systems
+              +--------------------------------+
+              | Agent Loop       Memory MCP   |
+              |                      |         |
+              |                Memory DB/RAG   |
+              +----------------------+---------+
+                                     |
+                              MCP Client externo
+                                     |
+                         +-----------+----------+
+                         |                      |
+                    Application MCP        Tools MCP
+                         |                      |
+                    Domain System        External Systems
 ```
 
 ---
@@ -321,15 +320,7 @@ El Runtime puede combinar estas capacidades sin conocer internamente cómo funci
 
 # 9. No existe un MCP "Tools" obligatorio
 
-No es necesario imponer una arquitectura como:
-
-```text
-Memory MCP
-Tools MCP
-Product MCP
-```
-
-En su lugar, la composición puede ser completamente flexible:
+No es necesario imponer una arquitectura fija para las integraciones externas:
 
 ```text
 Agent Runtime
@@ -338,20 +329,11 @@ Agent Runtime
      +-- GitHub MCP
      +-- PC MCP
      +-- Browser MCP
-     +-- Memory MCP
      +-- CRM MCP
-     +-- cualquier otro MCP
+     +-- cualquier otro MCP externo
 ```
 
-Un MCP puede ser un dominio de negocio.
-
-Otro puede representar una herramienta general.
-
-Otro puede representar memoria.
-
-Otro puede representar un dispositivo.
-
-Todos son tratados por el Agent Runtime mediante la misma abstracción: **MCP**.
+Un MCP externo puede representar un dominio de negocio, una herramienta general o un dispositivo. Agent Runtime consume esas integraciones mediante la abstracción **MCP**. La memoria no forma parte de esta composición opcional: Memory MCP es el componente integrado de Runtime, aunque internamente también use el protocolo MCP.
 
 ---
 
@@ -590,8 +572,7 @@ Por ejemplo:
 
 ```text
 Agent Runtime
-      |
-      +-- Engram / Memory MCP
+      ├── Memory MCP integrado
       |
       +-- Local Computer MCP
       |

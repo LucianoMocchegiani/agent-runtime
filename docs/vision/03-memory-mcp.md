@@ -1,97 +1,53 @@
-# Memory MCP — Concepto y Arquitectura
+# Memory MCP — Componente integrado de Agent Runtime
 
 ## 1. Objetivo
 
-El **Memory MCP** es un servidor MCP especializado en proporcionar memoria persistente a agentes de IA.
+El **Memory MCP** es el componente de Agent Runtime responsable de la memoria persistente. Administra:
 
-Su objetivo es permitir que un Agent Runtime pueda trabajar con:
+* conversaciones y mensajes
+* contexto persistente y recuerdos
+* preferencias, decisiones y hechos relevantes
+* resúmenes y recuperación de contexto
 
-* sesiones
-* conversaciones
-* contexto persistente
-* recuerdos
-* preferencias
-* decisiones
-* hechos relevantes
-* resúmenes
-* checkpoints
-* recuperación después de compaction
+La API de Runtime usa el protocolo MCP y el contrato compartido para comunicarse con este componente. MCP define la interfaz interna; no implica que Memory sea un servicio externo o una implementación intercambiable.
 
-sin que el Agent Runtime tenga que implementar directamente una base de datos o una arquitectura de memoria.
-
-La idea principal es:
-
-> **La memoria pertenece a un servicio independiente y el Agent Runtime la consume como una capacidad mediante MCP.**
+> **Memory MCP forma parte de Agent Runtime: Runtime ejecuta el agente y su Memory MCP integrado administra la memoria persistente.**
 
 ---
 
-# 2. Memory como MCP
+# 2. Memory como componente interno vía MCP
 
-El Agent Runtime no debería tener una implementación obligatoria de memoria.
+El proyecto incluye la implementación de Memory MCP (`apps/memory-mcp`). En el despliegue actual corre como proceso separado para mantener responsabilidades y persistencia claramente delimitadas, pero es parte de la solución Agent Runtime y se despliega junto con ella.
 
-En lugar de:
+```text
+                    AGENT RUNTIME
+        +----------------------------------+
+        | API / Agent Loop                 |
+        |        |                         |
+        |        +--- MCP interno ---------+
+        |                    |             |
+        |              Memory MCP         |
+        +--------------------|-------------+
+                             |
+                         PostgreSQL
+```
+
+El contrato MCP compartido mantiene una frontera clara entre la API y la implementación de persistencia. Esa frontera facilita evolucionar internamente el componente, pero no establece soporte para sustituirlo por un Memory MCP de terceros.
+
+---
+
+# 3. Implementación incluida
+
+El proyecto proporciona y mantiene su propia implementación de Memory MCP. El usuario puede iniciar Agent Runtime sin construir ni configurar un sistema de memoria aparte.
 
 ```text
 Agent Runtime
-    |
-    ├── Agent Loop
-    ├── Model
-    ├── Memory
-    └── MCP
+   ├── API / Agent Loop
+   └── Memory MCP integrado
+           └── PostgreSQL
 ```
 
-se propone:
-
-```text
-Agent Runtime
-    |
-    ├── Agent Loop
-    ├── Model
-    |
-    └── MCP Client
-          |
-          └── Memory MCP
-```
-
-De esta forma, Memory se convierte en una capacidad externa.
-
-El Runtime solamente necesita conocer el contrato del Memory MCP.
-
----
-
-# 3. Memory MCP como implementación por defecto
-
-Aunque Memory sea desacoplada del Runtime, el proyecto puede proporcionar un **Memory MCP oficial/default**.
-
-Esto permite que el Agent Runtime funcione inmediatamente sin obligar al usuario a construir su propio sistema de memoria.
-
-```text
-                     AGENT RUNTIME
-                           |
-                       MCP Client
-                           |
-                           ▼
-                    Memory MCP
-                           |
-                     PostgreSQL
-```
-
-El usuario podría posteriormente reemplazarlo por otra implementación:
-
-```text
-                    Agent Runtime
-                          |
-                     Memory MCP
-                          |
-            +-------------+-------------+
-            |             |             |
-          Default       Engram        Custom
-          Memory         Memory        Memory
-```
-
-El Runtime no debería depender de ninguna implementación concreta.
-
----
+La base de datos y las migraciones de conversaciones y mensajes son propiedad del componente Memory MCP incluido en el repositorio.
 
 # 4. Session vs Memory
 
@@ -501,7 +457,7 @@ Memory MCP
           8000 tokens
 ```
 
-Esto permite que la lógica de selección de memoria esté desacoplada del Agent Runtime.
+La selección de información relevante es responsabilidad del componente Memory MCP y se coordina con Runtime mediante el contrato interno compartido.
 
 ---
 
@@ -642,99 +598,57 @@ El Memory MCP debería ser responsable de:
 
 ---
 
-# 19. Implementación Default
+# 19. Implementación incluida
 
-El proyecto debería proporcionar una implementación oficial:
+El repositorio incluye la implementación de Memory MCP como parte de Agent Runtime. Su objetivo es ser:
 
-```text
-@agent-runtime/memory-mcp
-```
+* fácil de instalar y configurar junto con Runtime
+* responsable de conversaciones y mensajes
+* persistente y multiusuario
+* compatible con recuerdos, preferencias y recuperación de contexto
+* independiente del proveedor de modelo
 
-o equivalente.
-
-Su objetivo sería ser:
-
-* fácil de instalar
-* fácil de configurar
-* multi-tenant
-* persistente
-* compatible con sesiones
-* compatible con compaction
-* extensible
-* independiente del modelo
-* independiente del dominio
-
-El usuario debería poder iniciar un Agent Runtime sin tener que desarrollar su propio sistema de memoria.
+El usuario inicia Agent Runtime con el componente de memoria incluido; no necesita desarrollar ni proveer otro sistema de memoria.
 
 ---
 
-# 20. Implementaciones externas
+# 20. Evolución del componente
 
-La implementación default no debe convertirse en un requisito.
+Memory MCP puede evolucionar internamente —por ejemplo, ampliar la recuperación, los embeddings o la estrategia de persistencia— manteniendo un contrato estable con la API de Runtime.
 
-Un usuario puede reemplazarla por:
-
-```text
-Agent Runtime
-      |
-      ▼
-Memory MCP interface
-      |
-      +── Default Memory MCP
-      +── Engram
-      +── Mem0
-      +── Zep
-      +── Custom Memory MCP
-```
-
-Mientras el servidor implemente el contrato esperado, el Runtime puede utilizarlo.
+El contrato compartido sirve para organizar esa integración interna y no define un punto de extensión para reemplazar Memory por Engram, Mem0, Zep u otro servicio externo.
 
 ---
 
 # 21. Principio fundamental
 
-El objetivo no es construir "la única memoria correcta".
+> **Memory MCP es el componente de memoria integrado de Agent Runtime, no un proveedor externo opcional.**
 
-El objetivo es proporcionar:
-
-> **Una implementación de Memory MCP suficientemente completa para funcionar out-of-the-box y un contrato que permita reemplazarla.**
-
-Esto mantiene el Agent Runtime desacoplado y permite que diferentes aplicaciones utilicen diferentes estrategias de memoria.
+La separación por MCP permite que la API de Runtime use operaciones de memoria mediante una interfaz clara, mientras el componente incluido conserva la responsabilidad de persistencia y lógica de memoria.
 
 ---
 
-# 22. Arquitectura final
+# 22. Arquitectura
 
 ```text
                          AGENT RUNTIME
-                              |
-                    +---------+---------+
-                    |                   |
-                  Model             MCP Client
-                    |                   |
-               Any Provider       +-----+------+
-                                  |            |
-                            Memory MCP      Domain MCPs
-                                  |
-                     +------------+------------+
-                     |            |            |
-                  Sessions      Memory       Retrieval
-                     |            |            |
-                     +------------+------------+
-                                  |
-                              Storage
+                  +-------------------------+
+                  | API / Agent Loop        |
+                  |       |                 |
+                  |       +-- MCP interno --+
+                  |              |          |
+                  |        Memory MCP       |
+                  |              |          |
+                  |          Storage        |
+                  +-------------------------+
+                         |           |
+                    Model Provider  Domain MCPs
 ```
 
-El principio general es:
+El Runtime ejecuta el agente y orquesta sus turnos.
 
-> **Memory is a capability, not a core implementation detail of the Agent Runtime.**
+El Memory MCP integrado administra conversaciones, mensajes y recuerdos.
 
-El Runtime ejecuta.
+Los proveedores de modelo suministran inferencia y los MCP configurados aportan capacidades externas de dominio.
 
-El Model Provider proporciona inferencia.
-
-El Memory MCP proporciona memoria persistente.
-
-Los Domain MCPs proporcionan capacidades.
-
-Cada componente puede evolucionar o reemplazarse de forma independiente.
+Memory es una parte de la arquitectura de Agent Runtime; no se considera un componente externo intercambiable.

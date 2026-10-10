@@ -2,17 +2,20 @@
 
 ## 1. Visión general
 
-Agent Runtime es un entorno de ejecución genérico para agentes de IA. No está acoplado a un dominio, base de datos o sistema de memoria específico. La aplicación expone capacidades via MCP; el runtime ejecuta el agente y orquesta la conversación.
+Agent Runtime es un entorno de ejecución genérico para agentes de IA. No está acoplado a un dominio de negocio, pero incluye su propio Memory MCP para conversaciones, mensajes y recuerdos. Memory se ejecuta como proceso separado y se comunica con la API mediante el contrato MCP interno; es parte de Agent Runtime, no un proveedor externo reemplazable. La aplicación expone capacidades adicionales mediante MCP y Runtime ejecuta el agente y orquesta la conversación.
 
 ```
-                      AGENT RUNTIME
-                           |
-                    Model Interface   MCP Client
-                           |              |
-                    +------+------+  +----+----+
-                    |             |  |         |
-                  OpenRouter   Ollama  Memory   Domain MCPs
-                                |  MCP      MCP     MCP
+                         AGENT RUNTIME
+              +----------------------------------+
+              | API / Agent Loop                 |
+              |    |                |            |
+              |    |                +-- LLM      |
+              |    |                             |
+              |    +-- MCP interno --> Memory MCP|
+              +----------------------------------+
+                              |
+                       MCP externos
+                    (dominio / herramientas)
 ```
 
 ---
@@ -21,22 +24,22 @@ Agent Runtime es un entorno de ejecución genérico para agentes de IA. No está
 
 | Principio | Aplicación |
 |---|---|
-| Runtime agnóstico del dominio | No hay lógica de dominio en el runtime |
-| Memoria externa | El runtime no persiste; consume un Memory MCP |
-| Provider swapable | AI SDK abstrae el modelo; OpenRouter es default, no dependencia |
-| MCP como frontera | Todo acceso a capacidades externas pasa por MCP |
-| Identidad delegada | El dominio interpreta `userId`; el runtime solo pasa `userId` a memory |
-| Auth por MCP | Cada MCP valida su propio Bearer |
+| Runtime agnóstico del dominio | No hay lógica del dominio huésped en el runtime |
+| Memory MCP integrado | Componente propio que administra las conversaciones y recuerdos; usa una interfaz MCP interna |
+| Provider intercambiable | AI SDK abstrae el modelo; OpenRouter es default, no dependencia |
+| MCP para integraciones | Las capacidades externas de la aplicación se consumen mediante MCP |
+| Identidad delegada | El huésped autentica; Runtime pasa el `userId` a Memory y a las integraciones que lo requieran |
+| Auth de integraciones | Cada MCP externo valida su propio Bearer |
 
 ---
 
 ## 3. Patrones de diseño
 
 ### Adapter
-`Memory MCP client` adapta el protocolo MCP al contrato que el runtime necesita (`getContext`, `saveMessage`, `listMessages`). El runtime no conoce Prisma ni la implementación del MCP.
+El cliente de Memory adapta el protocolo MCP interno al contrato compartido que usa la API (`getContext`, `saveMessage`, `listMessages`). La implementación de persistencia pertenece al componente Memory MCP incluido; la API no conoce Prisma.
 
 ### Repository (virtual)
-Las operaciones de memoria (`listMessages`, `insertUserMessage`, etc.) se exponen como si fueran un repositorio, pero la implementación real es un MCP remoto.
+Las operaciones de memoria (`listMessages`, `insertUserMessage`, etc.) se exponen a la API mediante el contrato interno de Memory MCP. No representan una integración de memoria externa configurable.
 
 ### Strategy
 Proveedores de modelo: `chatModel()` retorna un modelo según configuración. Swappable sin tocar el agent loop.
@@ -54,7 +57,7 @@ Auth (`requirePrincipal`), CORS, rate-limit son middlewares desacoplados del neg
 | HTTP | Hono | Router, middleware, SSE |
 | LLM | AI SDK + OpenRouter / OpenAI | Inferencia, tool calling, streaming |
 | MCP | `@ai-sdk/mcp` | Conexión via `mcpConfig` guardado en `runtime.config` (URL y auth por MCP) |
-| DB (default memory) | Prisma + PostgreSQL | Solo Memory MCP default |
+| DB de memoria | Prisma + PostgreSQL | Propiedad del Memory MCP integrado |
 | Auth | Introspección HTTP + HMAC | Bearer token validation |
 | Rate limit | In-memory Map | Por instancia |
 
@@ -147,7 +150,7 @@ apps/api/src/                 # API + configuración runtime cifrada en PostgreS
   │   └── introspect.ts       # Introspección token (cache 30s)
   └── cors.ts                 # Config CORS
 
-apps/memory-mcp/              # Memory MCP default: dueño de la DB `memory`
+apps/memory-mcp/              # Memory MCP integrado: dueño de la DB `memory`
   ├── prisma/                 # schema + migraciones (conversations, messages)
   └── src/
       ├── index.ts            # Entry point (127.0.0.1:3012 por default)
