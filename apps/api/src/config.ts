@@ -129,7 +129,6 @@ export type AiConfig = {
 export type ChatConfig = {
   port: number;
   mcpConfig: McpConfig;
-  memoryMcpUrl: string;
   authIntrospectUrl: string;
   authMapping: AuthMapping;
   ai: AiConfig;
@@ -157,7 +156,6 @@ export type ChatConfig = {
 export const config: ChatConfig = {
   port: parsePort(process.env.PORT),
   mcpConfig: {},
-  memoryMcpUrl: required('MEMORY_MCP_URL'),
   authIntrospectUrl: required('AUTH_INTROSPECT_URL'),
   authMapping: parseAuthMapping(process.env.AUTH_MAPPING),
   ai: { defaultModel: '', providers: {} },

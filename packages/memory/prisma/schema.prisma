@@ -1,4 +1,4 @@
-// Memory MCP default — dueño único de la database `memory`.
+// Modelo del módulo interno Memory, sobre el esquema público de PostgreSQL.
 
 generator client {
   provider      = "prisma-client-js"
@@ -16,6 +16,7 @@ model Conversation {
   tenantId   String?  @map("tenant_id")
   userId     String    @map("user_id")
   title      String?
+  agentProfileId String? @map("agent_profile_id")
   archivedAt DateTime? @map("archived_at") @db.Timestamptz
   summary    String?   @db.Text
   summaryRevision Int  @default(0) @map("summary_revision")

@@ -1,15 +1,8 @@
-# agent-runtime sin clonar el repo: usa las imágenes publicadas en ghcr.io.
-#   1. Bajá este archivo y el .env.example (ver README, "Usar sin clonar").
-#   2. Completá .env con DATABASE_URL y RUNTIME_CONFIG_ENCRYPTION_KEY; RUNTIME_CONFIG_INTERNAL_TOKEN solo si habilitás embeddings.
-#   3. docker compose up -d   →   http://localhost:3010
-#
-# Versión fija: AGENT_RUNTIME_VERSION=0.1.0 en .env (default: latest).
-
+# agent-runtime sin clonar el repo: usa la imagen única publicada en ghcr.io.
+# Configurá DATABASE_URL y RUNTIME_CONFIG_ENCRYPTION_KEY en .env.
 name: agent-runtime
-
 services:
   postgres:
-    # pgvector is required by the Memory search migration (CREATE EXTENSION vector).
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
@@ -24,40 +17,29 @@ services:
       timeout: 3s
       retries: 30
 
-  # Memory MCP default: único dueño de la database `memory`. Sin auth propia, solo red interna.
-  memory-mcp:
-    image: ghcr.io/lucianomocchegiani/agent-runtime-memory-mcp:${AGENT_RUNTIME_VERSION:-latest}
-    restart: unless-stopped
+  # Tarea efímera para aplicar migraciones antes de iniciar la aplicación.
+  migrate:
+    image: ghcr.io/lucianomocchegiani/agent-runtime:${AGENT_RUNTIME_VERSION:-latest}
+    command: ["npm", "run", "prisma:deploy", "-w", "packages/memory"]
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
-      - MEMORY_MCP_PORT=3012
-      - AGENT_RUNTIME_CONFIG_URL=http://agent-runtime:3010/internal/runtime-config/embedding
-      - RUNTIME_CONFIG_INTERNAL_TOKEN=${RUNTIME_CONFIG_INTERNAL_TOKEN:-}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 10s
 
-  # API + UI nativa. Solo esta máquina: la UI no pide login.
   agent-runtime:
     image: ghcr.io/lucianomocchegiani/agent-runtime:${AGENT_RUNTIME_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "127.0.0.1:3010:3010"
-    # MCPs que corren en el host (fuera de Docker): http://host.docker.internal:<puerto>/mcp
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      memory-mcp:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file: ./.env
     environment:
-      - MEMORY_MCP_URL=http://memory-mcp:3012/mcp
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
 
 volumes:

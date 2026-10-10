@@ -1,53 +1,41 @@
-# Memory MCP — Componente integrado de Agent Runtime
+# Memory — Módulo integrado de Agent Runtime
+
+## Estado actual de implementación
+
+Memory es un módulo interno del mismo proceso que Runtime. No se levanta un servidor MCP, puerto ni proceso aparte, y la API realiza llamadas directas a sus operaciones. Las menciones posteriores a “Memory MCP” y los diagramas de protocolo de este documento son conceptos históricos y no describen el transporte actual.
 
 ## 1. Objetivo
 
-El **Memory MCP** es el componente de Agent Runtime responsable de la memoria persistente. Administra:
+El módulo **Memory** administra conversaciones y mensajes, recuerdos y preferencias, resúmenes y recuperación de contexto. Runtime coordina los turnos del agente y consume Memory directamente. Las herramientas MCP se reservan para integraciones externas.
 
-* conversaciones y mensajes
-* contexto persistente y recuerdos
-* preferencias, decisiones y hechos relevantes
-* resúmenes y recuperación de contexto
+```text
+Runtime API (un proceso)
+  ├── Agent Loop / perfiles
+  └── módulo Memory ── Prisma ── PostgreSQL
+```
 
-La API de Runtime usa el protocolo MCP y el contrato compartido para comunicarse con este componente. MCP define la interfaz interna; no implica que Memory sea un servicio externo o una implementación intercambiable.
-
-> **Memory MCP forma parte de Agent Runtime: Runtime ejecuta el agente y su Memory MCP integrado administra la memoria persistente.**
+Memory conserva su propio dominio, contrato de tipos, Prisma y migraciones. Compartir proceso no elimina la separación de responsabilidades.
 
 ---
 
-# 2. Memory como componente interno vía MCP
+# 2. Memory como módulo interno
 
-El proyecto incluye la implementación de Memory MCP (`apps/memory-mcp`). En el despliegue actual corre como proceso separado para mantener responsabilidades y persistencia claramente delimitadas, pero es parte de la solución Agent Runtime y se despliega junto con ella.
-
-```text
-                    AGENT RUNTIME
-        +----------------------------------+
-        | API / Agent Loop                 |
-        |        |                         |
-        |        +--- MCP interno ---------+
-        |                    |             |
-        |              Memory MCP         |
-        +--------------------|-------------+
-                             |
-                         PostgreSQL
-```
-
-El contrato MCP compartido mantiene una frontera clara entre la API y la implementación de persistencia. Esa frontera facilita evolucionar internamente el componente, pero no establece soporte para sustituirlo por un Memory MCP de terceros.
+La implementación del módulo, su schema Prisma y las migraciones viven en `packages/memory`. Runtime lo consume directamente dentro del proceso de la API; PostgreSQL es el servicio independiente que persiste los datos.
 
 ---
 
 # 3. Implementación incluida
 
-El proyecto proporciona y mantiene su propia implementación de Memory MCP. El usuario puede iniciar Agent Runtime sin construir ni configurar un sistema de memoria aparte.
+El proyecto proporciona y mantiene Memory como un paquete interno de dominio. El usuario puede iniciar Agent Runtime sin construir ni configurar un sistema de memoria aparte.
 
 ```text
 Agent Runtime
    ├── API / Agent Loop
-   └── Memory MCP integrado
+   └── paquete packages/memory
            └── PostgreSQL
 ```
 
-La base de datos y las migraciones de conversaciones y mensajes son propiedad del componente Memory MCP incluido en el repositorio.
+La base de datos y las migraciones de conversaciones y mensajes son responsabilidad del paquete `packages/memory` incluido en el repositorio.
 
 # 4. Session vs Memory
 

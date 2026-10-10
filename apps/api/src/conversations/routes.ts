@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/principal.js';
+import { getAgentProfile, getDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { requireConversationId } from './ids.js';
 import {
   archiveConversation,
@@ -43,11 +44,21 @@ conversationRoutes.get('/', async (c) => {
 
 conversationRoutes.post('/', async (c) => {
   const body = asRecord(await readJsonBody(c));
-  if (body.agentProfileId !== undefined) throw new HTTPException(400, { message: 'El perfil es global y no se configura por conversación.' });
   const title = parseTitleInput(body.title);
+  let profileId: string;
+  if (body.agentProfileId === undefined || body.agentProfileId === null) {
+    profileId = (await getDefaultAgentProfile()).id;
+  } else if (typeof body.agentProfileId === 'string' && body.agentProfileId.trim()) {
+    const profile = await getAgentProfile(body.agentProfileId.trim());
+    if (!profile) throw new HTTPException(400, { message: 'El perfil seleccionado no existe o está archivado.' });
+    profileId = profile.id;
+  } else {
+    throw new HTTPException(400, { message: 'agentProfileId debe ser un identificador de perfil.' });
+  }
   const created = await createConversation(
     c.get('principal'),
     title === undefined ? null : title,
+    profileId,
   );
   return c.json(created, 201);
 });
@@ -61,8 +72,18 @@ conversationRoutes.get('/:id', async (c) => {
 conversationRoutes.patch('/:id', async (c) => {
   const id = requireConversationId(c.req.param('id'));
   const body = asRecord(await readJsonBody(c));
-  if (body.agentProfileId !== undefined) throw new HTTPException(400, { message: 'El perfil es global y no se configura por conversación.' });
   const title = parseTitleInput(body.title);
+  let agentProfileId: string | undefined;
+  if (body.agentProfileId === null) {
+    agentProfileId = (await getDefaultAgentProfile()).id;
+  } else if (body.agentProfileId !== undefined) {
+    if (typeof body.agentProfileId !== 'string' || !body.agentProfileId.trim()) {
+      throw new HTTPException(400, { message: 'agentProfileId debe ser un identificador de perfil.' });
+    }
+    const profile = await getAgentProfile(body.agentProfileId.trim());
+    if (!profile) throw new HTTPException(400, { message: 'El perfil seleccionado no existe o está archivado.' });
+    agentProfileId = profile.id;
+  }
   let archived: boolean | undefined;
   if (body.archived !== undefined) {
     if (typeof body.archived !== 'boolean') {
@@ -73,6 +94,7 @@ conversationRoutes.patch('/:id', async (c) => {
   const row = await updateConversation(c.get('principal'), id, {
     ...(title !== undefined ? { title } : {}),
     ...(archived !== undefined ? { archived } : {}),
+    ...(agentProfileId !== undefined ? { agentProfileId } : {}),
   });
   return c.json(row);
 });

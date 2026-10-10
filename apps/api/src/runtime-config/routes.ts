@@ -6,7 +6,6 @@ import { getRuntimeConfigVersion, getRuntimeSettings, isRuntimeConfigStoreEnable
 
 const MASK = '********';
 export const runtimeConfigRoutes = new Hono<AppEnv>();
-export const internalRuntimeConfigRoutes = new Hono();
 
 function matchesSecret(actualValue: string, expectedValue: string | undefined): boolean {
   if (!expectedValue) return false;
@@ -108,13 +107,3 @@ runtimeConfigRoutes.put('/', async (c) => {
   }
 });
 
-internalRuntimeConfigRoutes.get('/embedding', (c) => {
-  const expected = process.env.RUNTIME_CONFIG_INTERNAL_TOKEN?.trim();
-  const authorization = c.req.header('Authorization');
-  if (!isRuntimeConfigStoreEnabled() || !expected || !authorization?.startsWith('Bearer ')) return c.json({ error: 'Not Found' }, 404);
-  const actual = Buffer.from(authorization.slice(7));
-  const secret = Buffer.from(expected);
-  if (actual.length !== secret.length || !timingSafeEqual(actual, secret)) return c.json({ error: 'Not Found' }, 404);
-  const settings = getRuntimeSettings();
-  return c.json({ version: getRuntimeConfigVersion(), embeddingConfig: settings.embeddingConfig });
-});

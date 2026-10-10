@@ -7,9 +7,9 @@ import { config } from './config.js';
 import { allowCorsOrigin } from './cors.js';
 import { conversationRoutes } from './conversations/routes.js';
 import { modelRoutes } from './llm/routes.js';
-import { createMemoryMcpClient } from './memory/client.js';
+import { prisma } from 'agent-runtime-memory';
 import { messageRoutes } from './messages/routes.js';
-import { internalRuntimeConfigRoutes, runtimeConfigRoutes } from './runtime-config/routes.js';
+import { runtimeConfigRoutes } from './runtime-config/routes.js';
 import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';
 import { agentProfileListRoutes } from './runtime-config/agent-profile-list-routes.js';
 import { mountUi } from './ui.js';
@@ -18,22 +18,16 @@ type DependencyStatus = 'up' | 'down';
 
 const HEALTH_TIMEOUT_MS = 3000;
 
-/** Handshake MCP + tools requeridas: sirve para cualquier implementación de memoria, no solo la default. */
+/** Verifica PostgreSQL, compartido por Runtime y el módulo interno de Memory. */
 async function pingMemory(): Promise<DependencyStatus> {
-  let timer: NodeJS.Timeout | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('timeout')), HEALTH_TIMEOUT_MS);
-  });
-  const pending = createMemoryMcpClient();
   try {
-    const memory = await Promise.race([pending, timeout]);
-    await memory.close();
+    await Promise.race([
+      prisma.$queryRaw`SELECT 1`,
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), HEALTH_TIMEOUT_MS)),
+    ]);
     return 'up';
   } catch {
-    pending.then((memory) => memory.close(), () => undefined);
     return 'down';
-  } finally {
-    clearTimeout(timer);
   }
 }
 
@@ -69,7 +63,7 @@ export function createApp(): Hono<AppEnv> {
     return c.json({ error: 'Internal Server Error' }, 500);
   });
 
-  /** Probe de proceso + ping al Memory MCP; la DB de runtime es otra dependencia del proceso. */
+  /** Probe del proceso y de PostgreSQL, dependencia compartida de Runtime y Memory. */
   app.get('/health', async (c) => {
     const memory = await pingMemory();
     return c.json(
@@ -84,7 +78,6 @@ export function createApp(): Hono<AppEnv> {
 
   app.route('/admin/runtime-config', runtimeConfigRoutes);
   app.route('/admin/agent-profiles', agentProfileAdminRoutes);
-  app.route('/internal/runtime-config', internalRuntimeConfigRoutes);
 
   const v1 = new Hono<AppEnv>();
   v1.use('*', requirePrincipal);

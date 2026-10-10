@@ -1,19 +1,15 @@
-# agent-runtime completo: Postgres + Memory MCP + API con UI nativa.
+# agent-runtime completo: PostgreSQL + aplicación Runtime (API, Memory interno y UI).
 #   docker compose up -d --build   →   http://localhost:3010
-
-# Fijo: el volumen `agent-runtime_pgdata` no depende del nombre de la carpeta.
 name: agent-runtime
 
 services:
   postgres:
-    # pgvector is required by the Memory search migration (CREATE EXTENSION vector).
     image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_USER: agent
       POSTGRES_PASSWORD: agent
       POSTGRES_DB: memory
-    # 5433 en el host: el 5432 suele estar tomado por un Postgres nativo.
     ports:
       - "127.0.0.1:5433:5432"
     volumes:
@@ -24,48 +20,33 @@ services:
       timeout: 3s
       retries: 30
 
-  # Memory MCP owns its Memory tables in `public`; runtime config uses schema `runtime`. Sin auth propia, solo red interna.
-  memory-mcp:
+  # Tarea efímera de despliegue: aplica migraciones antes de iniciar la aplicación.
+  migrate:
     build:
       context: .
-      target: memory-mcp
-    restart: unless-stopped
-    # Descomentar solo para correr la API en el host contra este contenedor.
-    # ports:
-    #   - "3012:3012"
+      target: migrate
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
-      - MEMORY_MCP_PORT=3012
-      - AGENT_RUNTIME_CONFIG_URL=http://agent-runtime:3010/internal/runtime-config/embedding
-      - RUNTIME_CONFIG_INTERNAL_TOKEN=${RUNTIME_CONFIG_INTERNAL_TOKEN:-}
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3012/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-      start_period: 10s
 
-  # API + UI nativa en http://localhost:3010 (UI_ENABLED=false en .env la apaga).
+  # Único servicio de aplicación: HTTP API + módulo Memory en el mismo proceso.
   agent-runtime:
     build:
       context: .
       target: api
     restart: unless-stopped
-    # Solo esta máquina: la UI no pide login y los MCP conectados (ej. tu PC) quedarían expuestos a la red.
     ports:
       - "127.0.0.1:3010:3010"
-    # MCPs que corren en el host (fuera de Docker): http://host.docker.internal:<puerto>/mcp
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      memory-mcp:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     env_file: ./.env
     environment:
-      - MEMORY_MCP_URL=http://memory-mcp:3012/mcp
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
 
 volumes:

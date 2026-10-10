@@ -18,6 +18,7 @@ export type Conversation = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  agentProfileId: string | null;
 };
 
 export type AgentProfileInfo = { id: string; name: string; modelId: string; sortOrder: number };
@@ -120,14 +121,14 @@ export function createClient(config: ClientConfig) {
         return data?.items ?? [];
       },
 
-      create: async (): Promise<Conversation> => {
+      create: async (options: { agentProfileId?: string } = {}): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations`, {
           method: 'POST',
           headers: headers(config, {
             'Content-Type': 'application/json',
             Accept: 'application/json',
           }),
-          body: '{}',
+          body: JSON.stringify(options),
         });
         if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
         return json<Conversation>(res);
@@ -152,7 +153,7 @@ export function createClient(config: ClientConfig) {
 
       patch: async (
         id: string,
-        patch: { title?: string | null; archived?: boolean },
+        patch: { title?: string | null; archived?: boolean; agentProfileId?: string | null },
       ): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations/${id}`, {
           method: 'PATCH',

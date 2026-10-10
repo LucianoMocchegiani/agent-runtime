@@ -20,7 +20,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { titleFromFirstMessage } from './title.js';
 
-/** El MCP lo devuelve como tool error con este mensaje. */
+/** Error de dominio cuando un hilo no existe o no pertenece al usuario. */
 export class ConversationNotFoundError extends Error {
   constructor() {
     super('Conversation not found');
@@ -64,6 +64,7 @@ function toConversationDto(row: {
   id: string;
   userId: string;
   title: string | null;
+  agentProfileId: string | null;
   archivedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -72,6 +73,7 @@ function toConversationDto(row: {
     id: row.id,
     userId: row.userId,
     title: row.title,
+    agentProfileId: row.agentProfileId,
     archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -228,6 +230,7 @@ export async function createConversation(
       userId: params.userId,
       tenantId: 'public',
       title: params.title ?? null,
+      agentProfileId: params.agentProfileId ?? null,
     },
   });
   return toConversationDto(row);
@@ -254,6 +257,7 @@ export async function updateConversation(
     where: { id },
     data: {
       ...(patch.title !== undefined ? { title: patch.title } : {}),
+      ...(patch.agentProfileId !== undefined ? { agentProfileId: patch.agentProfileId } : {}),
       ...(patch.archived !== undefined
         ? { archivedAt: patch.archived ? new Date() : null }
         : {}),

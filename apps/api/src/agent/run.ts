@@ -5,12 +5,12 @@ import { isAbortError, identifiedFacingLlmError } from '../llm/errors.js';
 import type { ResolvedModel } from '../llm/provider.js';
 import { McpRegistry } from '../mcp/registry.js';
 import {
-  createMemoryMcpClient,
+  createMemoryClient,
 } from '../memory/client.js';
 import {
   toJsonValue,
   type GetContextResult,
-  type MemoryMcp,
+  type MemoryService,
   type MessageDto,
 } from 'agent-runtime-memory-contract';
 import {
@@ -207,7 +207,7 @@ function messagesAfterSummaryCursor(
 }
 
 async function compactOmittedMessages(
-  memory: MemoryMcp,
+  memory: MemoryService,
   model: ResolvedModel,
   conversationId: string,
   userId: string,
@@ -263,7 +263,7 @@ async function compactOmittedMessages(
 }
 
 async function persistAgentTurn(
-  memory: MemoryMcp,
+  memory: MemoryService,
   conversationId: string,
   userId: string,
   text: string | undefined,
@@ -314,10 +314,10 @@ async function persistAgentTurn(
 }
 
 /**
- * Corre un turno: Memory MCP + Domain MCP + OpenRouter + stream UI.
+ * Corre un turno: Memory interno + Domain MCP + OpenRouter + stream UI.
  *
  * @remarks Abort del cliente (`AbortSignal`) corta el LLM y guarda lo ya generado.
- * @throws {HTTPException} 502 si Memory MCP, Domain MCP o OpenRouter no arrancan.
+ * @throws {HTTPException} 502 si Memory, Domain MCP o OpenRouter no están disponibles.
  */
 export async function streamAgentTurn(
   conversationId: string,
@@ -335,9 +335,9 @@ export async function streamAgentTurn(
   const runtimeSettings = getRuntimeSettings(agentProfile);
   const turnSystemPrompt = runtimeSettings.chatSystemPrompt;
 
-  let memory: MemoryMcp;
+  let memory: MemoryService;
   try {
-    memory = await createMemoryMcpClient();
+    memory = await createMemoryClient();
   } catch (error) {
     console.error(error);
     throw new HTTPException(502, { message: failMessage });
@@ -349,7 +349,6 @@ export async function streamAgentTurn(
     await registry.connect(accessToken, mcpTokens);
   } catch (error) {
     console.error(error);
-    await memory.close().catch(() => undefined);
     throw new HTTPException(502, { message: failMessage });
   }
 
@@ -358,7 +357,6 @@ export async function streamAgentTurn(
     tools = await registry.getAllTools() as Record<string, Tool>;
   } catch (error) {
     await registry.close().catch(() => undefined);
-    await memory.close().catch(() => undefined);
     console.error(error);
     throw new HTTPException(502, { message: failMessage });
   }
@@ -366,7 +364,6 @@ export async function streamAgentTurn(
   const memorySearchToolName = 'memory__searchMemory';
   if (Object.hasOwn(tools, memorySearchToolName)) {
     await registry.close().catch(() => undefined);
-    await memory.close().catch(() => undefined);
     throw new HTTPException(502, { message: failMessage });
   }
   tools[memorySearchToolName] = tool({
@@ -419,7 +416,6 @@ export async function streamAgentTurn(
   ];
   if (preferenceToolNames.some((name) => Object.hasOwn(tools, name))) {
     await registry.close().catch(() => undefined);
-    await memory.close().catch(() => undefined);
     throw new HTTPException(502, { message: failMessage });
   }
   tools.memory__savePreference = tool({
@@ -488,7 +484,6 @@ export async function streamAgentTurn(
     });
   } catch (error) {
     await registry.close().catch(() => undefined);
-    await memory.close().catch(() => undefined);
     console.error(error);
     throw new HTTPException(502, { message: failMessage });
   }
@@ -579,7 +574,6 @@ export async function streamAgentTurn(
     }
     closed = true;
     await registry.close().catch(() => undefined);
-    await memory.close().catch(() => undefined);
   };
 
   const startedAt = Date.now();

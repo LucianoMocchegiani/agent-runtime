@@ -1,29 +1,7 @@
 /**
- * Contrato del Memory MCP: nombres de tools y formas de entrada/salida.
- *
- * @remarks Lo implementa `apps/memory-mcp` (default) y lo consume `apps/api`. Cualquier
- * implementación alternativa (Engram, Mem0, propia) debe exponer estas tools por MCP.
+ * Tipos y DTOs del módulo interno Memory: conversaciones, mensajes, recuerdos y preferencias.
+ * Runtime consume estas operaciones como llamadas de código dentro del mismo proceso; no son transporte MCP.
  */
-
-export const MEMORY_TOOLS = {
-  getContext: 'getContext',
-  saveSummary: 'saveSummary',
-  saveMessage: 'saveMessage',
-  listMessages: 'listMessages',
-  listConversations: 'listConversations',
-  createConversation: 'createConversation',
-  getConversation: 'getConversation',
-  updateConversation: 'updateConversation',
-  archiveConversation: 'archiveConversation',
-  applyAutomaticTitle: 'applyAutomaticTitle',
-  searchMemory: 'searchMemory',
-  savePreference: 'savePreference',
-  listPreferences: 'listPreferences',
-  searchPreferences: 'searchPreferences',
-  deletePreference: 'deletePreference',
-} as const;
-
-export type MemoryToolName = (typeof MEMORY_TOOLS)[keyof typeof MEMORY_TOOLS];
 
 export type JsonValue =
   | string
@@ -51,6 +29,7 @@ export type ConversationDto = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  agentProfileId: string | null;
 };
 
 export type GetContextParams = {
@@ -92,11 +71,13 @@ export type SaveMessageParams = {
 export type CreateConversationParams = {
   userId: string;
   title?: string | null;
+  agentProfileId?: string | null;
 };
 
 export type UpdateConversationPatch = {
   title?: string | null;
   archived?: boolean;
+  agentProfileId?: string | null;
 };
 
 export type ListConversationsParams = {
@@ -210,7 +191,7 @@ export function toJsonValue(value: unknown): JsonValue | undefined {
   }
 }
 
-export interface MemoryMcp {
+export interface MemoryService {
   getContext(params: GetContextParams): Promise<GetContextResult>;
   saveSummary(params: SaveSummaryParams): Promise<boolean>;
   saveMessage(params: SaveMessageParams): Promise<void>;
@@ -234,5 +215,4 @@ export interface MemoryMcp {
   listPreferences(params: ListPreferencesParams): Promise<UserPreferenceDto[]>;
   searchPreferences(params: SearchPreferencesParams): Promise<UserPreferenceDto[]>;
   deletePreference(params: DeletePreferenceParams): Promise<boolean>;
-  close(): Promise<void>;
 }

@@ -1,13 +1,7 @@
 # Qué es Agent Runtime
 
-Agent Runtime es un entorno de ejecución para agentes de IA que se integra con aplicaciones y herramientas externas mediante MCP.
+Agent Runtime ejecuta agentes de IA con perfiles configurables, conversaciones persistentes y herramientas MCP externas.
 
-## Cómo funciona hoy
+Incluye un módulo interno **Memory** que administra conversaciones, mensajes, recuerdos, resúmenes y preferencias. Memory conserva sus modelos y migraciones, pero se ejecuta dentro del mismo proceso Runtime; no levanta un servidor, puerto ni MCP interno.
 
-Agent Runtime incluye su propio componente **Memory MCP**, que administra conversaciones, mensajes, recuerdos y preferencias. La API de Runtime lo consume mediante un contrato MCP interno. Aunque Memory se ejecuta como un proceso separado, forma parte de la solución y no se plantea como un servicio externo reemplazable.
-
-Los MCP configurados para herramientas e integraciones de producto son capacidades externas que el agente puede utilizar durante sus turnos. Memory no es una de esas integraciones opcionales: es parte de la infraestructura del Runtime.
-
-## Dirección del proyecto
-
-El Runtime puede reutilizarse con distintas aplicaciones mediante configuración de identidad e integraciones MCP. La persistencia y el contrato de Memory siguen siendo responsabilidad de Agent Runtime; no se requiere que cada aplicación provea su propio MCP de memoria.
+La aplicación persiste en PostgreSQL. Runtime es responsable de los perfiles y de aplicar el perfil asignado a cada conversación al comenzar cada turno. Los turnos son ejecuciones temporales y supervisables desde sus conversaciones, no procesos permanentes por hilo.

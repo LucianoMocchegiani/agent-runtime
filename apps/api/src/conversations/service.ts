@@ -1,5 +1,5 @@
 import { HTTPException } from 'hono/http-exception';
-import { createMemoryMcpClient } from '../memory/client.js';
+import { createMemoryClient } from '../memory/client.js';
 import type { Principal } from '../auth/principal.js';
 import type {
   ConversationDto,
@@ -18,7 +18,7 @@ export async function listConversations(
   principal: Principal,
   archived: boolean,
 ): Promise<ConversationDto[]> {
-  const memory = await createMemoryMcpClient();
+  const memory = await createMemoryClient();
   try {
     const items = await memory.listConversations({
       userId: principal.userId,
@@ -26,7 +26,6 @@ export async function listConversations(
     });
     return items.slice(0, LIST_TAKE);
   } finally {
-    await memory.close().catch(() => undefined);
   }
 }
 
@@ -36,15 +35,16 @@ export async function listConversations(
 export async function createConversation(
   principal: Principal,
   title: string | null,
+  agentProfileId: string,
 ): Promise<ConversationDto> {
-  const memory = await createMemoryMcpClient();
+  const memory = await createMemoryClient();
   try {
     return await memory.createConversation({
       userId: principal.userId,
       title,
+      agentProfileId,
     });
   } finally {
-    await memory.close().catch(() => undefined);
   }
 }
 
@@ -52,14 +52,13 @@ export async function getConversation(
   principal: Principal,
   id: string,
 ): Promise<ConversationDto> {
-  const memory = await createMemoryMcpClient();
+  const memory = await createMemoryClient();
   try {
     return await memory.getConversation({
       id,
       userId: principal.userId,
     });
   } finally {
-    await memory.close().catch(() => undefined);
   }
 }
 
@@ -68,7 +67,7 @@ export async function updateConversation(
   id: string,
   patch: UpdateConversationPatch,
 ): Promise<ConversationDto> {
-  const memory = await createMemoryMcpClient();
+  const memory = await createMemoryClient();
   try {
     return await memory.updateConversation({
       id,
@@ -76,7 +75,6 @@ export async function updateConversation(
       patch,
     });
   } finally {
-    await memory.close().catch(() => undefined);
   }
 }
 
@@ -90,7 +88,7 @@ export async function applyAutomaticTitle(
   conversationId: string,
   userText: string,
 ): Promise<string | null> {
-  const memory = await createMemoryMcpClient();
+  const memory = await createMemoryClient();
   try {
     return await memory.applyAutomaticTitle({
       conversationId,
@@ -98,7 +96,6 @@ export async function applyAutomaticTitle(
       userText,
     });
   } finally {
-    await memory.close().catch(() => undefined);
   }
 }
 

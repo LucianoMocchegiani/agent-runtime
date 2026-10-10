@@ -31,8 +31,8 @@ export async function listAgentProfiles(includeArchived = false): Promise<AgentP
   const result = await db().query(`SELECT * FROM runtime.agent_profile_configs ${includeArchived ? '' : 'WHERE archived_at IS NULL'} ORDER BY sort_order, created_at, id`);
   return result.rows.map(dto);
 }
-export async function getAgentProfile(id: string): Promise<AgentProfile | null> {
-  const result = await db().query('SELECT * FROM runtime.agent_profile_configs WHERE id = $1 AND archived_at IS NULL', [id]);
+export async function getAgentProfile(id: string, includeArchived = false): Promise<AgentProfile | null> {
+  const result = await db().query(`SELECT * FROM runtime.agent_profile_configs WHERE id = $1 ${includeArchived ? '' : 'AND archived_at IS NULL'}`, [id]);
   return result.rows[0] ? dto(result.rows[0]) : null;
 }
 export async function getDefaultAgentProfile(): Promise<AgentProfile> {

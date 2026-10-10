@@ -2,11 +2,11 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { streamAgentTurn } from '../agent/run.js';
 import type { AppEnv } from '../auth/principal.js';
-import { createMemoryMcpClient } from '../memory/client.js';
+import { createMemoryClient } from '../memory/client.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
 import { resolveModel } from '../llm/provider.js';
-import { getDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
+import { getAgentProfile } from '../runtime-config/agent-profiles.js';
 
 const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -119,7 +119,7 @@ messageRoutes.get('/', async (c) => {
     before = { createdAt: beforeCreatedAt, id: beforeId };
   }
 
-  const memory = await createMemoryMcpClient();
+  const memory = await createMemoryClient();
   try {
     const page = await memory.listMessages({
       conversationId: id,
@@ -129,7 +129,6 @@ messageRoutes.get('/', async (c) => {
     });
     return c.json(page);
   } finally {
-    await memory.close().catch(() => undefined);
   }
 });
 
@@ -153,9 +152,15 @@ messageRoutes.post('/', async (c) => {
     ? `${text}${text ? '\n\n' : ''}${imageNote}`
     : text;
   if (typeof body === 'object' && body !== null && 'model' in body) {
-    throw new HTTPException(400, { message: 'El modelo se define en el perfil global activo del runtime.' });
+    throw new HTTPException(400, { message: 'El modelo se define en el perfil asignado a la conversación.' });
   }
-  const profile = await getDefaultAgentProfile();
+  // La asignación se fija al crear el hilo o durante el backfill al iniciar Runtime.
+  // No recurrir al predeterminado aquí: eso cambiaría silenciosamente el agente del hilo.
+  if (!conversation.agentProfileId) {
+    throw new HTTPException(409, { message: 'Esta conversación no tiene un perfil asignado. Asignale un perfil antes de continuar.' });
+  }
+  const profile = await getAgentProfile(conversation.agentProfileId, true);
+  if (!profile) throw new HTTPException(409, { message: 'El perfil asignado a esta conversación ya no está disponible.' });
   const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
   if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
   const principal = c.get('principal');

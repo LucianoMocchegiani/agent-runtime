@@ -18,6 +18,9 @@ function sortMessages(items) {
 export default function Chat({ conversationId, onOpenSidebar, onConversationUpdated }) {
   const [messages, setMessages] = useState([]);
   const [conversationTitle, setConversationTitle] = useState('');
+  const [agentProfileId, setAgentProfileId] = useState('');
+  const [agentProfiles, setAgentProfiles] = useState([]);
+  const [isChangingProfile, setIsChangingProfile] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
@@ -218,8 +221,10 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
     let isCurrent = true;
     setConversationTitle('');
     setIsEditingTitle(false);
-    client.conversations.get(conversationId).then(conversation => {
+    Promise.all([client.conversations.get(conversationId), client.agentProfiles.list()]).then(([conversation, profiles]) => {
       if (!isCurrent) return;
+      setAgentProfiles(profiles);
+      setAgentProfileId(conversation.agentProfileId ?? '');
       setConversationTitle(conversation.title ?? '');
       onConversationUpdated?.(conversation);
     }).catch(e => {
@@ -355,6 +360,22 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
     }
   }
 
+  async function changeAgentProfile(event) {
+    const nextId = event.target.value;
+    if (!nextId || nextId === agentProfileId || isChangingProfile) return;
+    setIsChangingProfile(true);
+    setError(null);
+    try {
+      const conversation = await client.conversations.patch(conversationId, { agentProfileId: nextId });
+      setAgentProfileId(conversation.agentProfileId ?? '');
+      onConversationUpdated?.(conversation);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setIsChangingProfile(false);
+    }
+  }
+
   async function saveConversationTitle(e) {
     e.preventDefault();
     if (isSavingTitle) return;
@@ -420,6 +441,15 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
             </>
           )}
           <span className="conversation-id" title={`ID: ${conversationId}`}>ID: {conversationId.slice(0, 8)}</span>
+          {agentProfiles.length > 0 && (
+            <label className="chat-profile-picker" title="Perfil usado en los próximos turnos">
+              Agente
+              <select value={agentProfileId} onChange={changeAgentProfile} disabled={isChangingProfile || isLoading}>
+                {!agentProfiles.some(profile => profile.id === agentProfileId) && agentProfileId && <option value={agentProfileId}>Perfil archivado</option>}
+                {agentProfiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+              </select>
+            </label>
+          )}
         </div>
         <span className="header-spacer" />
         <div className="toolbar">

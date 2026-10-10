@@ -1,6 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { config, type ChatConfig } from '../config.js';
+import { setEmbeddingConfig } from 'agent-runtime-memory';
 import { seedDefaultAgentProfile, setAgentProfilePool } from './agent-profiles.js';
 
 export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
@@ -44,11 +45,12 @@ async function reload(): Promise<void> {
     const next = decrypt(row.payload);
     Object.assign(config, next);
     embeddingConfig = next.embeddingConfig;
+    await setEmbeddingConfig(embeddingConfig);
     version = row.version;
   }
 }
 
-/** Runtime owns this schema; memory-mcp keeps its own tables and migrations separate. */
+/** Runtime configuration is stored separately from Memory's conversation schema. */
 export async function startRuntimeConfigStore(): Promise<void> {
   const url = process.env.DATABASE_URL?.trim();
   const rawKey = process.env.RUNTIME_CONFIG_ENCRYPTION_KEY?.trim();
@@ -81,8 +83,19 @@ export async function startRuntimeConfigStore(): Promise<void> {
     updated_at timestamptz NOT NULL DEFAULT now(),
     archived_at timestamptz NULL
   )`);
-  // Profiles belong to Runtime. Memory owns conversations and does not store profile assignments.
   await seedDefaultAgentProfile();
+  // Deterministically pin legacy threads to the first active profile; later default-profile
+  // changes must not silently change the agent assigned to existing conversations.
+  await pool.query(`UPDATE public.conversations SET agent_profile_id = (
+    SELECT id FROM runtime.agent_profile_configs WHERE archived_at IS NULL
+    ORDER BY sort_order, created_at, id LIMIT 1
+  ) WHERE agent_profile_id IS NULL`);
+  const unassigned = await pool.query<{ count: string }>(
+    'SELECT count(*)::text AS count FROM public.conversations WHERE agent_profile_id IS NULL',
+  );
+  if (Number(unassigned.rows[0]?.count ?? 0) > 0) {
+    throw new Error('No se pudieron asignar perfiles a todas las conversaciones existentes; verificá que haya un perfil activo.');
+  }
   const poll = () => { void reload().catch((err: unknown) => console.error('runtime config reload failed', err)); };
   const timer = setInterval(poll, 3000);
   timer.unref();
@@ -195,6 +208,7 @@ export async function saveRuntimeSettings(value: unknown, expectedVersion?: numb
     await client.query('COMMIT');
     Object.assign(config, validated);
     embeddingConfig = validated.embeddingConfig;
+    await setEmbeddingConfig(embeddingConfig);
     version = nextVersion;
     return version;
   } catch (error) {

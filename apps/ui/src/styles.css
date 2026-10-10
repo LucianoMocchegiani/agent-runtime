@@ -630,3 +630,9 @@ html, body, #root { min-width: 0; overflow: hidden; }
   .admin-profile-buttons .admin-secondary { min-width: 0; }
   .admin-guide-field { grid-template-columns: 1fr; gap: 4px; }
 }
+
+.conversation-profile-picker, .chat-profile-picker { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
+.conversation-profile-picker { flex-direction: column; align-items: stretch; padding: 8px 14px; }
+.conversation-profile-picker select, .chat-profile-picker select { min-width: 0; padding: 6px 8px; color: var(--text); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: 6px; }
+.chat-profile-picker { margin-left: 8px; }
+@media (max-width: 700px) { .chat-profile-picker { display: none; } }

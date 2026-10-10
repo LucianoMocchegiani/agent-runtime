@@ -14,8 +14,8 @@
     "noImplicitAny": true,
     "strictNullChecks": true,
     "noFallthroughCasesInSwitch": true,
-    "declaration": false,
+    "declaration": true,
     "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src/**/*.ts"]
 }

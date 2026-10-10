@@ -1,7 +1,4 @@
-# Construye las imágenes de agent-runtime y las publica en GitHub Container Registry (ghcr.io).
-#   push a main     → :latest y :sha-<corto>
-#   tag vX.Y.Z      → :X.Y.Z y :X.Y
-#   pull request    → solo construye (verifica que compile), no publica
+# Construye la imagen única de Runtime y la publica en GitHub Container Registry.
 name: images
 
 on:
@@ -18,19 +15,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: api
-            image: agent-runtime
-          - target: memory-mcp
-            image: agent-runtime-memory-mcp
     steps:
       - uses: actions/checkout@v4
-
       - uses: docker/setup-buildx-action@v3
-
       - name: Login a ghcr.io
         if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
@@ -38,26 +25,24 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Tags y labels
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          images: ghcr.io/${{ github.repository_owner }}/agent-runtime
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=sha,prefix=sha-,enable={{is_default_branch}}
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=ref,event=pr
-
       - uses: docker/build-push-action@v6
         with:
           context: .
-          target: ${{ matrix.target }}
+          target: api
           platforms: linux/amd64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ matrix.target }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api

@@ -16,7 +16,7 @@ Setup y env: [`../README.md`](../README.md).
 | Documento | Contenido |
 |-----------|-----------|
 | [01-diseno-y-modelo.md](./01-diseno-y-modelo.md) | Rol, límites, stack, persistencia, aislamiento |
-| [02-modulos.md](./02-modulos.md) | Qué hace cada carpeta de `apps/api/src/` y `apps/memory-mcp/src/` |
+| [02-modulos.md](./02-modulos.md) | Qué hace cada carpeta de `apps/api/src/` y `packages/memory/src/` |
 | [03-flujos.md](./03-flujos.md) | De abrir el chat a la respuesta; turno identificado; público; abort; errores |
 | [04-http.md](./04-http.md) | Rutas, auth, códigos |
 | [agent-profiles.md](./agent-profiles.md) | Perfiles reutilizables, perfil predeterminado y migración |

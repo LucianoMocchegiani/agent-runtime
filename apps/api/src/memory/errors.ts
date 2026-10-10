@@ -10,7 +10,7 @@ export class MemoryError extends Error {
 }
 
 export class MemoryUnavailableError extends MemoryError {
-  constructor(message = 'Memory MCP unavailable') {
+  constructor(message = 'Memory unavailable') {
     super(message, undefined, 'MEMORY_UNAVAILABLE');
     this.name = 'MemoryUnavailableError';
   }

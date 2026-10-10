@@ -4,6 +4,15 @@ import Icon from './Icon.jsx';
 
 export default function ConversationList({ activeId, onSelect, onOpenAdmin, refreshKey }) {
   const [convs, setConvs] = useState([]);
+  const [profiles, setProfiles] = useState([]);
+  const [selectedProfileId, setSelectedProfileId] = useState('');
+
+  useEffect(() => {
+    client.agentProfiles.list().then(items => {
+      setProfiles(items);
+      setSelectedProfileId(current => current || items[0]?.id || '');
+    }).catch(() => setProfiles([]));
+  }, []);
 
   useEffect(() => {
     load();
@@ -19,7 +28,7 @@ export default function ConversationList({ activeId, onSelect, onOpenAdmin, refr
   }
 
   async function handleNew() {
-    const conv = await client.conversations.create();
+    const conv = await client.conversations.create(selectedProfileId ? { agentProfileId: selectedProfileId } : {});
     onSelect(conv.id);
   }
 
@@ -36,6 +45,14 @@ export default function ConversationList({ activeId, onSelect, onOpenAdmin, refr
         <button className="sidebar-action" onClick={onOpenAdmin} aria-label="Administración" title="Configuración del runtime">⚙</button>
         <button className="sidebar-action" onClick={handleNew} aria-label="Nuevo chat" title="Crear un nuevo chat"><Icon name="plus" /></button>
       </h2>
+      {profiles.length > 0 && (
+        <label className="conversation-profile-picker">
+          Perfil para nuevos chats
+          <select value={selectedProfileId} onChange={event => setSelectedProfileId(event.target.value)}>
+            {profiles.map(profile => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select>
+        </label>
+      )}
       <div id="conv-list">
         {convs.length === 0 && <div style={{ padding: 16, color: '#666', textAlign: 'center' }}>Sin conversaciones</div>}
         {convs.map(c => (

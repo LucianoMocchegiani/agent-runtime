@@ -1,34 +1,29 @@
 # Perfiles de agente
 
-La configuración de comportamiento del agente y su modelo viven en `runtime.agent_profile_configs`, propiedad de Runtime. Memory es dueño de las conversaciones y no almacena perfiles ni asignaciones. Por ahora, Runtime aplica un único perfil global a todas las conversaciones; los demás perfiles se conservan para preparar el futuro uso multiagente.
+Un perfil es una configuración reutilizable propiedad de Runtime: modelo, prompt y límites del agente. Una conversación es el historial persistente que administra el módulo interno Memory. La conversación guarda `agentProfileId`; no guarda una copia de toda la configuración.
 
-Los campos antiguos de chat/modelo en `runtime.config` se leen únicamente durante la migración inicial para crear el perfil `Predeterminado`. Después quedan congelados: el endpoint global ya no permite modificarlos y los turnos no los consultan. El perfil activo es la fuente de comportamiento para todos los turnos.
+```text
+Perfil (Runtime) ─────┐
+                      ├── Conversación (Memory) ─── mensajes
+Turno temporal ───────┘       usa el perfil asignado
+```
 
-## Perfil global activo
+La asociación es una referencia sin FK entre esquemas. Runtime valida el perfil al asignarlo y lo resuelve al comienzo de cada turno. No se reserva un proceso por hilo.
 
-Los perfiles activos se ordenan por `sort_order`, `created_at` e `id`. El primero es el perfil global activo. Cambiar su configuración o mover otro perfil al primer lugar afecta los próximos turnos de todas las conversaciones, incluidas las ya existentes. No se guarda una asociación perfil-conversación.
+## Asignación y cambios
 
-En la primera inicialización se crea `Predeterminado`, copiando al perfil los valores de chat y el modelo de la configuración activa anterior. La API no altera el esquema de conversaciones de Memory. Si se archiva el perfil global, el siguiente perfil activo pasa a ser el perfil global.
+- Al crear una conversación, se puede elegir un perfil activo. Si no se envía uno, se asigna el perfil activo predeterminado.
+- La UI ofrece un selector para nuevos chats y muestra un selector en cada conversación.
+- `PATCH /v1/conversations/:id` acepta `agentProfileId` para cambiar la asignación. Enviar `null` restablece el perfil predeterminado vigente.
+- Los perfiles archivados no se ofrecen para nuevas asignaciones, pero se conservan para las conversaciones que ya los usan. Runtime puede resolverlos para esos hilos.
+- Un cambio en la configuración del perfil se aplica a los próximos turnos. Un turno en curso conserva la instantánea con la que comenzó.
 
-## Configuración del perfil
+## Migración de hilos existentes
 
-Cada perfil contiene `modelId` y `config`, con prompt, límites de contexto/salida, pasos de herramientas, trazas y resúmenes. El modelo debe estar habilitado en los providers del runtime. Las credenciales, MCPs y embeddings siguen siendo infraestructura global; no son datos propios del perfil. Los límites de seguridad globales tampoco se relajan desde perfiles.
+La migración agrega `agent_profile_id` a `public.conversations` sin FK entre el esquema público y `runtime`. Al iniciar Runtime, los hilos sin asignación se fijan al primer perfil activo según `sort_order`, `created_at` e `id`. Este backfill es idempotente: cambiar el perfil predeterminado más adelante no reasigna conversaciones existentes. El inicio falla si quedan hilos sin asignar (por ejemplo, si no hay un perfil activo), en vez de dejar datos ambiguos.
 
-Solo las identidades autorizadas para administración pueden crear, editar, reordenar o archivar perfiles. La UI permite seleccionar un perfil para editarlo; esa selección no lo activa. Usá «Activar globalmente» para aplicarlo a todas las conversaciones. El envío de un modelo desde el navegador se rechaza: el servidor resuelve siempre el modelo desde el perfil global activo.
+Si un hilo no tiene perfil asignado o su referencia ya no se puede resolver, Runtime no cambia silenciosamente de agente: rechaza el turno con un error para que la asignación se corrija.
 
-## API administrativa
+## Administración
 
-`GET /admin/agent-profiles` devuelve perfiles activos. `POST /admin/agent-profiles` crea uno; `PUT /admin/agent-profiles/:id` actualiza los campos `name`, `modelId`, `sortOrder` y `config`; `POST /admin/agent-profiles/:id/activate` establece el perfil global activo; `DELETE /admin/agent-profiles/:id` archiva el perfil. Todas requieren la misma autorización administrativa que `/admin/runtime-config`.
-
-## Interfaz de administración
-
-La pantalla **Configuración del runtime** organiza la edición en cuatro pestañas:
-
-- **Profiles**: selector del perfil a editar, activación global, creación, edición JSON y archivado. El primero por orden se aplica globalmente.
-- **Provider**: proveedores, credenciales y modelos que pueden elegirse desde un perfil.
-- **Embedding**: configuración global del proveedor de embeddings.
-- **MCP**: configuración global de servidores MCP.
-
-La interfaz de chat no incluye selector de perfil; todas las conversaciones usan el perfil global activo. La guía integrada de Profiles explica esta limitación temporal y cómo cambiar el perfil global.
-
-La UI de administración está implementada en `apps/ui/src/AdminConfig.jsx`; las guías contextuales, incluida la de Profiles, están en `apps/ui/src/AdminConfigHelp.jsx`.
+La administración de perfiles sigue bajo `/admin/agent-profiles`; el listado seleccionable para chats está en `GET /v1/agent-profiles`. El endpoint de modelos y las credenciales siguen siendo responsabilidad de Runtime.
