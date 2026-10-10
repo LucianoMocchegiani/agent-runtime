@@ -5,6 +5,7 @@ import Icon from './Icon.jsx';
 const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
 const MESSAGE_PAGE_SIZE = 50;
+const BOTTOM_SCROLL_THRESHOLD = 2;
 
 function messageCursor(message) {
   return message ? { createdAt: message.createdAt, id: message.id } : null;
@@ -248,7 +249,8 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
     const container = scrollContainerRef.current;
     if (!container) return;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    shouldStickToBottomRef.current = distanceFromBottom <= 64;
+    // Solo retomamos el seguimiento cuando el usuario vuelve realmente al final.
+    shouldStickToBottomRef.current = distanceFromBottom <= BOTTOM_SCROLL_THRESHOLD;
     if (container.scrollTop <= 100) void loadOlderMessages();
   }
 
