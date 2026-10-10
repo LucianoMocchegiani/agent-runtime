@@ -5,8 +5,12 @@ import Icon from './Icon.jsx';
 const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
 
-export default function Chat({ conversationId, onOpenSidebar }) {
+export default function Chat({ conversationId, onOpenSidebar, onConversationUpdated }) {
   const [messages, setMessages] = useState([]);
+  const [conversationTitle, setConversationTitle] = useState('');
+  const [titleDraft, setTitleDraft] = useState('');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [input, setInput] = useState('');
   const [images, setImages] = useState([]);
   const [pendingImageReads, setPendingImageReads] = useState(0);
@@ -140,6 +144,20 @@ export default function Chat({ conversationId, onOpenSidebar }) {
   }, [conversationId]);
 
   useEffect(() => {
+    let isCurrent = true;
+    setConversationTitle('');
+    setIsEditingTitle(false);
+    client.conversations.get(conversationId).then(conversation => {
+      if (!isCurrent) return;
+      setConversationTitle(conversation.title ?? '');
+      onConversationUpdated?.(conversation);
+    }).catch(e => {
+      if (isCurrent) setError(e.message);
+    });
+    return () => { isCurrent = false; };
+  }, [conversationId, onConversationUpdated]);
+
+  useEffect(() => {
     loadMessages();
   }, [loadMessages]);
 
@@ -233,7 +251,16 @@ export default function Chat({ conversationId, onOpenSidebar }) {
       const result = await client.messages.send(conversationId, text, handlers, controller.signal, {
         images: selectedImages.map(image => image.dataUrl),
       });
-      if (result === 'ok') await loadMessages();
+      if (result === 'ok') {
+        await loadMessages();
+        try {
+          const conversation = await client.conversations.get(conversationId);
+          setConversationTitle(conversation.title ?? '');
+          onConversationUpdated?.(conversation);
+        } catch (e) {
+          setError(e.message);
+        }
+      }
     } catch (e) {
       const wasAborted = e.name === 'AbortError';
       setMessages(prev => prev.map(message =>
@@ -249,6 +276,34 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     }
   }
 
+  async function saveConversationTitle(e) {
+    e.preventDefault();
+    if (isSavingTitle) return;
+    setIsSavingTitle(true);
+    setError(null);
+    try {
+      const conversation = await client.conversations.patch(conversationId, { title: titleDraft });
+      setConversationTitle(conversation.title ?? '');
+      setTitleDraft(conversation.title ?? '');
+      setIsEditingTitle(false);
+      onConversationUpdated?.(conversation);
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setIsSavingTitle(false);
+    }
+  }
+
+  function startEditingTitle() {
+    setTitleDraft(conversationTitle);
+    setIsEditingTitle(true);
+  }
+
+  function cancelEditingTitle() {
+    setTitleDraft(conversationTitle);
+    setIsEditingTitle(false);
+  }
+
   function handleAbort() {
     setMessages(prev => prev.map(message =>
       message.role === 'tool' && message.status === 'running'
@@ -262,7 +317,31 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     <main className="chat-area">
       <header className="chat-header">
         <button className="mobile-menu-button" type="button" onClick={onOpenSidebar} aria-label="Abrir conversaciones" title="Abrir conversaciones"><Icon name="menu" /></button>
-        <span className="conversation-id" title={conversationId}>{conversationId.slice(0, 8)}</span>
+        <div className="conversation-heading">
+          {isEditingTitle ? (
+            <form className="conversation-title-form" onSubmit={saveConversationTitle}>
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={e => setTitleDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Escape') cancelEditingTitle(); }}
+                maxLength={200}
+                required
+                placeholder="Título de la conversación"
+                aria-label="Título de la conversación"
+                disabled={isSavingTitle}
+              />
+              <button type="submit" className="title-control title-icon-button" disabled={isSavingTitle || !titleDraft.trim()} title="Guardar título" aria-label="Guardar título"><Icon name="save" /></button>
+              <button type="button" className="title-control title-icon-button" onClick={cancelEditingTitle} disabled={isSavingTitle} title="Cancelar edición" aria-label="Cancelar edición"><Icon name="close" /></button>
+            </form>
+          ) : (
+            <>
+              <span className="conversation-title" title={conversationTitle || 'Sin título'}>{conversationTitle || 'Sin título'}</span>
+              <button type="button" className="title-edit-button title-icon-button" onClick={startEditingTitle} title="Cambiar título de la conversación" aria-label="Cambiar título de la conversación"><Icon name="edit" /></button>
+            </>
+          )}
+          <span className="conversation-id" title={`ID: ${conversationId}`}>ID: {conversationId.slice(0, 8)}</span>
+        </div>
         <span className="header-spacer" />
         <div className="toolbar">
           <button className="reload-button" onClick={loadMessages} disabled={isLoading} title="Actualizar los mensajes" aria-label="Actualizar los mensajes"><Icon name="refresh" /><span>Recargar</span></button>

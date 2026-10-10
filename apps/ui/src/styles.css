@@ -288,14 +288,57 @@ html, body, #root { min-width: 0; overflow: hidden; }
   background: rgba(22, 33, 62, 0.34);
 }
 
-.conversation-id {
+.conversation-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 0 1 auto;
+}
+.conversation-title {
   min-width: 0;
   overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text-muted);
-  font-size: 13px;
 }
+.conversation-id {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
+  white-space: nowrap;
+}
+.title-edit-button, .title-control {
+  min-height: 32px;
+  padding: 0 9px;
+  color: var(--text-muted);
+  background: #20263b;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.title-edit-button:hover, .title-control:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.title-icon-button { display: inline-flex; align-items: center; justify-content: center; width: 32px; min-width: 32px; padding: 0; }
+.title-icon-button .ui-icon { width: 16px; height: 16px; }
+.title-control:disabled { opacity: .5; cursor: not-allowed; }
+.conversation-title-form { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.conversation-title-form input {
+  width: min(34vw, 300px);
+  min-width: 100px;
+  min-height: 34px;
+  padding: 5px 8px;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+.conversation-title-form input:focus { outline: 2px solid rgba(79,195,247,.45); border-color: var(--accent); }
 .header-spacer { flex: 1 1 auto; }
 
 .messages {
@@ -495,7 +538,13 @@ html, body, #root { min-width: 0; overflow: hidden; }
     font-size: 18px;
   }
   .chat-header { min-height: 56px; gap: 8px; padding: 7px 10px; }
-  .conversation-id { display: none; }
+  .conversation-heading { gap: 6px; flex: 1 1 auto; }
+  .conversation-title { font-size: 12px; }
+  .conversation-id { font-size: 9px; }
+  .title-edit-button { min-height: 30px; padding: 0 6px; font-size: 10px; }
+  .conversation-title-form { flex: 1 1 auto; }
+  .conversation-title-form input { width: 100%; min-width: 70px; }
+  .title-control { min-height: 30px; padding: 0 6px; font-size: 10px; }
   .header-spacer { min-width: 0; }
   .model-picker { width: auto; flex: 1 1 auto; max-width: 240px; font-size: 12px; }
   .toolbar button { min-height: 40px; padding: 0 9px; }

@@ -9,6 +9,8 @@ const ICON_PATHS = {
   plus: <path d="M12 5v14M5 12h14" />,
   archive: <><path d="M3 4h18v4H3z" /><path d="M5 8v12h14V8M10 12h4" /></>,
   check: <path d="m5 12 4 4L19 6" />,
+  edit: <><path d="m15 5 4 4" /><path d="M4 20h4l11-11a2.1 2.1 0 0 0-4-4L4 16v4Z" /></>,
+  save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></>,
   cancel: <><circle cx="12" cy="12" r="9" /><path d="m9 9 6 6m0-6-6 6" /></>,
 };
 

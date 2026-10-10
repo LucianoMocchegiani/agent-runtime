@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import ConversationList from './ConversationList.jsx';
 import Chat from './Chat.jsx';
 import client from './client.js';
@@ -9,6 +9,8 @@ export default function App() {
   const [activeConv, setActiveConv] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [conversationRefreshKey, setConversationRefreshKey] = useState(0);
+  const refreshConversations = useCallback(() => setConversationRefreshKey(key => key + 1), []);
 
   function selectConversation(id) {
     setActiveConv(id);
@@ -23,7 +25,7 @@ export default function App() {
 
   return (
     <div className={`app-shell${activeConv || showAdmin ? ' has-active-chat' : ''}${isSidebarOpen ? ' sidebar-open' : ''}`}>
-      <ConversationList activeId={activeConv} onSelect={selectConversation} onOpenAdmin={openAdmin} />
+      <ConversationList activeId={activeConv} onSelect={selectConversation} onOpenAdmin={openAdmin} refreshKey={conversationRefreshKey} />
       {isSidebarOpen && (
         <button
           type="button"
@@ -35,7 +37,7 @@ export default function App() {
       {showAdmin ? (
         <AdminConfig onBack={() => setShowAdmin(false)} />
       ) : activeConv ? (
-        <Chat conversationId={activeConv} onOpenSidebar={() => setIsSidebarOpen(true)} />
+        <Chat conversationId={activeConv} onOpenSidebar={() => setIsSidebarOpen(true)} onConversationUpdated={refreshConversations} />
       ) : (
         <div id="empty-state">
           <div>Seleccioná un chat o creá uno nuevo</div>

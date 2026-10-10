@@ -2,12 +2,12 @@ import { useState, useEffect } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 
-export default function ConversationList({ activeId, onSelect, onOpenAdmin }) {
+export default function ConversationList({ activeId, onSelect, onOpenAdmin, refreshKey }) {
   const [convs, setConvs] = useState([]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [refreshKey]);
 
   async function load() {
     try {
