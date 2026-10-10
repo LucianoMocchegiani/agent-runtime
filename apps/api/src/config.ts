@@ -1,6 +1,6 @@
 /**
- * Env del servicio agent-runtime. La configuración funcional vive exclusivamente en runtime.config.
- * El huésped inyecta URLs de infraestructura (introspect, MCP y CORS).
+ * Env del servicio agent-runtime. Los perfiles persistidos definen el modelo y el comportamiento del agente;
+ * runtime.config guarda configuración global de infraestructura y secretos. El huésped inyecta URLs de servicio y CORS.
  */
 
 import { existsSync } from 'node:fs';
@@ -135,20 +135,15 @@ export type ChatConfig = {
   ai: AiConfig;
   corsOrigins: string[];
   corsAppDomain: string | null;
+  /** Valores bootstrap/compatibilidad: se migran al perfil inicial, no se editan como configuración global. */
   chatSystemPrompt: string;
-  /** Ventana total por defecto y compatibilidad para modelos sin contextoWindows configurado. */
   contextTokenBudget: number;
-  /** Máximo de mensajes conversacionales enviados, sin contar system/tools disponibles. */
   maxContextMessages: number;
-  /** Límite máximo de generación por llamada al modelo. */
   maxOutputTokens: number;
-  /** Espacio que se reserva en la ventana antes de seleccionar el historial; debe ser >= maxOutputTokens. */
   reserveOutputTokens: number;
   contextSafetyTokens: number;
   maxToolSteps: number;
-  /** Emite en logs el contexto y las herramientas enviados al proveedor; puede contener datos sensibles. */
   llmTraceRequests: boolean;
-  /** Resume y persiste turnos que quedaron fuera de la ventana de contexto. */
   summariesEnabled: boolean;
   summaryTokenBudget: number;
   ui: {

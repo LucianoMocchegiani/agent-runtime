@@ -1,8 +1,11 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { config, type ChatConfig } from '../config.js';
+import { seedDefaultAgentProfile, setAgentProfilePool } from './agent-profiles.js';
 
 export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
+export type AgentProfileConfig = Pick<ChatConfig, 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'>;
+export type AgentProfile = { id: string; name: string; modelId: string; sortOrder: number; config: AgentProfileConfig; createdAt: string; updatedAt: string };
 export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
 type Settings = RuntimeSettings;
 
@@ -50,12 +53,13 @@ export async function startRuntimeConfigStore(): Promise<void> {
   const url = process.env.DATABASE_URL?.trim();
   const rawKey = process.env.RUNTIME_CONFIG_ENCRYPTION_KEY?.trim();
   if (!url || !rawKey) {
-    throw new Error('DATABASE_URL and RUNTIME_CONFIG_ENCRYPTION_KEY are required; runtime.config is the only configuration source');
+    throw new Error('DATABASE_URL and RUNTIME_CONFIG_ENCRYPTION_KEY are required for persistent runtime infrastructure settings');
   }
   key = /^[\da-f]{64}$/i.test(rawKey) ? Buffer.from(rawKey, 'hex') : createHash('sha256').update(rawKey).digest();
   const connectionUrl = new URL(url);
   connectionUrl.searchParams.delete('schema'); // Prisma-specific option; node-postgres does not need it.
   pool = new Pool({ connectionString: connectionUrl.toString(), max: 5, connectionTimeoutMillis: 5000 });
+  setAgentProfilePool(pool);
   await pool.query('CREATE SCHEMA IF NOT EXISTS runtime');
   await pool.query('CREATE TABLE IF NOT EXISTS runtime.config (id text PRIMARY KEY, version integer NOT NULL, payload jsonb NOT NULL, updated_at timestamptz NOT NULL DEFAULT now())');
   await pool.query('CREATE TABLE IF NOT EXISTS runtime.config_history (id text NOT NULL, version integer NOT NULL, payload jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (id, version))');
@@ -67,6 +71,18 @@ export async function startRuntimeConfigStore(): Promise<void> {
   }
   await pool.query('INSERT INTO runtime.config_history (id, version, payload) SELECT id, version, payload FROM runtime.config WHERE id = $1 ON CONFLICT DO NOTHING', ['active']);
   await reload();
+  await pool.query(`CREATE TABLE IF NOT EXISTS runtime.agent_profile_configs (
+    id text PRIMARY KEY,
+    name text NOT NULL,
+    model_id text NOT NULL,
+    sort_order integer NOT NULL,
+    config jsonb NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    archived_at timestamptz NULL
+  )`);
+  // Profiles belong to Runtime. Memory owns conversations and does not store profile assignments.
+  await seedDefaultAgentProfile();
   const poll = () => { void reload().catch((err: unknown) => console.error('runtime config reload failed', err)); };
   const timer = setInterval(poll, 3000);
   timer.unref();
@@ -117,17 +133,18 @@ function validateSettings(value: unknown): Settings {
     throw new Error('reserveOutputTokens must be greater than or equal to maxOutputTokens');
   }
   if (typeof v.chatSystemPrompt !== 'string' || typeof v.llmTraceRequests !== 'boolean' || typeof v.summariesEnabled !== 'boolean') throw new Error('Invalid chat settings');
-  if (providers.length === 0) {
-    if (v.ai.defaultModel !== '') throw new Error('ai.defaultModel must be empty until a provider is configured');
-  } else {
-    const [provider, ...model] = v.ai.defaultModel.split('/');
-    if (!v.ai.providers[provider]?.models.includes(model.join('/'))) throw new Error('The default model must be enabled');
-  }
   return v as Settings;
 }
 
-/** Devuelve una instantánea aislada: los turnos no observan mutaciones a mitad de ejecución. */
-export function getRuntimeSettings(): RuntimeSettings { return structuredClone(settings()); }
+/** Devuelve una instantánea aislada y, cuando se indica, aplica el perfil global de agente. */
+export function getRuntimeSettings(profile?: Pick<AgentProfile, 'modelId' | 'config'>): RuntimeSettings {
+  const current = structuredClone(settings());
+  if (profile) {
+    current.ai.defaultModel = profile.modelId;
+    Object.assign(current, structuredClone(profile.config));
+  }
+  return current;
+}
 export function getRuntimeConfigVersion(): number { return version; }
 export function isRuntimeConfigStoreEnabled(): boolean { return pool !== undefined && key !== undefined; }
 
@@ -141,9 +158,32 @@ export class RuntimeConfigConflictError extends Error {
 export async function saveRuntimeSettings(value: unknown, expectedVersion?: number): Promise<number> {
   if (!pool) throw new Error('Database-backed config is disabled');
   const validated = validateSettings(value);
+  // Legacy chat/model fields remain readable only to migrate old installations into the first
+  // profile. Saving infrastructure settings can no longer change that behavior source.
+  validated.ai.defaultModel = config.ai.defaultModel;
+  validated.chatSystemPrompt = config.chatSystemPrompt;
+  validated.contextTokenBudget = config.contextTokenBudget;
+  validated.maxContextMessages = config.maxContextMessages;
+  validated.maxOutputTokens = config.maxOutputTokens;
+  validated.reserveOutputTokens = config.reserveOutputTokens;
+  validated.contextSafetyTokens = config.contextSafetyTokens;
+  validated.maxToolSteps = config.maxToolSteps;
+  validated.llmTraceRequests = config.llmTraceRequests;
+  validated.summariesEnabled = config.summariesEnabled;
+  validated.summaryTokenBudget = config.summaryTokenBudget;
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+    const profiles = await client.query<{ id: string; name: string; model_id: string }>("SELECT id, name, model_id FROM runtime.agent_profile_configs WHERE archived_at IS NULL AND model_id <> '' FOR SHARE");
+    for (const profile of profiles.rows) {
+      const slash = profile.model_id.indexOf('/');
+      const providerName = profile.model_id.slice(0, slash);
+      const providerModel = profile.model_id.slice(slash + 1);
+      const candidateProvider = slash > 0 ? validated.ai.providers[providerName as keyof typeof validated.ai.providers] : undefined;
+      if (!candidateProvider?.models.includes(providerModel)) {
+        throw new Error(`No se puede deshabilitar ${profile.model_id}: está asignado al perfil «${profile.name}»`);
+      }
+    }
     const current = await client.query<{ version: number }>("SELECT version FROM runtime.config WHERE id = 'active' FOR UPDATE");
     const previousVersion = current.rows[0]?.version;
     if (previousVersion === undefined) throw new Error('Runtime config has not been initialized');

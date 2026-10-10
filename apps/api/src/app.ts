@@ -10,6 +10,8 @@ import { modelRoutes } from './llm/routes.js';
 import { createMemoryMcpClient } from './memory/client.js';
 import { messageRoutes } from './messages/routes.js';
 import { internalRuntimeConfigRoutes, runtimeConfigRoutes } from './runtime-config/routes.js';
+import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';
+import { agentProfileListRoutes } from './runtime-config/agent-profile-list-routes.js';
 import { mountUi } from './ui.js';
 
 type DependencyStatus = 'up' | 'down';
@@ -81,6 +83,7 @@ export function createApp(): Hono<AppEnv> {
   });
 
   app.route('/admin/runtime-config', runtimeConfigRoutes);
+  app.route('/admin/agent-profiles', agentProfileAdminRoutes);
   app.route('/internal/runtime-config', internalRuntimeConfigRoutes);
 
   const v1 = new Hono<AppEnv>();
@@ -88,6 +91,7 @@ export function createApp(): Hono<AppEnv> {
   v1.route('/conversations/:id/messages', messageRoutes);
   v1.route('/conversations', conversationRoutes);
   v1.route('/models', modelRoutes);
+  v1.route('/agent-profiles', agentProfileListRoutes);
   app.route('/v1', v1);
 
   mountUi(app);

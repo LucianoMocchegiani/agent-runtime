@@ -1,6 +1,6 @@
 import { generateText, jsonSchema, streamText, tool, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import { getRuntimeSettings, type RuntimeSettings } from '../runtime-config/store.js';
+import { getRuntimeSettings, type AgentProfile, type RuntimeSettings } from '../runtime-config/store.js';
 import { isAbortError, identifiedFacingLlmError } from '../llm/errors.js';
 import type { ResolvedModel } from '../llm/provider.js';
 import { McpRegistry } from '../mcp/registry.js';
@@ -328,10 +328,11 @@ export async function streamAgentTurn(
   abortSignal?: AbortSignal,
   mcpTokens?: Record<string, string>,
   images: IncomingImage[] = [],
+  agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'modelId' | 'sortOrder' | 'config'>,
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
   // El turno conserva una configuración coherente incluso si otra versión se publica mientras corre.
-  const runtimeSettings = getRuntimeSettings();
+  const runtimeSettings = getRuntimeSettings(agentProfile);
   const turnSystemPrompt = runtimeSettings.chatSystemPrompt;
 
   let memory: MemoryMcp;

@@ -15,7 +15,7 @@ function matchesSecret(actualValue: string, expectedValue: string | undefined): 
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-async function authorized(header: string | undefined): Promise<boolean> {
+export async function authorized(header: string | undefined): Promise<boolean> {
   const value = header?.trim() ?? '';
   const configuredAdmins = (process.env.RUNTIME_CONFIG_ADMIN_USERS ?? '')
     .split(',')

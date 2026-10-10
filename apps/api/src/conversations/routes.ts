@@ -43,6 +43,7 @@ conversationRoutes.get('/', async (c) => {
 
 conversationRoutes.post('/', async (c) => {
   const body = asRecord(await readJsonBody(c));
+  if (body.agentProfileId !== undefined) throw new HTTPException(400, { message: 'El perfil es global y no se configura por conversación.' });
   const title = parseTitleInput(body.title);
   const created = await createConversation(
     c.get('principal'),
@@ -60,6 +61,7 @@ conversationRoutes.get('/:id', async (c) => {
 conversationRoutes.patch('/:id', async (c) => {
   const id = requireConversationId(c.req.param('id'));
   const body = asRecord(await readJsonBody(c));
+  if (body.agentProfileId !== undefined) throw new HTTPException(400, { message: 'El perfil es global y no se configura por conversación.' });
   const title = parseTitleInput(body.title);
   let archived: boolean | undefined;
   if (body.archived !== undefined) {

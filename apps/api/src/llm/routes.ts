@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../auth/principal.js';
-import { defaultModelId, listModels } from './provider.js';
+import { listModels } from './provider.js';
+import { getDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 
-/**
- * Modelos elegibles por el cliente. El cliente manda `id` como `model` en POST de mensajes.
- */
+/** Modelos habilitados para definir perfiles; los turnos usan el modelo del perfil global activo. */
 export const modelRoutes = new Hono<AppEnv>();
 
-modelRoutes.get('/', (c) => {
-  return c.json({ default: defaultModelId(), items: listModels() });
+modelRoutes.get('/', async (c) => {
+  const profile = await getDefaultAgentProfile();
+  return c.json({ default: profile.modelId, items: listModels() });
 });

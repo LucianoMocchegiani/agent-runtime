@@ -1,13 +1,13 @@
 # Módulos de la API (`apps/api/src/`)
 
-No es un monolito por bounded context. Es un servicio chico partido por **capa técnica del chat**. Cada carpeta es un módulo con un trabajo claro. La API no persiste conversaciones ni mensajes: eso vive en Memory MCP. Sí administra la configuración funcional cifrada y versionada en PostgreSQL, bajo `runtime.config`.
+No es un monolito por bounded context. Es un servicio chico partido por **capa técnica del chat**. Cada carpeta es un módulo con un trabajo claro. La API no persiste conversaciones ni mensajes: eso vive en Memory MCP. Administra configuración global de infraestructura cifrada en `runtime.config` y perfiles reutilizables de agente en `runtime.agent_profile_configs`.
 
 ```text
 src/
   index.ts          arranque HTTP
   app.ts            Hono: CORS, /health, /v1 autenticado, UI en /
   config.ts         infraestructura/env y seed mínimo de runtime
-  runtime-config/   configuración cifrada, validación y API administrativa
+  runtime-config/   configuración global, perfiles de agente y APIs administrativas
   cors.ts           allowlist + *.localhost + CORS_APP_DOMAIN
   ui.ts             UI nativa (apps/ui/dist) + fallback SPA
   auth/             quién sos
@@ -25,7 +25,7 @@ src/
 |---------|----------|
 | `index.ts` | `serve` en `PORT` (default 3010). |
 | `app.ts` | CORS; `GET /health` (handshake MCP con el Memory MCP, timeout 3 s); monta `/v1` con `requirePrincipal`, conversaciones, mensajes y modelos. `onError` serializa `HTTPException`. |
-| `config.ts` | Lee solo infraestructura/env de ejecución. Define el seed funcional mínimo; la API crea `runtime.config` y arranca incluso sin provider de IA. |
+| `config.ts` | Lee infraestructura/env de ejecución y define valores bootstrap del primer perfil; la API crea `runtime.config` y arranca incluso sin provider de IA. |
 | `cors.ts` | Refleja `Origin` si está en `CORS_ORIGIN`, es `*.localhost` o cae bajo `CORS_APP_DOMAIN`. |
 
 `/health` no pide Bearer. Si el Memory MCP no responde: `503` y `status: degraded`.

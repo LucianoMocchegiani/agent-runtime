@@ -1,4 +1,20 @@
 const guides = {
+  Profiles: {
+    intro: 'Un perfil reúne el modelo y los parámetros de comportamiento del agente. Por ahora, el primer perfil activo por sortOrder se aplica globalmente en todas las conversaciones; las credenciales de proveedores, MCP y embeddings se configuran en sus pestañas globales.',
+    fields: [
+      ['name', 'Nombre visible del perfil para identificarlo en la administración y prepararlo para el futuro uso multiagente.'],
+      ['modelId', 'ID exacto de un modelo habilitado en Provider. El servidor selecciona el modelo del perfil activo global; no se toma del navegador.'],
+      ['sortOrder', 'Orden numérico de los perfiles activos. El primero es el perfil global; también podés cambiarlo con «Activar globalmente».'],
+      ['config.chatSystemPrompt', 'Instrucción base del agente. No incluyas secretos ni credenciales.'],
+      ['config.contextTokenBudget', 'Presupuesto de contexto de respaldo en tokens para modelos sin una ventana declarada en Provider.'],
+      ['config.maxContextMessages', 'Máximo de mensajes previos de usuario/asistente que se incluyen al iniciar el turno.'],
+      ['config.maxOutputTokens / config.reserveOutputTokens', 'Límite de generación y tokens reservados para la salida al seleccionar el historial. Normalmente conviene que la reserva sea igual o mayor que el máximo.'],
+      ['config.contextSafetyTokens', 'Margen para variaciones de tokenización y evitar exceder la ventana del modelo.'],
+      ['config.maxToolSteps', 'Máximo de rondas de uso de herramientas permitidas por turno.'],
+      ['config.summariesEnabled / config.summaryTokenBudget', 'Controlan la generación y el tamaño de los resúmenes persistentes del historial.'],
+    ],
+    note: 'Editar el perfil que está primero por sortOrder afecta los próximos turnos de todas las conversaciones. Si se archiva el perfil global, el siguiente perfil activo pasa a aplicarse globalmente. Los perfiles quedan listos para una futura selección por agente.',
+  },
   Chat: {
     intro: 'Los enteros deben ser positivos. Estos ajustes controlan el contexto y la ejecución de cada turno.',
     fields: [
@@ -15,14 +31,13 @@ const guides = {
     ],
   },
   Providers: {
-    intro: 'La instalación nueva arranca sin proveedores ni credenciales. Configurá al menos uno aquí para habilitar el chat. Se admiten openai y openrouter; los secretos se enmascaran: dejá ******** sin modificar para conservar la clave guardada.',
+    intro: 'Configurá las credenciales y los modelos habilitados para que puedan ser seleccionados desde los perfiles de agente. Se admiten openai y openrouter; los secretos se enmascaran: dejá ******** sin modificar para conservar la clave guardada.',
     fields: [
-      ['ai.defaultModel', 'Modelo predeterminado, formato proveedor/modelo. Debe existir en la lista models del proveedor. Ejemplos: openai/gpt-4.1-mini y openrouter/anthropic/claude-sonnet-4.'],
       ['ai.providers.<proveedor>.apiKey', 'Clave privada. Creala en OpenAI: https://platform.openai.com/api-keys o OpenRouter: https://openrouter.ai/keys. La cuenta debe tener acceso/crédito. No la compartas ni la pegues en documentación pública.'],
       ['ai.providers.<proveedor>.models', 'IDs de modelos que se ofrecen en el selector. Consultá https://platform.openai.com/docs/models o https://openrouter.ai/models. OpenAI usa ID sin prefijo; OpenRouter usa el slug completo, por ejemplo openai/gpt-4.1-mini.'],
       ['ai.providers.<proveedor>.contextWindows', 'Mapa opcional de ID exacto de modelo a ventana en tokens. Consultá la documentación/ficha del modelo; si no conocés el valor, dejá {} y se usará contextTokenBudget de Chat. Cada valor debe ser entero positivo.'],
     ],
-    example: '{\n  "defaultModel": "openai/gpt-4.1-mini",\n  "providers": {\n    "openai": {\n      "apiKey": "PEGAR_CLAVE_API",\n      "models": ["gpt-4.1-mini"],\n      "contextWindows": {}\n    }\n  }\n}',
+    example: '{\n  "providers": {\n    "openai": {\n      "apiKey": "PEGAR_CLAVE_API",\n      "models": ["gpt-4.1-mini"],\n      "contextWindows": {}\n    }\n  }\n}',
     note: 'Disponibilidad, permisos y precios dependen del proveedor y la cuenta. Verificá antes de seleccionar un modelo.',
   },
   Embeddings: {

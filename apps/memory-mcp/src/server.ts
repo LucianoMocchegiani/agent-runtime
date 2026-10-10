@@ -176,18 +176,17 @@ function registerTools(server: McpServer): void {
       inputSchema: z.object({
         id: z.string(),
         userId: z.string(),
-        title: z.string().nullish(),
-        archived: z.boolean().optional(),
+        patch: z.object({
+          title: z.string().nullish(),
+          archived: z.boolean().optional(),
+        }),
       }),
     },
     async (args) => {
-      const row =       await updateConversation({
+      const row = await updateConversation({
         id: args.id,
         userId: args.userId,
-        patch: {
-          title: args.title,
-          archived: args.archived,
-        },
+        patch: args.patch,
       });
       return { content: [{ type: 'text', text: JSON.stringify(row) }] };
     },

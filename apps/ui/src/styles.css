@@ -48,6 +48,24 @@ html, body, #root { width: 100%; height: 100%; }
 }
 #empty-state button:hover { background: var(--accent-hover); }
 
+.agent-profile-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.agent-profile-select select {
+  max-width: min(38vw, 240px);
+  min-height: 32px;
+  padding: 4px 28px 4px 8px;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+}
+.agent-profile-select select:disabled { opacity: 0.65; }
+
 .bubble {
   max-width: 80%;
   padding: 10px 14px;
@@ -518,7 +536,10 @@ html, body, #root { min-width: 0; overflow: hidden; }
 .admin-auth-card { max-width: 600px; }
 .admin-card h2 { margin-bottom: 12px; font-size: 20px; }
 .admin-field { display: flex; flex-direction: column; gap: 8px; margin: 18px 0; color: var(--text-muted); font-size: 13px; }
-.admin-field input, .admin-field textarea { width: 100%; min-height: 42px; padding: 10px 12px; color: var(--text); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); font: inherit; }
+.admin-field input, .admin-field textarea, .admin-field select { width: 100%; min-height: 42px; padding: 10px 12px; color: var(--text); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius-sm); font: inherit; }
+.admin-field select { cursor: pointer; }
+.admin-field input:focus, .admin-field textarea:focus, .admin-field select:focus { outline: 2px solid rgba(79,195,247,.45); outline-offset: 1px; border-color: var(--accent); }
+.admin-field select:disabled { opacity: .65; cursor: not-allowed; }
 .admin-tabs { display: flex; max-width: 1100px; gap: 6px; margin: 0 auto 12px; overflow-x: auto; }
 .admin-tabs button, .admin-secondary, .admin-primary { min-height: 40px; padding: 8px 14px; color: var(--text); background: #20263b; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
 .admin-tabs button.active { color: #07131a; background: var(--accent); border-color: var(--accent); }
@@ -527,6 +548,10 @@ html, body, #root { min-width: 0; overflow: hidden; }
 .admin-primary:disabled, .admin-secondary:disabled { opacity: .5; cursor: not-allowed; }
 .admin-json { min-height: 360px !important; resize: vertical; font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace !important; tab-size: 2; }
 .admin-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.admin-profile-controls { display: flex; align-items: flex-end; gap: 14px; margin: 20px 0 8px; padding: 14px; background: rgba(10,16,31,.28); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.admin-profile-field { flex: 1; min-width: 220px; margin: 0; }
+.admin-profile-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-profile-buttons .admin-secondary { min-width: 120px; }
 .admin-notice, .admin-error { max-width: 1100px; margin: 14px auto 0; padding: 11px 14px; border-radius: var(--radius-sm); font-size: 13px; }
 .admin-notice { color: #a5e6ac; background: rgba(67,160,71,.12); }
 .admin-error { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--error-text); background: var(--bg-error); }
@@ -547,5 +572,9 @@ html, body, #root { min-width: 0; overflow: hidden; }
   .admin-header { gap: 8px; }
   .admin-header .admin-secondary { padding-inline: 9px; font-size: 12px; }
   .admin-json { min-height: 280px !important; }
+  .admin-profile-controls { align-items: stretch; flex-direction: column; }
+  .admin-profile-field { min-width: 0; }
+  .admin-profile-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-profile-buttons .admin-secondary { min-width: 0; }
   .admin-guide-field { grid-template-columns: 1fr; gap: 4px; }
 }

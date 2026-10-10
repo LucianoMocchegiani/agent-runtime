@@ -5,7 +5,8 @@ import type { AppEnv } from '../auth/principal.js';
 import { createMemoryMcpClient } from '../memory/client.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
-import { resolveModel, type ResolvedModel } from '../llm/provider.js';
+import { resolveModel } from '../llm/provider.js';
+import { getDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 
 const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -89,22 +90,6 @@ function readImages(body: unknown): IncomingImage[] {
   return [parseImage(record.image)];
 }
 
-/** `model` opcional (`proveedor/modelo`); sin él, se usa el modelo default de runtime.config. */
-function readModel(body: unknown): ResolvedModel {
-  const raw = (body as { model?: unknown }).model;
-  if (raw !== undefined && raw !== null && typeof raw !== 'string') {
-    throw new HTTPException(400, { message: 'model must be a string' });
-  }
-  const resolved = resolveModel(raw);
-  if (!resolved) {
-    if (!resolveModel()) {
-      throw new HTTPException(503, { message: 'No hay un proveedor de IA configurado. Abrí Administración → Configuración del runtime → Providers y agregá uno.' });
-    }
-    throw new HTTPException(400, { message: `Unknown model: ${raw}. See GET /v1/models` });
-  }
-  return resolved;
-}
-
 /**
  * Mensajes de un hilo. GET lista; POST stremea un turno (UI Message Stream).
  */
@@ -145,7 +130,12 @@ messageRoutes.post('/', async (c) => {
   const messageText = images.length
     ? `${text}${text ? '\n\n' : ''}${imageNote}`
     : text;
-  const model = readModel(body);
+  if (typeof body === 'object' && body !== null && 'model' in body) {
+    throw new HTTPException(400, { message: 'El modelo se define en el perfil global activo del runtime.' });
+  }
+  const profile = await getDefaultAgentProfile();
+  const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
+  if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
   const principal = c.get('principal');
   return streamAgentTurn(
     id,
@@ -156,5 +146,6 @@ messageRoutes.post('/', async (c) => {
     c.req.raw.signal,
     c.get('mcpAuth') ?? undefined,
     images,
+    profile,
   );
 });

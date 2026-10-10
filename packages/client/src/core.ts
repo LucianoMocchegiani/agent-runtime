@@ -20,6 +20,8 @@ export type Conversation = {
   updatedAt: string;
 };
 
+export type AgentProfileInfo = { id: string; name: string; modelId: string; sortOrder: number };
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -45,8 +47,6 @@ export type ModelList = {
 };
 
 export type SendOptions = {
-  /** `proveedor/modelo`. Sin él, el server usa su default. */
-  model?: string | null;
   /** Data URLs temporales de imágenes; el servidor no las persiste. */
   images?: string[];
   /** Compatibilidad con clientes antiguos que envían una sola imagen. */
@@ -125,6 +125,14 @@ export function createClient(config: ClientConfig) {
         return json<Conversation>(res);
       },
 
+      get: async (id: string): Promise<Conversation> => {
+        const res = await fetch(`${baseUrl(config)}/v1/conversations/${id}`, {
+          headers: headers(config, { Accept: 'application/json' }),
+        });
+        if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
+        return json<Conversation>(res);
+      },
+
       archive: async (id: string): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations/${id}`, {
           method: 'DELETE',
@@ -162,6 +170,15 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    agentProfiles: {
+      list: async (): Promise<AgentProfileInfo[]> => {
+        const res = await fetch(`${baseUrl(config)}/v1/agent-profiles`, { headers: headers(config, { Accept: 'application/json' }) });
+        if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
+        const data = await json<{ items: AgentProfileInfo[] }>(res);
+        return data?.items ?? [];
+      },
+    },
+
     messages: {
       list: async (conversationId: string): Promise<Message[]> => {
         const res = await fetch(
@@ -191,7 +208,6 @@ export function createClient(config: ClientConfig) {
               }),
               body: JSON.stringify({
                 text,
-                ...(options.model ? { model: options.model } : {}),
                 ...(options.images?.length ? { images: options.images } : {}),
                 ...(!options.images?.length && options.image ? { image: options.image } : {}),
               }),

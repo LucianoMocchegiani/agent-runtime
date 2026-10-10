@@ -142,16 +142,16 @@ PII de negocio (nombre, documento, deuda) **puede** quedar en `content` / `tool_
 
 ## Ventana de contexto (prompt)
 
-`contextTokenBudget` (default 10 000; estimación `ceil(chars / 4)`) y `maxContextMessages` (default 20), guardados en `runtime.config`, limitan juntos el historial recuperado para iniciar el turno. El tope cuenta mensajes user/assistant; excluye el system prompt, las definiciones de tools y las interacciones de tools que ocurren durante el turno activo (necesarias para continuar esa ejecución).
+`contextTokenBudget` (default 10 000; estimación `ceil(chars / 4)`) y `maxContextMessages` (default 20), guardados en el perfil global activo de Runtime, limitan juntos el historial recuperado para iniciar el turno. El tope cuenta mensajes user/assistant; excluye el system prompt, las definiciones de tools y las interacciones de tools que ocurren durante el turno activo (necesarias para continuar esa ejecución).
 
 - Los resultados históricos de tools quedan persistidos para memoria/auditoría, pero no se reenvían como mensajes de historial.
 - Se seleccionan turnos recientes completos de atrás hacia adelante, respetando ambos límites; el límite por cantidad puede dejar fuera mensajes aunque aún haya presupuesto de tokens.
 - Los turnos omitidos se compactan en un resumen persistente breve; no se borran de la base de datos. Para detalles más profundos se puede usar `memory__searchMemory`.
 
-`maxToolSteps` (default 8) en `runtime.config` corta round-trips del agente.
+`maxToolSteps` (default 8) en el perfil global activo corta round-trips del agente.
 
 ## Configuración de instancia
 
-La configuración de infraestructura (URLs de introspect, CORS y servicios) va en `.env`; proveedores, MCPs, prompts y límites viven en `runtime.config` y se editan desde Administración.
+La configuración de infraestructura (URLs de introspect, CORS y servicios) va en `.env`; providers/credenciales, MCPs globales y embeddings viven en `runtime.config`. El modelo, prompt y límites del agente viven en perfiles reutilizables propiedad de Runtime; por ahora el perfil activo se aplica globalmente y Memory no guarda su ID en la conversación.
 
 [Índice](./00-indice.md) · [Módulos →](./02-modulos.md)

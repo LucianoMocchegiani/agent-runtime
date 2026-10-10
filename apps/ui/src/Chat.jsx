@@ -2,30 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 
-const MODEL_KEY = 'chat_model';
 const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
-
-function useModels() {
-  const [models, setModels] = useState([]);
-  const [model, setModel] = useState(() => localStorage.getItem(MODEL_KEY) || '');
-
-  useEffect(() => {
-    client.models.list()
-      .then(({ default: def, items }) => {
-        setModels(items);
-        setModel(prev => (items.some(m => m.id === prev) ? prev : def));
-      })
-      .catch(() => setModels([]));
-  }, []);
-
-  function select(id) {
-    setModel(id);
-    localStorage.setItem(MODEL_KEY, id);
-  }
-
-  return { models, model, select };
-}
 
 function reconcileLiveTurn(liveMessages, persistedMessages, turnStartIndex) {
   const history = persistedMessages.slice(0, turnStartIndex);
@@ -91,7 +69,6 @@ export default function Chat({ conversationId, onOpenSidebar }) {
   const [isLoading, setIsLoading] = useState(false);
   const [activity, setActivity] = useState('idle');
   const [error, setError] = useState(null);
-  const { models, model, select } = useModels();
   const scrollContainerRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
@@ -314,7 +291,6 @@ export default function Chat({ conversationId, onOpenSidebar }) {
 
     try {
       await client.messages.send(conversationId, text, handlers, controller.signal, {
-        model,
         images: selectedImages.map(image => image.dataUrl),
       });
     } catch (e) {
@@ -345,9 +321,8 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     <main className="chat-area">
       <header className="chat-header">
         <button className="mobile-menu-button" type="button" onClick={onOpenSidebar} aria-label="Abrir conversaciones" title="Abrir conversaciones"><Icon name="menu" /></button>
-        <span className="conversation-id">{conversationId.slice(0, 8)}</span>
+        <span className="conversation-id" title={conversationId}>{conversationId.slice(0, 8)}</span>
         <span className="header-spacer" />
-        <ModelPicker models={models} value={model} onChange={select} disabled={isLoading} />
         <div className="toolbar">
           <button className="reload-button" onClick={loadMessages} disabled={isLoading} title="Actualizar los mensajes" aria-label="Actualizar los mensajes"><Icon name="refresh" /><span>Recargar</span></button>
         </div>
@@ -431,23 +406,6 @@ export default function Chat({ conversationId, onOpenSidebar }) {
         </small>
       </form>
     </main>
-  );
-}
-
-function ModelPicker({ models, value, onChange, disabled }) {
-  if (models.length === 0) return null;
-  const groups = [...models.reduce((acc, m) => {
-    acc.set(m.providerLabel, [...(acc.get(m.providerLabel) ?? []), m]);
-    return acc;
-  }, new Map())];
-  return (
-    <select className="model-picker" value={value} onChange={e => onChange(e.target.value)} disabled={disabled}>
-      {groups.map(([label, items]) => (
-        <optgroup key={label} label={label}>
-          {items.map(m => <option key={m.id} value={m.id}>{m.model}</option>)}
-        </optgroup>
-      ))}
-    </select>
   );
 }
 

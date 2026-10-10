@@ -41,17 +41,13 @@ export function listModels(): ModelInfo[] {
   );
 }
 
-export function defaultModelId(): string {
-  return config.ai.defaultModel;
-}
-
 /**
- * `proveedor/modelo` → modelo listo para `streamText`. Sin id usa el default.
+ * Resuelve exclusivamente el modelo elegido por el perfil de agente.
  *
- * @returns null si el proveedor no está habilitado o el modelo no está en su lista.
+ * @returns null si no hay modelo o si el proveedor/modelo no está habilitado.
  */
-export function resolveModel(id?: string | null): ResolvedModel | null {
-  const fullId = id?.trim() || config.ai.defaultModel;
+export function resolveModel(id: string | null | undefined, fallbackContextWindow: number): ResolvedModel | null {
+  const fullId = id?.trim() ?? '';
   const split = splitModelId(fullId);
   if (!split) {
     return null;
@@ -79,6 +75,6 @@ export function resolveModel(id?: string | null): ResolvedModel | null {
     model: split.model,
     languageModel,
     contextWindowTokens:
-      providerConfig.contextWindows[split.model] ?? config.contextTokenBudget,
+      providerConfig.contextWindows[split.model] ?? fallbackContextWindow,
   };
 }
