@@ -4,6 +4,15 @@ import Icon from './Icon.jsx';
 
 const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
+const MESSAGE_PAGE_SIZE = 50;
+
+function messageCursor(message) {
+  return message ? { createdAt: message.createdAt, id: message.id } : null;
+}
+
+function sortMessages(items) {
+  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
 
 export default function Chat({ conversationId, onOpenSidebar, onConversationUpdated }) {
   const [messages, setMessages] = useState([]);
@@ -18,6 +27,8 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
   const imagesRef = useRef([]);
   const imageReadQueueRef = useRef(Promise.resolve());
   const [isLoading, setIsLoading] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [activity, setActivity] = useState('idle');
   const [error, setError] = useState(null);
   const scrollContainerRef = useRef(null);
@@ -25,8 +36,14 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
   const abortRef = useRef(null);
   const imagePreviewsRef = useRef([]);
   const messageLoadRequestRef = useRef(0);
+  const messagesRef = useRef([]);
+  const hasMoreMessagesRef = useRef(false);
+  const loadingOlderRef = useRef(false);
+  const scrollRestoreRef = useRef(null);
   const messageInputRef = useRef(null);
   const imageFileInputRef = useRef(null);
+  messagesRef.current = messages;
+  hasMoreMessagesRef.current = hasMoreMessages;
 
   useEffect(() => {
     const textarea = messageInputRef.current;
@@ -124,24 +141,77 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
     e.currentTarget.form?.requestSubmit();
   }
   
-  const loadMessages = useCallback(async () => {
+  const addLocalImagePreviews = useCallback((items) => {
+    const previews = [...imagePreviewsRef.current];
+    return items.map(message => {
+      if (message.role !== 'user') return message;
+      const previewIndex = previews.findIndex(preview => preview.content === message.content);
+      if (previewIndex < 0) return message;
+      const [preview] = previews.splice(previewIndex, 1);
+      return { ...message, imageDataUrls: preview.dataUrls };
+    });
+  }, []);
+
+  const loadMessages = useCallback(async ({ preserveHistory = false } = {}) => {
     const requestId = ++messageLoadRequestRef.current;
+    if (!preserveHistory) {
+      setMessages([]);
+      setHasMoreMessages(false);
+      hasMoreMessagesRef.current = false;
+      loadingOlderRef.current = false;
+      setIsLoadingOlder(false);
+      shouldStickToBottomRef.current = true;
+      scrollRestoreRef.current = null;
+    }
     try {
-      const msgs = await client.messages.list(conversationId);
+      const page = await client.messages.list(conversationId, { limit: MESSAGE_PAGE_SIZE });
       if (requestId !== messageLoadRequestRef.current) return;
-      const previews = [...imagePreviewsRef.current];
-      const withLocalPreviews = msgs.map(message => {
-        if (message.role !== 'user') return message;
-        const previewIndex = previews.findIndex(preview => preview.content === message.content);
-        if (previewIndex < 0) return message;
-        const [preview] = previews.splice(previewIndex, 1);
-        return { ...message, imageDataUrls: preview.dataUrls };
-      });
-      setMessages(withLocalPreviews);
+      const latestItems = addLocalImagePreviews(page.items);
+      if (preserveHistory) {
+        const retained = messagesRef.current.filter(message => !message.pending);
+        const merged = new Map([...retained, ...latestItems].map(message => [message.id, message]));
+        setMessages(sortMessages([...merged.values()]));
+        setHasMoreMessages(hasMoreMessagesRef.current || page.hasMore);
+      } else {
+        setMessages(latestItems);
+        setHasMoreMessages(page.hasMore);
+      }
+      hasMoreMessagesRef.current = preserveHistory
+        ? hasMoreMessagesRef.current || page.hasMore
+        : page.hasMore;
     } catch (e) {
       if (requestId === messageLoadRequestRef.current) setError(e.message);
     }
-  }, [conversationId]);
+  }, [addLocalImagePreviews, conversationId]);
+
+  const loadOlderMessages = useCallback(async () => {
+    const currentMessages = messagesRef.current;
+    const before = messageCursor(currentMessages[0]);
+    if (!before || !hasMoreMessagesRef.current || loadingOlderRef.current) return;
+
+    const requestId = messageLoadRequestRef.current;
+    const container = scrollContainerRef.current;
+    const previousHeight = container?.scrollHeight ?? 0;
+    const previousTop = container?.scrollTop ?? 0;
+    loadingOlderRef.current = true;
+    setIsLoadingOlder(true);
+    try {
+      const page = await client.messages.list(conversationId, { limit: MESSAGE_PAGE_SIZE, before });
+      if (requestId !== messageLoadRequestRef.current) return;
+      const combined = new Map([...messagesRef.current, ...addLocalImagePreviews(page.items)].map(message => [message.id, message]));
+      scrollRestoreRef.current = { height: previousHeight, top: previousTop };
+      setMessages(sortMessages([...combined.values()]));
+      setHasMoreMessages(page.hasMore);
+      hasMoreMessagesRef.current = page.hasMore;
+    } catch (e) {
+      if (requestId === messageLoadRequestRef.current) setError(e.message);
+    } finally {
+      if (requestId === messageLoadRequestRef.current) {
+        loadingOlderRef.current = false;
+        setIsLoadingOlder(false);
+      }
+    }
+  }, [addLocalImagePreviews, conversationId]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -163,7 +233,13 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
 
   useEffect(() => {
     const container = scrollContainerRef.current;
-    if (container && shouldStickToBottomRef.current) {
+    if (!container) return;
+    if (scrollRestoreRef.current) {
+      const { height, top } = scrollRestoreRef.current;
+      container.scrollTop = top + (container.scrollHeight - height);
+      scrollRestoreRef.current = null;
+      shouldStickToBottomRef.current = false;
+    } else if (shouldStickToBottomRef.current) {
       container.scrollTop = container.scrollHeight;
     }
   }, [messages]);
@@ -173,6 +249,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
     if (!container) return;
     const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
     shouldStickToBottomRef.current = distanceFromBottom <= 64;
+    if (container.scrollTop <= 100) void loadOlderMessages();
   }
 
   async function handleSubmit(e) {
@@ -199,7 +276,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
       imagePreviewsRef.current.push({ content: persistedContent, dataUrls: selectedImages.map(image => image.dataUrl) });
     }
     setMessages(prev => [...prev, {
-      id: userKey, conversationId, role: 'user',
+      id: userKey, conversationId, role: 'user', pending: true,
       content: persistedContent, imageDataUrls: selectedImages.map(image => image.dataUrl),
       toolName: null, toolArgs: null, toolResult: null,
       createdAt: new Date().toISOString(),
@@ -214,7 +291,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
             return [...prev.slice(0, -1), { ...last, content: last.content + delta }];
           }
           return [...prev, {
-            id: assistantKey, conversationId, role: 'assistant',
+            id: assistantKey, conversationId, role: 'assistant', pending: true,
             content: delta, toolName: null, toolArgs: null, toolResult: null,
             createdAt: new Date().toISOString(),
           }];
@@ -223,7 +300,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
       onToolStart: (id, name) => {
         setActivity('tool');
         setMessages(prev => [...prev, {
-          id, conversationId, role: 'tool', status: 'running',
+          id, conversationId, role: 'tool', status: 'running', pending: true,
           content: '', toolName: name, toolArgs: null, toolResult: null,
           createdAt: new Date().toISOString(),
         }]);
@@ -252,7 +329,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
         images: selectedImages.map(image => image.dataUrl),
       });
       if (result === 'ok') {
-        await loadMessages();
+        await loadMessages({ preserveHistory: true });
         try {
           const conversation = await client.conversations.get(conversationId);
           setConversationTitle(conversation.title ?? '');
@@ -352,6 +429,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
         className="messages"
         onScroll={handleMessagesScroll}
       >
+        {isLoadingOlder && <div className="history-loading" role="status">Cargando mensajes anteriores…</div>}
         {renderMessageList(messages)}
         {isLoading && (
           <div className="thinking-slot">

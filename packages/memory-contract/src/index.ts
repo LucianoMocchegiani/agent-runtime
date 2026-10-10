@@ -104,9 +104,22 @@ export type ListConversationsParams = {
   archived?: boolean;
 };
 
+export type MessageCursor = {
+  createdAt: string;
+  id: string;
+};
+
 export type ListMessagesParams = {
   conversationId: string;
   userId: string;
+  limit?: number;
+  before?: MessageCursor;
+};
+
+export type ListMessagesResult = {
+  items: MessageDto[];
+  hasMore: boolean;
+  nextCursor: MessageCursor | null;
 };
 
 export type GetConversationParams = {
@@ -201,7 +214,7 @@ export interface MemoryMcp {
   getContext(params: GetContextParams): Promise<GetContextResult>;
   saveSummary(params: SaveSummaryParams): Promise<boolean>;
   saveMessage(params: SaveMessageParams): Promise<void>;
-  listMessages(params: ListMessagesParams): Promise<MessageDto[]>;
+  listMessages(params: ListMessagesParams): Promise<ListMessagesResult>;
   listConversations(params: ListConversationsParams): Promise<ConversationDto[]>;
   createConversation(
     params: CreateConversationParams,

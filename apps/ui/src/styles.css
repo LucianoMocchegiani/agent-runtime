@@ -351,6 +351,7 @@ html, body, #root { min-width: 0; overflow: hidden; }
   flex-direction: column;
   gap: 8px;
 }
+.history-loading { align-self: center; flex: 0 0 auto; padding: 4px 0; color: var(--text-muted); font-size: 12px; }
 
 .error-bar { flex: 0 0 auto; }
 

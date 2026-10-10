@@ -100,14 +100,18 @@ function registerTools(server: McpServer): void {
       inputSchema: z.object({
         conversationId: z.string(),
         userId: z.string(),
+        limit: z.number().int().positive().optional(),
+        before: z.object({ createdAt: z.string(), id: z.string().uuid() }).optional(),
       }),
     },
     async (args) => {
-      const rows = await listMessages({
+      const page = await listMessages({
         conversationId: args.conversationId,
         userId: args.userId,
+        limit: args.limit,
+        before: args.before,
       });
-      return { content: [{ type: 'text', text: JSON.stringify(rows) }] };
+      return { content: [{ type: 'text', text: JSON.stringify(page) }] };
     },
   );
 

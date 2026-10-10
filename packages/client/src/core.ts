@@ -33,6 +33,14 @@ export type Message = {
   createdAt: string;
 };
 
+export type MessageCursor = { createdAt: string; id: string };
+export type MessagePage = {
+  items: Message[];
+  hasMore: boolean;
+  nextCursor: MessageCursor | null;
+};
+export type MessageListOptions = { limit?: number; before?: MessageCursor };
+
 export type ModelInfo = {
   /** `proveedor/modelo`; se manda como `model` en `messages.send`. */
   id: string;
@@ -180,14 +188,21 @@ export function createClient(config: ClientConfig) {
     },
 
     messages: {
-      list: async (conversationId: string): Promise<Message[]> => {
+      list: async (conversationId: string, options: MessageListOptions = {}): Promise<MessagePage> => {
+        const query = new URLSearchParams();
+        if (options.limit !== undefined) query.set('limit', String(options.limit));
+        if (options.before) {
+          query.set('beforeCreatedAt', options.before.createdAt);
+          query.set('beforeId', options.before.id);
+        }
+        const suffix = query.size ? `?${query.toString()}` : '';
         const res = await fetch(
-          `${baseUrl(config)}/v1/conversations/${conversationId}/messages`,
+          `${baseUrl(config)}/v1/conversations/${conversationId}/messages${suffix}`,
           { headers: headers(config, { Accept: 'application/json' }) },
         );
         if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
-        const data = await json<{ items: Message[] }>(res);
-        return data?.items ?? [];
+        const data = await json<MessagePage>(res);
+        return data ?? { items: [], hasMore: false, nextCursor: null };
       },
 
       send: async (

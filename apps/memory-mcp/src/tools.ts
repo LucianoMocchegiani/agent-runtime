@@ -10,6 +10,7 @@ import {
   type UpdateConversationPatch,
   type ListConversationsParams,
   type ListMessagesParams,
+  type ListMessagesResult,
   type GetConversationParams,
   type UpdateConversationParams,
   type ArchiveConversationParams,
@@ -91,7 +92,9 @@ async function assertConversationOwner(
 }
 
 const LIST_TAKE = 100;
-const MESSAGES_TAKE = 500;
+const CONTEXT_MESSAGES_TAKE = 500;
+const DEFAULT_MESSAGES_TAKE = 50;
+const MAX_MESSAGES_TAKE = 100;
 
 export async function getContext(
   params: GetContextParams,
@@ -111,12 +114,12 @@ export async function getContext(
     prisma.message.findMany({
       where: { conversationId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: MESSAGES_TAKE + 1,
+      take: CONTEXT_MESSAGES_TAKE + 1,
     }),
   ]);
   if (!conversation) throw new ConversationNotFoundError();
-  const hasMore = descendingRows.length > MESSAGES_TAKE;
-  const rows = descendingRows.slice(0, MESSAGES_TAKE).reverse();
+  const hasMore = descendingRows.length > CONTEXT_MESSAGES_TAKE;
+  const rows = descendingRows.slice(0, CONTEXT_MESSAGES_TAKE).reverse();
 
   return {
     messages: rows.map(toMessageDto),
@@ -167,17 +170,40 @@ export async function saveMessage(
 
 export async function listMessages(
   params: ListMessagesParams,
-): Promise<MessageDto[]> {
+): Promise<ListMessagesResult> {
   const { conversationId, userId } = params;
   await assertConversationOwner(conversationId, userId);
+
+  const requestedLimit = Math.floor(params.limit ?? DEFAULT_MESSAGES_TAKE);
+  const limit = Math.max(1, Math.min(requestedLimit, MAX_MESSAGES_TAKE));
+  const beforeCreatedAt = params.before ? new Date(params.before.createdAt) : null;
+  if (params.before && (!beforeCreatedAt || !Number.isFinite(beforeCreatedAt.getTime()))) {
+    throw new Error('Invalid message cursor');
+  }
+
   const rows = await prisma.message.findMany({
-    where: { conversationId },
+    where: {
+      conversationId,
+      ...(params.before && beforeCreatedAt ? {
+        OR: [
+          { createdAt: { lt: beforeCreatedAt } },
+          { createdAt: beforeCreatedAt, id: { lt: params.before.id } },
+        ],
+      } : {}),
+    },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-    take: MESSAGES_TAKE,
+    take: limit + 1,
   });
-  // La UI recibe los 500 mensajes más recientes en orden cronológico.
-  rows.reverse();
-  return rows.map(toMessageDto);
+  const hasMore = rows.length > limit;
+  const page = rows.slice(0, limit).reverse();
+  const oldest = page[0];
+  return {
+    items: page.map(toMessageDto),
+    hasMore,
+    nextCursor: hasMore && oldest
+      ? { createdAt: oldest.createdAt.toISOString(), id: oldest.id }
+      : null,
+  };
 }
 
 export async function listConversations(

@@ -99,13 +99,35 @@ messageRoutes.get('/', async (c) => {
   const id = requireConversationId(c.req.param('id'));
   await getConversation(c.get('principal'), id);
   const principal = c.get('principal');
+  const query = c.req.query();
+  const rawLimit = query.limit;
+  const limit = rawLimit === undefined ? 50 : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new HTTPException(400, { message: 'limit debe ser un entero entre 1 y 100.' });
+  }
+
+  const beforeCreatedAt = query.beforeCreatedAt;
+  const beforeId = query.beforeId;
+  if ((beforeCreatedAt === undefined) !== (beforeId === undefined)) {
+    throw new HTTPException(400, { message: 'beforeCreatedAt y beforeId deben enviarse juntos.' });
+  }
+  let before: { createdAt: string; id: string } | undefined;
+  if (beforeCreatedAt !== undefined && beforeId !== undefined) {
+    if (!Number.isFinite(Date.parse(beforeCreatedAt)) || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(beforeId)) {
+      throw new HTTPException(400, { message: 'Cursor de mensajes inválido.' });
+    }
+    before = { createdAt: beforeCreatedAt, id: beforeId };
+  }
+
   const memory = await createMemoryMcpClient();
   try {
-    const rows = await memory.listMessages({
+    const page = await memory.listMessages({
       conversationId: id,
       userId: principal.userId,
+      limit,
+      before,
     });
-    return c.json({ items: rows });
+    return c.json(page);
   } finally {
     await memory.close().catch(() => undefined);
   }

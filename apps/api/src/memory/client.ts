@@ -11,8 +11,8 @@ import {
   type CreateConversationParams,
   type ConversationDto,
   type UpdateConversationPatch,
-  type MessageDto,
   type ListMessagesParams,
+  type ListMessagesResult,
   type GetConversationParams,
   type UpdateConversationParams,
   type ArchiveConversationParams,
@@ -108,8 +108,8 @@ export async function createMemoryMcpClient(): Promise<MemoryMcp> {
     async saveMessage(params: SaveMessageParams): Promise<void> {
       await callTool<void>(TOOL_NAMES.saveMessage, params);
     },
-    async listMessages(params: ListMessagesParams): Promise<MessageDto[]> {
-      return callTool<MessageDto[]>(TOOL_NAMES.listMessages, params);
+    async listMessages(params: ListMessagesParams): Promise<ListMessagesResult> {
+      return callTool<ListMessagesResult>(TOOL_NAMES.listMessages, params);
     },
     async listConversations(
       params: ListConversationsParams,
