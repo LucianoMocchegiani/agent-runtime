@@ -5,59 +5,6 @@ import Icon from './Icon.jsx';
 const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
 
-function reconcileLiveTurn(liveMessages, persistedMessages, turnStartIndex) {
-  const history = persistedMessages.slice(0, turnStartIndex);
-  const liveTurn = liveMessages.slice(turnStartIndex);
-  const savedTurn = persistedMessages.slice(turnStartIndex);
-  const savedTools = savedTurn.filter(message => message.role === 'tool');
-  const usedSavedTools = new Set();
-  let nextToolIndex = 0;
-
-  const reconciledTurn = liveTurn.map(message => {
-    if (message.role === 'tool') {
-      let savedIndex = savedTools.findIndex((saved, index) =>
-        index >= nextToolIndex && saved.toolName === message.toolName
-      );
-      if (savedIndex < 0) savedIndex = savedTools.findIndex((_, index) => index >= nextToolIndex);
-      if (savedIndex < 0) return message;
-
-      nextToolIndex = savedIndex + 1;
-      const saved = savedTools[savedIndex];
-      usedSavedTools.add(saved.id);
-      return {
-        ...message,
-        toolName:
-          message.toolName && message.toolName !== 'tool'
-            ? message.toolName
-            : saved.toolName || message.toolName,
-        toolArgs: saved.toolArgs ?? message.toolArgs,
-        toolResult: saved.toolResult ?? message.toolResult,
-        content: message.content || saved.content,
-        status: 'done',
-      };
-    }
-
-    if (message.role === 'assistant' && !message.content) {
-      const savedText = savedTurn
-        .filter(item => item.role === 'assistant')
-        .map(item => item.content)
-        .filter(Boolean)
-        .join('\n\n');
-      return savedText ? { ...message, content: savedText } : message;
-    }
-    return message;
-  });
-
-  const missingTools = savedTools
-    .filter(message => !usedSavedTools.has(message.id))
-    .map(message => ({ ...message, status: 'done' }));
-  const hasAssistant = reconciledTurn.some(message => message.role === 'assistant' && message.content);
-  const savedAssistant = savedTurn.filter(message => message.role === 'assistant' && message.content);
-  const missingAssistant = !hasAssistant && savedAssistant.length > 0 ? savedAssistant : [];
-
-  return [...history, ...reconciledTurn, ...missingTools, ...missingAssistant];
-}
-
 export default function Chat({ conversationId, onOpenSidebar }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -73,7 +20,7 @@ export default function Chat({ conversationId, onOpenSidebar }) {
   const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
   const imagePreviewsRef = useRef([]);
-  const turnStartIndexRef = useRef(null);
+  const messageLoadRequestRef = useRef(0);
   const messageInputRef = useRef(null);
   const imageFileInputRef = useRef(null);
 
@@ -173,10 +120,11 @@ export default function Chat({ conversationId, onOpenSidebar }) {
     e.currentTarget.form?.requestSubmit();
   }
   
-  const loadMessages = useCallback(async ({ preserveLiveTurn = false } = {}) => {
-    const turnStartIndex = preserveLiveTurn ? turnStartIndexRef.current : null;
+  const loadMessages = useCallback(async () => {
+    const requestId = ++messageLoadRequestRef.current;
     try {
       const msgs = await client.messages.list(conversationId);
+      if (requestId !== messageLoadRequestRef.current) return;
       const previews = [...imagePreviewsRef.current];
       const withLocalPreviews = msgs.map(message => {
         if (message.role !== 'user') return message;
@@ -185,14 +133,9 @@ export default function Chat({ conversationId, onOpenSidebar }) {
         const [preview] = previews.splice(previewIndex, 1);
         return { ...message, imageDataUrls: preview.dataUrls };
       });
-      setMessages(current => turnStartIndex === null
-        ? withLocalPreviews
-        : reconcileLiveTurn(current, withLocalPreviews, turnStartIndex));
-      if (preserveLiveTurn) turnStartIndexRef.current = null;
+      setMessages(withLocalPreviews);
     } catch (e) {
-      setError(e.message);
-    } finally {
-      if (preserveLiveTurn) turnStartIndexRef.current = null;
+      if (requestId === messageLoadRequestRef.current) setError(e.message);
     }
   }, [conversationId]);
 
@@ -234,8 +177,6 @@ export default function Chat({ conversationId, onOpenSidebar }) {
 
     const userKey = `user-${Date.now()}`;
     const assistantKey = `assistant-${Date.now()}`;
-    turnStartIndexRef.current = messages.length;
-
     if (selectedImages.length) {
       imagePreviewsRef.current.push({ content: persistedContent, dataUrls: selectedImages.map(image => image.dataUrl) });
     }
@@ -283,16 +224,16 @@ export default function Chat({ conversationId, onOpenSidebar }) {
             : message
         ));
       },
-      onFinish: () => { void loadMessages({ preserveLiveTurn: true }); },
     };
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      await client.messages.send(conversationId, text, handlers, controller.signal, {
+      const result = await client.messages.send(conversationId, text, handlers, controller.signal, {
         images: selectedImages.map(image => image.dataUrl),
       });
+      if (result === 'ok') await loadMessages();
     } catch (e) {
       const wasAborted = e.name === 'AbortError';
       setMessages(prev => prev.map(message =>
