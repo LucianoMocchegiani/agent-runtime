@@ -333,7 +333,11 @@ export default function Chat({ conversationId, onOpenSidebar }) {
         onScroll={handleMessagesScroll}
       >
         {renderMessageList(messages)}
-        {isLoading && activity === 'thinking' && <ThinkingIndicator />}
+        {isLoading && (
+          <div className="thinking-slot">
+            {activity === 'thinking' && <ThinkingIndicator />}
+          </div>
+        )}
       </div>
       {error && <div className="error-bar" role="alert">{error}</div>}
       <form onSubmit={handleSubmit} className="composer">
