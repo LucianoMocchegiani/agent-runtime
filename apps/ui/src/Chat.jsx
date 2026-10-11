@@ -46,6 +46,7 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
   const scrollRestoreRef = useRef(null);
   const messageInputRef = useRef(null);
   const imageFileInputRef = useRef(null);
+  const attachmentMenuRef = useRef(null);
   messagesRef.current = messages;
   hasMoreMessagesRef.current = hasMoreMessages;
 
@@ -57,6 +58,24 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
     textarea.style.height = `${Math.min(textarea.scrollHeight, Number.isFinite(maxHeight) ? maxHeight : textarea.scrollHeight)}px`;
     textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
   }, [input]);
+
+  useEffect(() => {
+    if (!isAttachMenuOpen) return;
+    function handlePointerDown(event) {
+      if (!attachmentMenuRef.current?.contains(event.target)) {
+        setIsAttachMenuOpen(false);
+      }
+    }
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setIsAttachMenuOpen(false);
+    }
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAttachMenuOpen]);
 
   function replaceImages(nextImages) {
     const next = typeof nextImages === 'function' ? nextImages(imagesRef.current) : nextImages;
@@ -503,7 +522,7 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
           aria-hidden="true"
         />
         <div className="composer-row">
-          <div className="attachment-menu-wrap">
+          <div className="attachment-menu-wrap" ref={attachmentMenuRef}>
             <button
               type="button"
               className="attach-button"
