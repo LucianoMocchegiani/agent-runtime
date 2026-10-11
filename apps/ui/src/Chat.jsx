@@ -15,7 +15,7 @@ function sortMessages(items) {
   return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
-export default function Chat({ conversationId, onOpenSidebar, onConversationUpdated }) {
+export default function Chat({ conversationId, isVisible, onOpenSidebar, onConversationUpdated, onActivityChange }) {
   const [messages, setMessages] = useState([]);
   const [conversationTitle, setConversationTitle] = useState('');
   const [agentProfileId, setAgentProfileId] = useState('');
@@ -238,8 +238,14 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
   }, [loadMessages]);
 
   useEffect(() => {
+    onActivityChange?.(conversationId, isLoading ? activity : null);
+  }, [activity, conversationId, isLoading, onActivityChange]);
+
+  useEffect(() => () => abortRef.current?.abort(), []);
+
+  useEffect(() => {
     const container = scrollContainerRef.current;
-    if (!container) return;
+    if (!container || !isVisible) return;
     if (scrollRestoreRef.current) {
       const { height, top } = scrollRestoreRef.current;
       container.scrollTop = top + (container.scrollHeight - height);
@@ -248,7 +254,7 @@ export default function Chat({ conversationId, onOpenSidebar, onConversationUpda
     } else if (shouldStickToBottomRef.current) {
       container.scrollTop = container.scrollHeight;
     }
-  }, [messages]);
+  }, [isVisible, messages]);
 
   function handleMessagesScroll() {
     const container = scrollContainerRef.current;

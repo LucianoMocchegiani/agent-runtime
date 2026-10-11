@@ -2,7 +2,13 @@ import { useState, useEffect } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 
-export default function ConversationList({ activeId, onSelect, onOpenAdmin, refreshKey }) {
+const activityLabels = {
+  thinking: 'Pensando',
+  responding: 'Respondiendo',
+  tool: 'Usando herramienta',
+};
+
+export default function ConversationList({ activeId, activityByConversation = {}, onSelect, onArchive, onOpenAdmin, refreshKey }) {
   const [convs, setConvs] = useState([]);
 
   useEffect(() => {
@@ -25,7 +31,7 @@ export default function ConversationList({ activeId, onSelect, onOpenAdmin, refr
 
   async function handleArchive(id) {
     await client.conversations.archive(id);
-    if (activeId === id) onSelect(null);
+    onArchive?.(id);
     load();
   }
 
@@ -40,10 +46,12 @@ export default function ConversationList({ activeId, onSelect, onOpenAdmin, refr
         {convs.length === 0 && <div style={{ padding: 16, color: '#666', textAlign: 'center' }}>Sin conversaciones</div>}
         {convs.map(c => {
           const title = c.title || 'Sin título';
+          const activity = activityByConversation[c.id];
           return (
             <div key={c.id} className={`conv-item ${c.id === activeId ? 'active' : ''}`}>
               <button type="button" className="conv-select" onClick={() => onSelect(c.id)} title={title} aria-current={c.id === activeId ? 'page' : undefined}>
                 <span className="conv-title">{title}</span>
+                {activity && <span className="conv-activity" role="status" aria-label={`Agente ${activityLabels[activity] ?? 'en ejecución'}`} title={`Agente ${activityLabels[activity] ?? 'en ejecución'}`}><span className="conv-activity-dot" aria-hidden="true" />{activityLabels[activity] ?? 'En curso'}</span>}
                 <span className="conv-date">{fmtDate(c.updatedAt)}</span>
               </button>
               <button className="archive-button" onClick={() => handleArchive(c.id)} aria-label={`Archivar ${title}`} title={`Archivar ${title}`}><Icon name="archive" /></button>

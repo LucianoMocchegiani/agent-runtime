@@ -17,12 +17,13 @@
 ## Enviar mensaje
 
 1. La API autentica la petición y busca la conversación en Memory.
-2. Runtime carga el perfil referenciado por `agentProfileId`; un perfil archivado sigue siendo válido para el hilo existente.
-3. Runtime captura la configuración del perfil para este turno, recupera contexto y preferencias mediante llamadas directas al módulo Memory.
-4. El agente ejecuta herramientas MCP externas y transmite la respuesta.
-5. Runtime guarda mensajes, título y resumen mediante Memory; el hilo y la asignación siguen persistentes para próximos turnos.
+2. Runtime valida el mensaje y carga el perfil referenciado por `agentProfileId`; un perfil archivado sigue siendo válido para el hilo existente.
+3. Antes de ejecutar el turno, la API reserva en memoria una clave por usuario y conversación. Si ya hay un turno activo para esa clave, responde HTTP `409`.
+4. Runtime captura la configuración del perfil para este turno, recupera contexto y preferencias mediante llamadas directas al módulo Memory.
+5. El agente ejecuta herramientas MCP externas y transmite la respuesta.
+6. Runtime guarda mensajes, título y resumen mediante Memory; el hilo y la asignación siguen persistentes para próximos turnos. El bloqueo se libera al terminar o fallar el stream, o al cancelarse la respuesta.
 
-Un turno es temporal: no existe un proceso reservado por conversación. Cambiar la asignación afecta turnos siguientes y no modifica uno que ya está corriendo.
+Un turno es temporal: no existe un proceso reservado por conversación. Cambiar la asignación afecta turnos siguientes y no modifica uno que ya está corriendo. El bloqueo es local al proceso de API: permite turnos paralelos en conversaciones distintas, pero solo evita duplicados atendidos por la misma instancia. En despliegues con varias réplicas, la exclusión entre instancias requiere coordinación compartida; sin ella, turnos concurrentes del mismo hilo podrían entremezclar escrituras. Reiniciar la API borra los bloqueos locales y no recupera turnos interrumpidos.
 
 ## Cambiar perfil
 

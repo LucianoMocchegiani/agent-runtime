@@ -30,6 +30,16 @@ Un perfil es configuración reutilizable propiedad de Runtime. Cada conversació
 
 Un turno es una ejecución temporal. No hay procesos reservados por hilo. El cambio de perfil durante un chat se aplica a próximos turnos; el turno que ya comenzó conserva su configuración.
 
+## Concurrencia de turnos
+
+La API mantiene un bloqueo en memoria por combinación de usuario y conversación. Al iniciar un turno, reserva esa clave; mientras siga activa, otro `POST /v1/conversations/:id/messages` para el mismo usuario y conversación recibe HTTP `409`. Las conversaciones distintas pueden ejecutar turnos en paralelo. El bloqueo se libera al terminar o fallar el stream, o cuando se cancela la respuesta.
+
+Este mecanismo coordina únicamente solicitudes atendidas por **el mismo proceso de API**: el estado reside en un `Set` local y no se guarda en PostgreSQL ni en otro coordinador compartido. Con varias réplicas, cada proceso tendría su propio bloqueo y dos solicitudes para el mismo hilo podrían ser aceptadas por réplicas diferentes; por lo tanto, no se garantiza exclusión mutua ni se evita que sus escrituras de mensajes se entremezclen. Reiniciar el proceso también elimina los bloqueos en memoria; los turnos interrumpidos por el reinicio no se recuperan mediante este mecanismo.
+
+El despliegue actual de Compose usa una sola instancia de la API, que es el escenario cubierto por este bloqueo. Antes de escalar a varias réplicas, hay que sustituirlo o complementarlo con coordinación compartida —por ejemplo, un bloqueo/advisory lock de PostgreSQL con alcance por usuario y conversación— y definir el comportamiento ante caídas y expiración de bloqueos.
+
+Este bloqueo solo impide turnos duplicados en una conversación; no distribuye el trabajo entre agentes ni reserva un proceso por conversación.
+
 ## Persistencia y despliegue
 
 El módulo Memory usa Prisma y PostgreSQL. Runtime mantiene su acceso al schema `runtime` para configuración y perfiles. Las migraciones se ejecutan como tarea de despliegue antes de iniciar la API. En Compose hay PostgreSQL, una tarea efímera `migrate` y un solo servicio persistente `agent-runtime`.

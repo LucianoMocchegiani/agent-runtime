@@ -6,6 +6,7 @@ import { createMemoryClient } from '../memory/client.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
 import { resolveModel } from '../llm/provider.js';
+import { acquireConversationTurn } from './turn-lock.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
 
 const TEXT_MAX = 100_000;
@@ -90,6 +91,44 @@ function readImages(body: unknown): IncomingImage[] {
   return [parseImage(record.image)];
 }
 
+function releaseTurnWhenResponseEnds(response: Response, release: () => void): Response {
+  if (!response.body) {
+    release();
+    return response;
+  }
+
+  const reader = response.body.getReader();
+  const body = new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          release();
+          controller.close();
+        } else {
+          controller.enqueue(value);
+        }
+      } catch (error) {
+        release();
+        controller.error(error);
+      }
+    },
+    async cancel(reason) {
+      try {
+        await reader.cancel(reason);
+      } finally {
+        release();
+      }
+    },
+  });
+
+  return new Response(body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
 /**
  * Mensajes de un hilo. GET lista; POST stremea un turno (UI Message Stream).
  */
@@ -164,15 +203,25 @@ messageRoutes.post('/', async (c) => {
   const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
   if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
   const principal = c.get('principal');
-  return streamAgentTurn(
-    id,
-    principal,
-    c.get('accessToken'),
-    messageText,
-    model,
-    c.req.raw.signal,
-    c.get('mcpAuth') ?? undefined,
-    images,
-    profile,
-  );
+  const releaseTurn = acquireConversationTurn(principal.userId, id);
+  if (!releaseTurn) {
+    throw new HTTPException(409, { message: 'Ya hay un turno en curso en esta conversación. Esperá a que termine antes de enviar otro.' });
+  }
+  try {
+    const response = await streamAgentTurn(
+      id,
+      principal,
+      c.get('accessToken'),
+      messageText,
+      model,
+      c.req.raw.signal,
+      c.get('mcpAuth') ?? undefined,
+      images,
+      profile,
+    );
+    return releaseTurnWhenResponseEnds(response, releaseTurn);
+  } catch (error) {
+    releaseTurn();
+    throw error;
+  }
 });

@@ -11,7 +11,7 @@
     "start": "node dist/index.js",
     "start:dev": "tsx watch --env-file=../../.env src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/agent/window.test.ts"
+    "test": "node --import tsx --test src/agent/window.test.ts src/messages/turn-lock.test.ts"
   },
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.78",
