@@ -2,11 +2,11 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID }
 import { Pool } from 'pg';
 import { config, type ChatConfig } from '../config.js';
 import { setEmbeddingConfig } from 'agent-runtime-memory';
-import { seedDefaultAgentProfile, setAgentProfilePool } from './agent-profiles.js';
+import { initializeNewChatDefaultProfile, seedDefaultAgentProfile, setAgentProfilePool } from './agent-profiles.js';
 
 export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
 export type AgentProfileConfig = Pick<ChatConfig, 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'>;
-export type AgentProfile = { id: string; name: string; modelId: string; sortOrder: number; config: AgentProfileConfig; createdAt: string; updatedAt: string };
+export type AgentProfile = { id: string; name: string; modelId: string; config: AgentProfileConfig; createdAt: string; updatedAt: string };
 export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
 type Settings = RuntimeSettings;
 
@@ -84,11 +84,17 @@ export async function startRuntimeConfigStore(): Promise<void> {
     archived_at timestamptz NULL
   )`);
   await seedDefaultAgentProfile();
+  await pool.query(`CREATE TABLE IF NOT EXISTS runtime.agent_profile_preferences (
+    id text PRIMARY KEY,
+    default_profile_id text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+  )`);
+  await initializeNewChatDefaultProfile();
   // Deterministically pin legacy threads to the first active profile; later default-profile
   // changes must not silently change the agent assigned to existing conversations.
   await pool.query(`UPDATE public.conversations SET agent_profile_id = (
     SELECT id FROM runtime.agent_profile_configs WHERE archived_at IS NULL
-    ORDER BY sort_order, created_at, id LIMIT 1
+    ORDER BY created_at, id LIMIT 1
   ) WHERE agent_profile_id IS NULL`);
   const unassigned = await pool.query<{ count: string }>(
     'SELECT count(*)::text AS count FROM public.conversations WHERE agent_profile_id IS NULL',
@@ -149,7 +155,7 @@ function validateSettings(value: unknown): Settings {
   return v as Settings;
 }
 
-/** Devuelve una instantánea aislada y, cuando se indica, aplica el perfil global de agente. */
+/** Devuelve una instantánea aislada y, cuando se indica, aplica el perfil asignado a la conversación. */
 export function getRuntimeSettings(profile?: Pick<AgentProfile, 'modelId' | 'config'>): RuntimeSettings {
   const current = structuredClone(settings());
   if (profile) {

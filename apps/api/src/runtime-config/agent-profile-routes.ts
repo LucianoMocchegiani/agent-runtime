@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { authorized } from './routes.js';
-import { activateAgentProfile, archiveAgentProfile, createAgentProfile, listAgentProfiles, updateAgentProfile } from './agent-profiles.js';
+import { archiveAgentProfile, createAgentProfile, getNewChatDefaultProfileId, listAgentProfiles, setNewChatDefaultProfileId, updateAgentProfile } from './agent-profiles.js';
 
 export const agentProfileAdminRoutes = new Hono();
 agentProfileAdminRoutes.use('*', async (c, next) => {
@@ -12,16 +12,25 @@ async function input(c: any): Promise<any> {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Body must be a JSON object');
   return body;
 }
-agentProfileAdminRoutes.get('/', async (c) => c.json({ items: await listAgentProfiles() }));
+agentProfileAdminRoutes.get('/', async (c) => c.json({
+  items: await listAgentProfiles(),
+  defaultForNewChatsId: await getNewChatDefaultProfileId(),
+}));
+agentProfileAdminRoutes.put('/default-for-new-chats', async (c) => {
+  try {
+    const body = await input(c);
+    if (typeof body.profileId !== 'string' || !body.profileId.trim()) {
+      return c.json({ error: 'profileId debe ser un identificador de perfil.' }, 400);
+    }
+    const saved = await setNewChatDefaultProfileId(body.profileId.trim());
+    return saved
+      ? c.json({ defaultForNewChatsId: body.profileId.trim() })
+      : c.json({ error: 'El perfil seleccionado no existe o está archivado.' }, 400);
+  } catch (error) { return c.json({ error: error instanceof Error ? error.message : 'Invalid profile' }, 400); }
+});
 agentProfileAdminRoutes.post('/', async (c) => {
   try { return c.json(await createAgentProfile(await input(c)), 201); }
   catch (error) { return c.json({ error: error instanceof Error ? error.message : 'Invalid profile' }, 400); }
-});
-agentProfileAdminRoutes.post('/:id/activate', async (c) => {
-  try {
-    const activated = await activateAgentProfile(c.req.param('id'));
-    return activated ? c.json({ ok: true }) : c.json({ error: 'Profile not found' }, 404);
-  } catch (error) { return c.json({ error: error instanceof Error ? error.message : 'Invalid profile' }, 400); }
 });
 agentProfileAdminRoutes.put('/:id', async (c) => {
   try {

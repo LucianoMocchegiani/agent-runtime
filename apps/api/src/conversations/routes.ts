@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/principal.js';
-import { getAgentProfile, getDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
+import { getAgentProfile, getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { requireConversationId } from './ids.js';
 import {
   archiveConversation,
@@ -47,7 +47,7 @@ conversationRoutes.post('/', async (c) => {
   const title = parseTitleInput(body.title);
   let profileId: string;
   if (body.agentProfileId === undefined || body.agentProfileId === null) {
-    profileId = (await getDefaultAgentProfile()).id;
+    profileId = (await getNewChatDefaultAgentProfile()).id;
   } else if (typeof body.agentProfileId === 'string' && body.agentProfileId.trim()) {
     const profile = await getAgentProfile(body.agentProfileId.trim());
     if (!profile) throw new HTTPException(400, { message: 'El perfil seleccionado no existe o está archivado.' });
@@ -75,7 +75,7 @@ conversationRoutes.patch('/:id', async (c) => {
   const title = parseTitleInput(body.title);
   let agentProfileId: string | undefined;
   if (body.agentProfileId === null) {
-    agentProfileId = (await getDefaultAgentProfile()).id;
+    agentProfileId = (await getNewChatDefaultAgentProfile()).id;
   } else if (body.agentProfileId !== undefined) {
     if (typeof body.agentProfileId !== 'string' || !body.agentProfileId.trim()) {
       throw new HTTPException(400, { message: 'agentProfileId debe ser un identificador de perfil.' });

@@ -20,6 +20,7 @@ services:
   # Tarea efímera para aplicar migraciones antes de iniciar la aplicación.
   migrate:
     image: ghcr.io/lucianomocchegiani/agent-runtime:${AGENT_RUNTIME_VERSION:-latest}
+    working_dir: /app
     command: ["npm", "run", "prisma:deploy", "-w", "packages/memory"]
     restart: "no"
     depends_on:

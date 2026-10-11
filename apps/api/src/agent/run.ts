@@ -328,7 +328,7 @@ export async function streamAgentTurn(
   abortSignal?: AbortSignal,
   mcpTokens?: Record<string, string>,
   images: IncomingImage[] = [],
-  agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'modelId' | 'sortOrder' | 'config'>,
+  agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'modelId' | 'config'>,
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
   // El turno conserva una configuración coherente incluso si otra versión se publica mientras corre.

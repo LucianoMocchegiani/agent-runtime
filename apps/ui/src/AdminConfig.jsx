@@ -14,6 +14,10 @@ async function errorText(res) {
   catch { return `HTTP ${res.status}`; }
 }
 
+function editableProfile(profile) {
+  return { name: profile.name, modelId: profile.modelId, config: profile.config };
+}
+
 function tabValue(config, tab) {
   if (tab === 'Providers') return { providers: config.ai.providers };
   if (tab === 'Embeddings') return config.embeddingConfig;
@@ -30,6 +34,7 @@ export default function AdminConfig({ onBack }) {
   const [profiles, setProfiles] = useState([]);
   const [profileDraft, setProfileDraft] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [defaultForNewChatsId, setDefaultForNewChatsId] = useState('');
   const [version, setVersion] = useState(0);
   const [tab, setTab] = useState('Profiles');
   const [draft, setDraft] = useState('');
@@ -71,10 +76,11 @@ export default function AdminConfig({ onBack }) {
       setAuthHeader(overrideHeader);
       loadData(data);
       setProfiles(nextProfiles);
+      setDefaultForNewChatsId(profileData.defaultForNewChatsId ?? nextProfiles[0]?.id ?? '');
       const selected = nextProfiles.find((item) => item.id === selectedProfileId) ?? nextProfiles[0];
       if (selected) {
         setSelectedProfileId(selected.id);
-        setProfileDraft(JSON.stringify(selected, null, 2));
+        setProfileDraft(JSON.stringify(editableProfile(selected), null, 2));
       } else {
         setSelectedProfileId('');
         setProfileDraft('');
@@ -126,6 +132,23 @@ export default function AdminConfig({ onBack }) {
     finally { setBusy(false); }
   }
 
+  async function saveDefaultForNewChats() {
+    if (!defaultForNewChatsId) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const res = await fetch(`${API}/admin/agent-profiles/default-for-new-chats`, {
+        method: 'PUT',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profileId: defaultForNewChatsId }),
+      });
+      if (!res.ok) throw new Error(await errorText(res));
+      setNotice('Perfil predeterminado para nuevos chats guardado.');
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   async function saveProfile() {
     setBusy(true);
     setError('');
@@ -139,22 +162,7 @@ export default function AdminConfig({ onBack }) {
       });
       if (!res.ok) throw new Error(await errorText(res));
       await load();
-      setNotice('Perfil guardado. El que quede primero por sortOrder se aplicará globalmente en los próximos turnos de todas las conversaciones.');
-    } catch (e) { setError(e.message); }
-    finally { setBusy(false); }
-  }
-
-  async function activateProfile() {
-    if (!selectedProfileId || profiles[0]?.id === selectedProfileId) return;
-    setBusy(true);
-    setError('');
-    try {
-      const res = await fetch(`${API}/admin/agent-profiles/${encodeURIComponent(selectedProfileId)}/activate`, {
-        method: 'POST', headers: { Authorization: authHeader },
-      });
-      if (!res.ok) throw new Error(await errorText(res));
-      await load();
-      setNotice('Perfil activado globalmente. Se usará en los próximos turnos de todas las conversaciones.');
+      setNotice('Perfil guardado. Se aplicará en los próximos turnos de las conversaciones que lo tengan asignado.');
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -165,7 +173,7 @@ export default function AdminConfig({ onBack }) {
     try {
       const source = profiles[0];
       const profile = source
-        ? { ...source, id: undefined, name: 'Nuevo perfil', sortOrder: Math.max(...profiles.map((item) => item.sortOrder)) + 1 }
+        ? { ...editableProfile(source), name: 'Nuevo perfil' }
         : null;
       if (!profile) throw new Error('No hay perfil base para copiar.');
       const res = await fetch(`${API}/admin/agent-profiles`, {
@@ -177,7 +185,7 @@ export default function AdminConfig({ onBack }) {
       const created = await res.json();
       await load();
       setSelectedProfileId(created.id);
-      setProfileDraft(JSON.stringify(created, null, 2));
+      setProfileDraft(JSON.stringify(editableProfile(created), null, 2));
       setTab('Profiles');
       setNotice('Perfil creado. Revisá sus datos y guardá los cambios si hace falta.');
     } catch (e) { setError(e.message); }
@@ -185,8 +193,7 @@ export default function AdminConfig({ onBack }) {
   }
 
   async function archiveProfile() {
-    if (!selectedProfileId || profiles.length < 2 || !confirm('¿Archivar este perfil? Si es el activo, el siguiente perfil pasará a aplicarse globalmente.')) return;
-    const wasGlobal = profiles[0]?.id === selectedProfileId;
+    if (!selectedProfileId || profiles.length < 2 || !confirm('¿Archivar este perfil? Las conversaciones que lo tienen asignado conservarán esa referencia.')) return;
     setBusy(true);
     setError('');
     try {
@@ -195,7 +202,7 @@ export default function AdminConfig({ onBack }) {
       });
       if (!res.ok) throw new Error(await errorText(res));
       await load();
-      setNotice(wasGlobal ? 'Perfil archivado. El siguiente perfil activo se aplicará globalmente.' : 'Perfil archivado.');
+      setNotice('Perfil archivado. Las conversaciones existentes conservan su asignación.');
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -203,7 +210,7 @@ export default function AdminConfig({ onBack }) {
   function selectProfile(id) {
     const profile = profiles.find((item) => item.id === id);
     setSelectedProfileId(id);
-    setProfileDraft(profile ? JSON.stringify(profile, null, 2) : '');
+    setProfileDraft(profile ? JSON.stringify(editableProfile(profile), null, 2) : '');
     setError('');
   }
 
@@ -242,19 +249,26 @@ export default function AdminConfig({ onBack }) {
       {tab === 'Profiles' ? <section className="admin-card admin-form" role="tabpanel">
         <h2>Perfiles de agente</h2>
         <AdminConfigHelp tab="Profiles" />
-        <p className="admin-notice">Por ahora, el perfil activo (★) se usa globalmente en todas las conversaciones. Activar otro perfil cambia el comportamiento de los próximos turnos en todos los chats.</p>
+        <p className="admin-notice">Cada conversación usa el perfil que tiene asignado. El predeterminado solo se aplica a los chats nuevos; cambiarlo no modifica las conversaciones existentes.</p>
         <div className="admin-profile-controls">
-          <label className="admin-field admin-profile-field">Perfil a editar<select value={selectedProfileId} onChange={(e) => selectProfile(e.target.value)} disabled={!profiles.length}>
-            {profiles.map((profile, index) => <option key={profile.id} value={profile.id}>{index === 0 ? '★ ' : ''}{profile.name} · orden {profile.sortOrder}</option>)}
+          <label className="admin-field admin-profile-field">Perfil para nuevos chats<select value={defaultForNewChatsId} onChange={(e) => setDefaultForNewChatsId(e.target.value)} disabled={!profiles.length}>
+            {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
           </select></label>
           <div className="admin-profile-buttons">
-            <button className="admin-primary" disabled={busy || !selectedProfileId || profiles[0]?.id === selectedProfileId} onClick={activateProfile}>Activar globalmente</button>
+            <button className="admin-primary" disabled={busy || !defaultForNewChatsId} onClick={saveDefaultForNewChats}>Guardar predeterminado</button>
+          </div>
+        </div>
+        <div className="admin-profile-controls">
+          <label className="admin-field admin-profile-field">Perfil a editar<select value={selectedProfileId} onChange={(e) => selectProfile(e.target.value)} disabled={!profiles.length}>
+            {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
+          </select></label>
+          <div className="admin-profile-buttons">
             <button className="admin-secondary" disabled={busy || !profiles.length} onClick={createProfile}>Crear perfil</button>
             <button className="admin-secondary" disabled={busy || profiles.length < 2} onClick={archiveProfile}>Archivar</button>
           </div>
         </div>
         {selectedProfileId && <>
-          <label className="admin-field">Perfil JSON · name, modelId, sortOrder y config<textarea className="admin-json" spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
+          <label className="admin-field">Perfil JSON · name, modelId y config<textarea className="admin-json" spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
           <div className="admin-actions"><button className="admin-primary" disabled={busy} onClick={saveProfile}>{busy ? 'Guardando…' : 'Validar y guardar perfil'}</button></div>
         </>}
       </section> : <>

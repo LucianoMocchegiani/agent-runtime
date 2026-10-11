@@ -223,11 +223,25 @@ html, body, #root { width: 100%; height: 100%; }
   gap: 6px;
   padding: 8px 12px 8px 16px;
   border-bottom: 1px solid var(--border);
-  cursor: pointer;
   transition: background 0.15s;
 }
 .conv-item:hover { background: rgba(255,255,255,0.04); }
 .conv-item.active { background: rgba(79,195,247,0.1); border-left: 3px solid var(--accent); }
+.conv-select {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.conv-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .conv-title { flex: 1; min-width: 0; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .conv-date { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
 
@@ -631,8 +645,6 @@ html, body, #root { min-width: 0; overflow: hidden; }
   .admin-guide-field { grid-template-columns: 1fr; gap: 4px; }
 }
 
-.conversation-profile-picker, .chat-profile-picker { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
-.conversation-profile-picker { flex-direction: column; align-items: stretch; padding: 8px 14px; }
-.conversation-profile-picker select, .chat-profile-picker select { min-width: 0; padding: 6px 8px; color: var(--text); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: 6px; }
-.chat-profile-picker { margin-left: 8px; }
+.chat-profile-picker { display: flex; align-items: center; gap: 8px; margin-left: 8px; color: var(--text-muted); font-size: 12px; }
+.chat-profile-picker select { min-width: 0; padding: 6px 8px; color: var(--text); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: 6px; }
 @media (max-width: 700px) { .chat-profile-picker { display: none; } }

@@ -21,7 +21,7 @@ export type Conversation = {
   agentProfileId: string | null;
 };
 
-export type AgentProfileInfo = { id: string; name: string; modelId: string; sortOrder: number };
+export type AgentProfileInfo = { id: string; name: string; modelId: string };
 
 export type Message = {
   id: string;
