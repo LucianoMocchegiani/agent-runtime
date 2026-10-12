@@ -13,6 +13,7 @@ import { runtimeConfigRoutes } from './runtime-config/routes.js';
 import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';
 import { agentProfileListRoutes } from './runtime-config/agent-profile-list-routes.js';
 import { mountUi } from './ui.js';
+import { delegationRoutes } from './delegations/routes.js';
 
 type DependencyStatus = 'up' | 'down';
 
@@ -49,6 +50,7 @@ export function createApp(): Hono<AppEnv> {
         'Content-Type',
         'x-vercel-ai-ui-message-stream',
         'X-MCP-Auth',
+        'Last-Event-ID',
       ],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }),
@@ -85,6 +87,7 @@ export function createApp(): Hono<AppEnv> {
   v1.route('/conversations', conversationRoutes);
   v1.route('/models', modelRoutes);
   v1.route('/agent-profiles', agentProfileListRoutes);
+  v1.route('/delegations', delegationRoutes);
   app.route('/v1', v1);
 
   mountUi(app);

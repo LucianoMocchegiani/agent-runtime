@@ -15,7 +15,16 @@ function sortMessages(items) {
   return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
-export default function Chat({ conversationId, isVisible, onOpenSidebar, onConversationUpdated, onActivityChange }) {
+const DELEGATION_ACTIVE_STATUSES = new Set(['queued', 'running']);
+const DELEGATION_LABELS = {
+  queued: 'Conversación delegada · en cola',
+  running: 'Conversación delegada',
+  completed: 'Delegación completada',
+  failed: 'Delegación fallida',
+  interrupted: 'Delegación interrumpida',
+};
+
+export default function Chat({ conversationId, isVisible, delegationStatus, onOpenSidebar, onConversationUpdated, onActivityChange, onOpenConversation }) {
   const [messages, setMessages] = useState([]);
   const [conversationTitle, setConversationTitle] = useState('');
   const [agentProfileId, setAgentProfileId] = useState('');
@@ -35,6 +44,7 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [activity, setActivity] = useState('idle');
   const [error, setError] = useState(null);
+  const [visibleDelegationStatus, setVisibleDelegationStatus] = useState(delegationStatus);
   const scrollContainerRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
@@ -257,6 +267,21 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
   }, [loadMessages]);
 
   useEffect(() => {
+    if (!delegationStatus || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
+    void loadMessages({ preserveHistory: true });
+  }, [delegationStatus, loadMessages]);
+
+  useEffect(() => {
+    setVisibleDelegationStatus(delegationStatus);
+    if (!delegationStatus || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
+
+    const timeout = window.setTimeout(() => {
+      setVisibleDelegationStatus(current => current === delegationStatus ? null : current);
+    }, 5000);
+    return () => window.clearTimeout(timeout);
+  }, [delegationStatus]);
+
+  useEffect(() => {
     onActivityChange?.(conversationId, isLoading ? activity : null);
   }, [activity, conversationId, isLoading, onActivityChange]);
 
@@ -286,7 +311,7 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if ((!input.trim() && images.length === 0) || isLoading || pendingImageReads > 0) return;
+    if ((!input.trim() && images.length === 0) || isLoading || pendingImageReads > 0 || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
 
     const text = input.trim();
     const selectedImages = images;
@@ -438,6 +463,8 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
     abortRef.current?.abort();
   }
 
+  const isDelegatedActive = DELEGATION_ACTIVE_STATUSES.has(delegationStatus);
+
   return (
     <main className="chat-area">
       <header className="chat-header">
@@ -465,7 +492,7 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
               <button type="button" className="title-edit-button title-icon-button" onClick={startEditingTitle} title="Cambiar título de la conversación" aria-label="Cambiar título de la conversación"><Icon name="edit" /></button>
             </>
           )}
-          <span className="conversation-id" title={`ID: ${conversationId}`}>ID: {conversationId.slice(0, 8)}</span>
+          <span className="conversation-id" title={`ID: ${conversationId}`}>ID: {conversationId}</span>
           {agentProfiles.length > 0 && (
             <label className="chat-profile-picker" title="Perfil usado en los próximos turnos">
               Agente
@@ -487,10 +514,16 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
         onScroll={handleMessagesScroll}
       >
         {isLoadingOlder && <div className="history-loading" role="status">Cargando mensajes anteriores…</div>}
-        {renderMessageList(messages)}
+        {renderMessageList(messages, onOpenConversation)}
         {isLoading && (
           <div className="thinking-slot">
             {activity === 'thinking' && <ThinkingIndicator />}
+          </div>
+        )}
+        {visibleDelegationStatus && (
+          <div className={`delegation-chat-status delegation-chat-status-${visibleDelegationStatus}`} role="status">
+            {isDelegatedActive && <span className="tool-spinner" />}
+            {DELEGATION_LABELS[visibleDelegationStatus] ?? 'Estado de delegación actualizado'}
           </div>
         )}
       </div>
@@ -526,7 +559,7 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
             <button
               type="button"
               className="attach-button"
-              disabled={isLoading}
+              disabled={isLoading || isDelegatedActive}
               aria-haspopup="menu"
               aria-expanded={isAttachMenuOpen}
               title="Adjuntar un archivo"
@@ -552,12 +585,12 @@ export default function Chat({ conversationId, isVisible, onOpenSidebar, onConve
             onPaste={handleInputPaste}
             onKeyDown={handleInputKeyDown}
             placeholder="Escribí un mensaje..."
-            disabled={isLoading}
+            disabled={isLoading || isDelegatedActive}
             maxLength={MAX_MESSAGE_CHARS}
             rows={1}
             aria-label="Mensaje"
           />
-          <button className="send-button" type="submit" disabled={isLoading || (!input.trim() && images.length === 0)} title="Enviar mensaje" aria-label="Enviar mensaje"><Icon name="send" /><span>Enviar</span></button>
+          <button className="send-button" type="submit" disabled={isLoading || isDelegatedActive || (!input.trim() && images.length === 0)} title="Enviar mensaje" aria-label="Enviar mensaje"><Icon name="send" /><span>Enviar</span></button>
           <button className="stop-button" type="button" disabled={!isLoading} onClick={handleAbort} title="Detener la respuesta" aria-label="Detener la respuesta"><Icon name="stop" /><span>Parar</span></button>
         </div>
         <small className="message-length" aria-label="Longitud del mensaje">
@@ -584,14 +617,14 @@ function ActivityDots() {
   );
 }
 
-function renderMessageList(messages) {
+function renderMessageList(messages, onOpenConversation) {
   const rendered = [];
   let index = 0;
 
   while (index < messages.length) {
     const message = messages[index];
     if (!isStackableTool(message)) {
-      rendered.push(<MessageBubble key={message.id} message={message} />);
+      rendered.push(<MessageBubble key={message.id} message={message} onOpenConversation={onOpenConversation} />);
       index++;
       continue;
     }
@@ -604,18 +637,18 @@ function renderMessageList(messages) {
     }
 
     rendered.push(stack.length > 1
-      ? <ToolStack key={`tool-stack-${stack[0].id}`} messages={stack} />
-      : <MessageBubble key={stack[0].id} message={stack[0]} />);
+      ? <ToolStack key={`tool-stack-${stack[0].id}`} messages={stack} onOpenConversation={onOpenConversation} />
+      : <MessageBubble key={stack[0].id} message={stack[0]} onOpenConversation={onOpenConversation} />);
   }
 
   return rendered;
 }
 
 function isStackableTool(message) {
-  return message?.role === 'tool' && !parseProposal(message.toolResult);
+  return message?.role === 'tool';
 }
 
-function ToolStack({ messages }) {
+function ToolStack({ messages, onOpenConversation }) {
   const names = [...new Set(messages.map(message => message.toolName || 'Herramienta'))];
   const nameSummary = names.slice(0, 3).join(', ');
   const remainingNames = names.length - 3;
@@ -631,16 +664,16 @@ function ToolStack({ messages }) {
         {errorCount > 0 && <span className="tool-stack-status tool-status-error">{errorCount} con error</span>}
       </summary>
       <div className="tool-stack-items">
-        {messages.map(message => <MessageBubble key={message.id} message={message} />)}
+        {messages.map(message => <MessageBubble key={message.id} message={message} onOpenConversation={onOpenConversation} />)}
       </div>
     </details>
   );
 }
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, onOpenConversation }) {
   if (message.role === 'tool') {
-    const proposal = parseProposal(message.toolResult);
-    if (proposal) return <ProposalCard proposal={proposal} />;
+    const delegation = message.toolName === 'delegate_to_conversation' ? parseDelegation(message.toolResult) : null;
+    if (delegation) return <DelegationCard delegation={delegation} onOpenConversation={onOpenConversation} />;
     const output = formatToolOutput(message.toolResult ?? message.content, message.toolName);
     const outputLines = output ? output.split('\n').length : 0;
     return (
@@ -772,65 +805,114 @@ function MarkdownInline({ text }) {
   });
 }
 
-function ProposalCard({ proposal }) {
-  const [status, setStatus] = useState(null);
-
-  async function decide(decision) {
-    try {
-      const res = await fetch(`http://localhost:3010/v1/conversations/${proposal.id}/user-actions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tool: 'confirm_proposal', input: { proposalId: proposal.id, decision } }),
-      });
-      const data = await res.json();
-      setStatus(data.message || `${decision} enviado`);
-    } catch {
-      alert('Error al enviar decisión');
-    }
+function parseDelegation(value, depth = 0) {
+  if (depth > 4 || value == null) return null;
+  let record = value;
+  if (typeof record === 'string') {
+    try { record = JSON.parse(record); } catch { return null; }
   }
-
-  return (
-    <div className="bubble tool">
-      <div className="proposal">
-        <div className="proposal-title">{proposal.title}</div>
-        <div className="proposal-lines">
-          {proposal.lines.map(l => (
-            <div key={l.label} className="proposal-line">
-              <span>{l.label}</span>
-              <span>{l.value}</span>
-            </div>
-          ))}
-        </div>
-        <div className="proposal-actions">
-          <button className="btn-confirm" onClick={() => decide('confirm')} title="Confirmar propuesta"><Icon name="check" /><span>Confirmar</span></button>
-          <button className="btn-cancel" onClick={() => decide('cancel')} title="Cancelar propuesta"><Icon name="cancel" /><span>Cancelar</span></button>
-        </div>
-        {status && <div className="proposal-status">{status}</div>}
-      </div>
-    </div>
-  );
-}
-
-function parseProposal(toolResult) {
-  if (!toolResult) return null;
-  try {
-    const rec = typeof toolResult === 'string' ? JSON.parse(toolResult) : toolResult;
-    if (!rec || typeof rec !== 'object') return null;
-    const proposal = rec.proposal ?? rec;
-    if (!proposal || typeof proposal !== 'object') return null;
-    if (typeof proposal.id !== 'string') return null;
-    if (typeof proposal.title !== 'string') return null;
-    return {
-      id: proposal.id,
-      title: proposal.title,
-      lines: Array.isArray(proposal.lines) ? proposal.lines.filter(l => l && typeof l.label === 'string' && typeof l.value === 'string') : [],
-      dangerous: proposal.dangerous === true,
-      expiresAt: proposal.expiresAt ?? '',
-      confirmTool: proposal.confirmTool ?? 'confirm_proposal',
-    };
-  } catch {
+  if (!record || typeof record !== 'object') return null;
+  if (Array.isArray(record)) {
+    for (const item of record) {
+      const found = parseDelegation(item, depth + 1);
+      if (found) return found;
+    }
     return null;
   }
+  if (typeof record.delegationId === 'string' && typeof record.targetConversationId === 'string') {
+    return { id: record.delegationId, targetConversationId: record.targetConversationId };
+  }
+  if (typeof record.text === 'string') return parseDelegation(record.text, depth + 1);
+  if (typeof record.content === 'string' || Array.isArray(record.content)) return parseDelegation(record.content, depth + 1);
+  return null;
+}
+
+const TERMINAL_DELEGATION_STATUSES = new Set(['completed', 'failed', 'interrupted']);
+const DELEGATION_STATUS_LABELS = {
+  queued: 'En cola', running: 'En curso', completed: 'Completada', failed: 'Fallida', interrupted: 'Interrumpida',
+};
+const DELEGATION_EVENT_LABELS = {
+  queued: 'Trabajo agregado a la cola', started: 'El agente destinatario empezó a trabajar',
+  completed: 'El trabajo terminó correctamente', failed: 'El trabajo terminó con error',
+  interrupted: 'El worker se interrumpió; el trabajo no se reintentará',
+};
+
+function DelegationCard({ delegation, onOpenConversation }) {
+  const [status, setStatus] = useState('queued');
+  const [events, setEvents] = useState([]);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    let cursor = '0';
+    const pause = () => new Promise(resolve => setTimeout(resolve, 1500));
+    const updateStatus = async () => {
+      const current = await client.delegations.get(delegation.id);
+      if (active) {
+        setStatus(current.status);
+        setError(null);
+      }
+      return current.status;
+    };
+
+    async function follow() {
+      while (active) {
+        try {
+          await updateStatus();
+          await client.delegations.events(delegation.id, {
+            after: cursor,
+            signal: controller.signal,
+            onEvent: event => {
+              if (!active) return;
+              if (event.id) cursor = event.id;
+              setEvents(current => [...current, event].slice(-8));
+              if (TERMINAL_DELEGATION_STATUSES.has(event.type)) setStatus(event.type);
+            },
+          });
+          if (active && TERMINAL_DELEGATION_STATUSES.has(await updateStatus())) return;
+        } catch (e) {
+          if (!active || e.name === 'AbortError') return;
+          setError(e.message || 'No se pudieron actualizar los eventos.');
+        }
+        if (active) await pause();
+      }
+    }
+
+    void follow();
+    return () => { active = false; controller.abort(); };
+  }, [delegation.id]);
+
+  const targetId = delegation.targetConversationId;
+  return (
+    <section className="delegation-card" aria-label="Seguimiento de delegación">
+      <div className="delegation-heading">
+        <strong>Delegación al otro hilo</strong>
+        <span className={`delegation-status delegation-status-${status}`} role="status">
+          {status === 'running' && <span className="tool-spinner" />}
+          {DELEGATION_STATUS_LABELS[status] ?? status}
+        </span>
+      </div>
+      <div className="delegation-meta">ID: <code>{delegation.id}</code></div>
+      {events.length > 0 && (
+        <ol className="delegation-events" aria-label="Eventos de la delegación">
+          {events.map((event, index) => (
+            <li key={event.id || `${event.type}-${index}`}>
+              <span className="delegation-event-dot" />
+              <span>{DELEGATION_EVENT_LABELS[event.type] ?? `Evento: ${event.type}`}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+      {status === 'completed' && <p className="delegation-note">El resultado quedó guardado en la conversación de destino.</p>}
+      {status === 'interrupted' && <p className="delegation-note">El trabajo se detuvo por una interrupción y no se volverá a ejecutar automáticamente.</p>}
+      {status === 'failed' && <p className="delegation-note">El trabajo no pudo completarse.</p>}
+      {error && <p className="delegation-error">{error} Se volverá a intentar la conexión.</p>}
+      <button type="button" className="delegation-open-button" onClick={() => onOpenConversation?.(targetId)}>
+        Abrir conversación de destino
+      </button>
+    </section>
+  );
 }
 
 function formatToolOutput(value, toolName, depth = 0) {

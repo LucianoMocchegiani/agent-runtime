@@ -23,6 +23,19 @@ export type Conversation = {
 
 export type AgentProfileInfo = { id: string; name: string; modelId: string };
 
+export type DelegationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
+export type Delegation = {
+  id: string;
+  status: DelegationStatus;
+  sourceConversationId: string;
+  targetConversationId: string;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorCode: string | null;
+};
+export type DelegationEvent = { id: string; type: string; data: unknown; createdAt: string };
+
 export type Message = {
   id: string;
   conversationId: string;
@@ -185,6 +198,74 @@ export function createClient(config: ClientConfig) {
         if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
         const data = await json<{ items: AgentProfileInfo[] }>(res);
         return data?.items ?? [];
+      },
+    },
+
+    delegations: {
+      list: async (): Promise<Delegation[]> => {
+        const res = await fetch(`${baseUrl(config)}/v1/delegations`, {
+          headers: headers(config, { Accept: 'application/json' }),
+        });
+        if (!res.ok) throw new ClientError(res.status, `No se pudieron listar las delegaciones (HTTP ${res.status}).`);
+        const data = await json<{ items: Delegation[] }>(res);
+        return data?.items ?? [];
+      },
+
+      get: async (id: string): Promise<Delegation> => {
+        const res = await fetch(`${baseUrl(config)}/v1/delegations/${encodeURIComponent(id)}`, {
+          headers: headers(config, { Accept: 'application/json' }),
+        });
+        if (!res.ok) throw new ClientError(res.status, `No se pudo consultar la delegación (HTTP ${res.status}).`);
+        return json<Delegation>(res);
+      },
+
+      events: async (
+        id: string,
+        options: { after?: string; signal?: AbortSignal; onEvent: (event: DelegationEvent) => void },
+      ): Promise<void> => {
+        const query = options.after ? `?after=${encodeURIComponent(options.after)}` : '';
+        const res = await fetch(`${baseUrl(config)}/v1/delegations/${encodeURIComponent(id)}/events${query}`, {
+          headers: headers(config, { Accept: 'text/event-stream' }),
+          signal: options.signal,
+        });
+        if (!res.ok) throw new ClientError(res.status, `No se pudieron cargar los eventos (HTTP ${res.status}).`);
+        if (!res.body) throw new ClientError(502, 'El stream de eventos no está disponible.');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let lastId = options.after ?? '';
+        const dispatch = (block: string) => {
+          let idValue = lastId;
+          let eventType = 'message';
+          const data: string[] = [];
+          for (const line of block.split(/\r?\n/)) {
+            if (line.startsWith('id:')) idValue = line.slice(3).trim();
+            else if (line.startsWith('event:')) eventType = line.slice(6).trim();
+            else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+          }
+          if (!data.length) return;
+          lastId = idValue;
+          try {
+            options.onEvent({ id: idValue, type: eventType, data: JSON.parse(data.join('\n')), createdAt: new Date().toISOString() });
+          } catch {
+            // Ignoramos eventos malformados; el estado se puede volver a consultar.
+          }
+        };
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const blocks = buffer.split(/\r?\n\r?\n/);
+            buffer = blocks.pop() ?? '';
+            for (const block of blocks) dispatch(block);
+          }
+          if (buffer.trim()) dispatch(buffer);
+        } finally {
+          reader.releaseLock();
+        }
       },
     },
 

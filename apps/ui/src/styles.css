@@ -181,6 +181,35 @@ html, body, #root { width: 100%; height: 100%; }
 .btn-cancel:hover { background: var(--danger-hover); }
 .proposal-status { margin-top: 8px; color: var(--accent); font-size: 13px; }
 
+.delegation-card {
+  align-self: stretch;
+  max-width: 100%;
+  padding: 12px 14px;
+  color: var(--text);
+  background: #172b36;
+  border: 1px solid rgba(79,195,247,.38);
+  border-radius: var(--radius);
+}
+.delegation-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-size: 13px; }
+.delegation-status { display: inline-flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 12px; }
+.delegation-status-completed { color: #81c784; }
+.delegation-status-failed, .delegation-status-interrupted { color: var(--error-text); }
+.delegation-status-queued { color: #ffcc80; }
+.delegation-meta { margin-top: 7px; color: var(--text-dim); font-size: 11px; overflow-wrap: anywhere; }
+.delegation-meta code { color: var(--text-muted); font: 11px ui-monospace, SFMono-Regular, Consolas, monospace; }
+.delegation-events { display: flex; flex-direction: column; gap: 7px; margin: 12px 0; padding: 0; list-style: none; }
+.delegation-events li { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px; }
+.delegation-event-dot { flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.delegation-note, .delegation-error { margin-top: 10px; color: var(--text-muted); font-size: 12px; }
+.delegation-error { color: var(--error-text); }
+.delegation-open-button { min-height: 34px; margin-top: 12px; padding: 5px 10px; color: var(--accent); background: transparent; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; }
+.delegation-open-button:hover { background: rgba(79,195,247,.1); border-color: var(--accent); }
+.delegation-open-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.delegation-chat-status { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; color: var(--text-muted); font-size: 13px; }
+.delegation-chat-status-queued { color: #ffcc80; }
+.delegation-chat-status-completed { color: #81c784; }
+.delegation-chat-status-failed, .delegation-chat-status-interrupted { color: var(--error-text); }
+
 .attachment-file-input { display: none; }
 .attachment-menu-wrap { position: relative; flex: 0 0 auto; }
 .attach-button { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 12px; color: var(--text-muted); background: var(--bg-input); border: 1px solid var(--border-input); border-radius: var(--radius); cursor: pointer; white-space: nowrap; }
@@ -322,6 +351,7 @@ html, body, #root { min-width: 0; overflow: hidden; }
 .conversation-heading {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   min-width: 0;
   flex: 0 1 auto;
@@ -336,10 +366,12 @@ html, body, #root { min-width: 0; overflow: hidden; }
   white-space: nowrap;
 }
 .conversation-id {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
   color: var(--text-dim);
   font: 11px ui-monospace, SFMono-Regular, Consolas, monospace;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 .title-edit-button, .title-control {
   min-height: 32px;

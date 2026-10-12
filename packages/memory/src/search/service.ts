@@ -7,6 +7,14 @@ const MAX_BATCHES_PER_CYCLE = 8;
 const POLL_MS = 2_000;
 const MAX_RETRY_MS = 5 * 60_000;
 const RRF_K = 60;
+// Prevent a single long chat message from making the provider reject the whole batch.
+const MAX_EMBEDDING_INPUT_CHARS = 4_000;
+
+function toEmbeddingInput(role: string, content: string): string {
+  const input = `${role}: ${content}`;
+  if (input.length <= MAX_EMBEDDING_INPUT_CHARS) return input;
+  return `${input.slice(0, MAX_EMBEDDING_INPUT_CHARS - 20)} [truncated]`;
+}
 
 export type SearchMemoryInput = {
   userId: string;
@@ -88,7 +96,7 @@ async function processPendingBatch(): Promise<boolean> {
   const documents = await searchIndex.claimPending(BATCH_SIZE);
   if (documents.length === 0) return false;
   try {
-    const vectors = await provider.embed(documents.map((document) => `${document.role}: ${document.content}`));
+    const vectors = await provider.embed(documents.map((document) => toEmbeddingInput(document.role, document.content)));
     if (vectors.length !== documents.length) throw new Error('Embedding batch size mismatch');
     await Promise.all(documents.map((document, index) =>
       searchIndex.saveEmbedding(document.messageId, provider.model, vectors[index]),

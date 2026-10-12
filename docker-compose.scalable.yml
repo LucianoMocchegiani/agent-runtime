@@ -1,0 +1,60 @@
+# Despliegue horizontal: PostgreSQL compartido, varias réplicas API y HAProxy.
+#   docker compose -f docker-compose.scalable.yml up -d --build --scale agent-runtime=3
+#   http://localhost:3010
+name: agent-runtime
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agent
+      POSTGRES_PASSWORD: agent
+      POSTGRES_DB: memory
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent -d memory"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  migrate:
+    build:
+      context: .
+      target: migrate
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
+
+  agent-runtime:
+    build:
+      context: .
+      target: api
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    env_file: ./.env
+    environment:
+      - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
+
+  load-balancer:
+    image: haproxy:3.2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3010:3010"
+    volumes:
+      - ./deploy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - agent-runtime
+
+volumes:
+  pgdata:

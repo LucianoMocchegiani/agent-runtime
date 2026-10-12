@@ -31,6 +31,7 @@ COPY --from=build /app/packages/memory-contract/dist packages/memory-contract/di
 COPY --from=build /app/packages/memory/dist packages/memory/dist
 COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/ui/dist apps/ui/dist
+USER node
 
 # One-shot deployment task; it does not run a Memory server.
 FROM runtime-base AS migrate

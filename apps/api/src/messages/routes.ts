@@ -8,30 +8,16 @@ import { getConversation } from '../conversations/service.js';
 import { resolveModel } from '../llm/provider.js';
 import { acquireConversationTurn } from './turn-lock.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
+import { readJsonBody } from './request-body.js';
 
 const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGES = 10;
 // Hasta diez imágenes de 5 MiB codificadas en base64, más el JSON que las envuelve.
-const MAX_BODY_CHARS = 72_000_000;
+const MAX_BODY_BYTES = 72_000_000;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 type IncomingImage = { data: Uint8Array; mediaType: string };
-
-async function readJsonBody(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
-  const text = await c.req.text();
-  if (text.length > MAX_BODY_CHARS) {
-    throw new HTTPException(413, { message: 'La solicitud supera el tamaño máximo permitido.' });
-  }
-  if (!text.trim()) {
-    return {};
-  }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new HTTPException(400, { message: 'Invalid JSON' });
-  }
-}
 
 function bodyRecord(body: unknown): Record<string, unknown> {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) {
@@ -91,9 +77,9 @@ function readImages(body: unknown): IncomingImage[] {
   return [parseImage(record.image)];
 }
 
-function releaseTurnWhenResponseEnds(response: Response, release: () => void): Response {
+async function releaseTurnWhenResponseEnds(response: Response, release: () => Promise<void>): Promise<Response> {
   if (!response.body) {
-    release();
+    await release();
     return response;
   }
 
@@ -103,13 +89,13 @@ function releaseTurnWhenResponseEnds(response: Response, release: () => void): R
       try {
         const { done, value } = await reader.read();
         if (done) {
-          release();
+          await release();
           controller.close();
         } else {
           controller.enqueue(value);
         }
       } catch (error) {
-        release();
+        await release().catch((releaseError: unknown) => console.error('No se pudo liberar la reserva del turno.', releaseError));
         controller.error(error);
       }
     },
@@ -117,7 +103,7 @@ function releaseTurnWhenResponseEnds(response: Response, release: () => void): R
       try {
         await reader.cancel(reason);
       } finally {
-        release();
+        await release();
       }
     },
   });
@@ -158,17 +144,14 @@ messageRoutes.get('/', async (c) => {
     before = { createdAt: beforeCreatedAt, id: beforeId };
   }
 
-  const memory = await createMemoryClient();
-  try {
-    const page = await memory.listMessages({
-      conversationId: id,
-      userId: principal.userId,
-      limit,
-      before,
-    });
-    return c.json(page);
-  } finally {
-  }
+  const memory = createMemoryClient();
+  const page = await memory.listMessages({
+    conversationId: id,
+    userId: principal.userId,
+    limit,
+    before,
+  });
+  return c.json(page);
 });
 
 messageRoutes.post('/', async (c) => {
@@ -177,7 +160,7 @@ messageRoutes.post('/', async (c) => {
   if (conversation.archivedAt) {
     throw new HTTPException(409, { message: 'Conversation archived' });
   }
-  const body = await readJsonBody(c);
+  const body = await readJsonBody(c.req.raw, MAX_BODY_BYTES);
   const text = readText(body);
   const images = readImages(body);
   if (!text && images.length === 0) {
@@ -203,8 +186,14 @@ messageRoutes.post('/', async (c) => {
   const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
   if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
   const principal = c.get('principal');
-  const releaseTurn = acquireConversationTurn(principal.userId, id);
-  if (!releaseTurn) {
+  let turnLease;
+  try {
+    turnLease = await acquireConversationTurn(principal.userId, id);
+  } catch (error) {
+    console.error('No se pudo adquirir la reserva compartida del turno.', error);
+    throw new HTTPException(503, { message: 'No se pudo coordinar el turno. Intentá de nuevo en unos instantes.' });
+  }
+  if (!turnLease) {
     throw new HTTPException(409, { message: 'Ya hay un turno en curso en esta conversación. Esperá a que termine antes de enviar otro.' });
   }
   try {
@@ -214,14 +203,14 @@ messageRoutes.post('/', async (c) => {
       c.get('accessToken'),
       messageText,
       model,
-      c.req.raw.signal,
+      AbortSignal.any([c.req.raw.signal, turnLease.signal]),
       c.get('mcpAuth') ?? undefined,
       images,
       profile,
     );
-    return releaseTurnWhenResponseEnds(response, releaseTurn);
+    return await releaseTurnWhenResponseEnds(response, turnLease.release);
   } catch (error) {
-    releaseTurn();
+    await turnLease.release().catch((releaseError: unknown) => console.error('No se pudo liberar la reserva del turno.', releaseError));
     throw error;
   }
 });

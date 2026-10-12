@@ -7,8 +7,12 @@ const activityLabels = {
   responding: 'Respondiendo',
   tool: 'Usando herramienta',
 };
+const delegationLabels = {
+  queued: 'Conversación delegada',
+  running: 'Conversación delegada',
+};
 
-export default function ConversationList({ activeId, activityByConversation = {}, onSelect, onArchive, onOpenAdmin, refreshKey }) {
+export default function ConversationList({ activeId, activityByConversation = {}, delegationByConversation = {}, onSelect, onArchive, onOpenAdmin, refreshKey }) {
   const [convs, setConvs] = useState([]);
 
   useEffect(() => {
@@ -47,11 +51,15 @@ export default function ConversationList({ activeId, activityByConversation = {}
         {convs.map(c => {
           const title = c.title || 'Sin título';
           const activity = activityByConversation[c.id];
+          const delegation = delegationByConversation[c.id];
+          const delegationLabel = delegationLabels[delegation?.status];
           return (
             <div key={c.id} className={`conv-item ${c.id === activeId ? 'active' : ''}`}>
               <button type="button" className="conv-select" onClick={() => onSelect(c.id)} title={title} aria-current={c.id === activeId ? 'page' : undefined}>
                 <span className="conv-title">{title}</span>
-                {activity && <span className="conv-activity" role="status" aria-label={`Agente ${activityLabels[activity] ?? 'en ejecución'}`} title={`Agente ${activityLabels[activity] ?? 'en ejecución'}`}><span className="conv-activity-dot" aria-hidden="true" />{activityLabels[activity] ?? 'En curso'}</span>}
+                {delegationLabel
+                  ? <span className="conv-activity" role="status" aria-label={delegationLabel} title={delegationLabel}><span className="conv-activity-dot" aria-hidden="true" />{delegationLabel}</span>
+                  : activity && <span className="conv-activity" role="status" aria-label={`Agente ${activityLabels[activity] ?? 'en ejecución'}`} title={`Agente ${activityLabels[activity] ?? 'en ejecución'}`}><span className="conv-activity-dot" aria-hidden="true" />{activityLabels[activity] ?? 'En curso'}</span>}
                 <span className="conv-date">{fmtDate(c.updatedAt)}</span>
               </button>
               <button className="archive-button" onClick={() => handleArchive(c.id)} aria-label={`Archivar ${title}`} title={`Archivar ${title}`}><Icon name="archive" /></button>
