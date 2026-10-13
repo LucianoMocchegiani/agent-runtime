@@ -21,7 +21,7 @@ import {
 import type { Principal } from '../auth/principal.js';
 import { createConversation, getConversation } from '../conversations/service.js';
 import { getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
-import { decodeConversationCursor, encodeConversationCursor, type ConversationListScope } from './conversation-cursor.js';
+import { decodeOptionalConversationCursor, encodeConversationCursor, type ConversationListScope } from './conversation-cursor.js';
 import { delegationEncryptionEnabled } from '../delegations/payload.js';
 import { enqueueDelegation, getDelegationForUser } from '../delegations/store.js';
 
@@ -398,12 +398,10 @@ export async function streamAgentTurn(
     execute: async ({ scope = 'all', cursor }) => {
       console.info('tool list_conversations invoked');
       let before: { updatedAt: string; id: string } | undefined;
-      if (cursor !== undefined) {
-        try {
-          before = decodeConversationCursor(cursor, scope);
-        } catch (error) {
-          return { error: error instanceof Error ? error.message : 'El cursor no es válido.' };
-        }
+      try {
+        before = decodeOptionalConversationCursor(cursor, scope);
+      } catch (error) {
+        return { error: error instanceof Error ? error.message : 'El cursor no es válido.' };
       }
       const page = await memory.listConversations({
         userId: principal.userId,

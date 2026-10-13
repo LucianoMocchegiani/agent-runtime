@@ -12,6 +12,14 @@ export function encodeConversationCursor(payload: CursorPayload): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
 }
 
+export function decodeOptionalConversationCursor(
+  cursor: string | undefined,
+  expectedScope: ConversationListScope,
+): { updatedAt: string; id: string } | undefined {
+  if (cursor === undefined || cursor.trim() === '') return undefined;
+  return decodeConversationCursor(cursor, expectedScope);
+}
+
 export function decodeConversationCursor(
   cursor: string,
   expectedScope: ConversationListScope,
