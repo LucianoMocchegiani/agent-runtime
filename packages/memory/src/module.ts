@@ -3,6 +3,7 @@ export {
   getContext,
   saveSummary,
   saveMessage,
+  editMessageAndTruncate,
   listMessages,
   listConversations,
   createConversation,

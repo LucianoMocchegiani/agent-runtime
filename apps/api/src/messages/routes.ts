@@ -9,12 +9,18 @@ import { resolveModel } from '../llm/provider.js';
 import { acquireConversationTurn } from './turn-lock.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
 import { readJsonBody } from './request-body.js';
+import {
+  MessageContainsUnstoredAttachmentError,
+  MessageEditConflictError,
+  MessageNotEditableError,
+} from 'agent-runtime-memory-contract';
 
 const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_IMAGES = 10;
 // Hasta diez imágenes de 5 MiB codificadas en base64, más el JSON que las envuelve.
 const MAX_BODY_BYTES = 72_000_000;
+const MAX_EDIT_BODY_BYTES = 1_000_000;
 const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 type IncomingImage = { data: Uint8Array; mediaType: string };
@@ -116,7 +122,7 @@ async function releaseTurnWhenResponseEnds(response: Response, release: () => Pr
 }
 
 /**
- * Mensajes de un hilo. GET lista; POST stremea un turno (UI Message Stream).
+ * Mensajes de un hilo. GET lista; POST stremea un turno o edita un mensaje y regenera desde ahí.
  */
 export const messageRoutes = new Hono<AppEnv>();
 
@@ -152,6 +158,88 @@ messageRoutes.get('/', async (c) => {
     before,
   });
   return c.json(page);
+});
+
+messageRoutes.post('/:messageId/edit', async (c) => {
+  const id = requireConversationId(c.req.param('id'));
+  const messageId = c.req.param('messageId');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(messageId)) {
+    throw new HTTPException(400, { message: 'Identificador de mensaje inválido.' });
+  }
+  const conversation = await getConversation(c.get('principal'), id);
+  if (conversation.archivedAt) throw new HTTPException(409, { message: 'Conversation archived' });
+
+  const body = bodyRecord(await readJsonBody(c.req.raw, MAX_EDIT_BODY_BYTES));
+  const text = readText(body);
+  if (!text) throw new HTTPException(400, { message: 'El mensaje editado no puede estar vacío.' });
+  const expectedLaterMessages = body.expectedLaterMessages;
+  if (typeof expectedLaterMessages !== 'number' || !Number.isInteger(expectedLaterMessages)
+    || expectedLaterMessages < 0 || expectedLaterMessages > 10_000) {
+    throw new HTTPException(400, { message: 'expectedLaterMessages debe ser un entero entre 0 y 10000.' });
+  }
+  if (body.images !== undefined || body.image !== undefined) {
+    throw new HTTPException(400, { message: 'Los adjuntos no se pueden volver a enviar al editar un mensaje.' });
+  }
+  if (!conversation.agentProfileId) {
+    throw new HTTPException(409, { message: 'Esta conversación no tiene un perfil asignado. Asignale un perfil antes de continuar.' });
+  }
+  const profile = await getAgentProfile(conversation.agentProfileId, true);
+  if (!profile) throw new HTTPException(409, { message: 'El perfil asignado a esta conversación ya no está disponible.' });
+  const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
+  if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
+
+  const principal = c.get('principal');
+  let turnLease;
+  try {
+    turnLease = await acquireConversationTurn(principal.userId, id);
+  } catch (error) {
+    console.error('No se pudo adquirir la reserva compartida del turno.', error);
+    throw new HTTPException(503, { message: 'No se pudo coordinar el turno. Intentá de nuevo en unos instantes.' });
+  }
+  if (!turnLease) {
+    throw new HTTPException(409, { message: 'Ya hay un turno en curso en esta conversación. Esperá a que termine antes de editar.' });
+  }
+
+  try {
+    const memory = createMemoryClient();
+    try {
+      await memory.editMessageAndTruncate({
+        conversationId: id,
+        messageId,
+        userId: principal.userId,
+        content: text,
+        expectedLaterMessages,
+      });
+    } catch (error) {
+      if (error instanceof MessageEditConflictError) {
+        throw new HTTPException(409, { message: 'La conversación cambió desde que confirmaste la edición. Actualizá los mensajes y volvé a intentarlo.' });
+      }
+      if (error instanceof MessageContainsUnstoredAttachmentError) {
+        throw new HTTPException(409, { message: 'Este mensaje tenía imágenes que no se guardaron y no se pueden reenviar.' });
+      }
+      if (error instanceof MessageNotEditableError) {
+        throw new HTTPException(404, { message: 'No se encontró un mensaje propio que se pueda editar.' });
+      }
+      throw error;
+    }
+
+    const response = await streamAgentTurn(
+      id,
+      principal,
+      c.get('accessToken'),
+      text,
+      model,
+      AbortSignal.any([c.req.raw.signal, turnLease.signal]),
+      c.get('mcpAuth') ?? undefined,
+      [],
+      profile,
+      { userMessageAlreadySaved: true },
+    );
+    return await releaseTurnWhenResponseEnds(response, turnLease.release);
+  } catch (error) {
+    await turnLease.release().catch((releaseError: unknown) => console.error('No se pudo liberar la reserva del turno.', releaseError));
+    throw error;
+  }
 });
 
 messageRoutes.post('/', async (c) => {

@@ -80,6 +80,41 @@ html, body, #root { width: 100%; height: 100%; }
   background: var(--user-bubble);
   border-bottom-right-radius: 2px;
 }
+.message-actions { display: flex; justify-content: flex-end; margin-top: 6px; }
+.message-edit-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 7px;
+  color: rgba(255,255,255,0.72);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+.message-edit-button:hover, .message-edit-button:focus-visible { color: #fff; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+.message-edit-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.message-edit-button svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.message-edit-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  color: var(--text);
+  background: rgba(79,195,247,0.08);
+  border: 1px solid rgba(79,195,247,0.3);
+  border-radius: var(--radius);
+  font-size: 12px;
+}
+.message-edit-notice > div { display: flex; flex-direction: column; gap: 2px; }
+.message-edit-notice > div span { color: var(--text-muted); }
+.message-edit-cancel { min-height: 34px; padding: 4px 10px; color: var(--text); background: transparent; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; }
+.message-edit-cancel:hover { border-color: var(--accent); }
+.message-edit-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .bubble.assistant {
   align-self: flex-start;
   color: var(--text);
@@ -521,6 +556,28 @@ html, body, #root { min-width: 0; overflow: hidden; }
   border-color: rgba(229,57,53,0.35);
 }
 .composer-row > .stop-button:hover:not(:disabled) { background: rgba(229,57,53,0.22); }
+.composer-row > .voice-button {
+  flex: 0 0 auto;
+  color: var(--text);
+  background: #20263b;
+  border-color: var(--border-input);
+}
+.composer-row > .voice-button:hover:not(:disabled) { border-color: var(--accent); background: #252f49; }
+.composer-row > .voice-button.voice-listening {
+  color: #fff;
+  background: rgba(229,57,53,0.2);
+  border-color: rgba(229,57,53,0.7);
+}
+.composer-row > .voice-cancel-button {
+  flex: 0 0 auto;
+  color: #ffb4a9;
+  background: rgba(229,57,53,0.12);
+  border-color: rgba(229,57,53,0.35);
+}
+.composer-row > .voice-cancel-button:hover:not(:disabled) {
+  background: rgba(229,57,53,0.22);
+  border-color: rgba(229,57,53,0.7);
+}
 .composer-row > button:disabled { opacity: 0.42; cursor: not-allowed; }
 
 #sidebar { flex: 0 0 280px; min-width: 0; }

@@ -332,6 +332,7 @@ export async function streamAgentTurn(
   mcpTokens?: Record<string, string>,
   images: IncomingImage[] = [],
   agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'modelId' | 'config'>,
+  options: { userMessageAlreadySaved?: boolean } = {},
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
   // El turno conserva una configuración coherente incluso si otra versión se publica mientras corre.
@@ -571,12 +572,14 @@ export async function streamAgentTurn(
     });
   }
 
-  await memory.saveMessage({
-    conversationId,
-    userId: principal.userId,
-    role: 'user',
-    content: userText,
-  });
+  if (!options.userMessageAlreadySaved) {
+    await memory.saveMessage({
+      conversationId,
+      userId: principal.userId,
+      role: 'user',
+      content: userText,
+    });
+  }
   await memory.applyAutomaticTitle({
     conversationId,
     userId: principal.userId,

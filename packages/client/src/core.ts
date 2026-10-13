@@ -269,6 +269,43 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    voice: {
+      status: async (conversationId: string): Promise<{ available: boolean }> => {
+        const res = await fetch(`${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/status`, {
+          headers: headers(config, { Accept: 'application/json' }),
+        });
+        if (!res.ok) throw new ClientError(res.status, `No se pudo consultar la disponibilidad de voz (HTTP ${res.status}).`);
+        return json<{ available: boolean }>(res);
+      },
+
+      createRealtimeToken: async (conversationId: string): Promise<{ value: string; expiresAt: number | null }> => {
+        const res = await fetch(`${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/token`, {
+          method: 'POST',
+          headers: headers(config, { Accept: 'application/json' }),
+        });
+        if (!res.ok) {
+          const data = await json<{ error?: string; message?: string }>(res);
+          throw new ClientError(res.status, data?.error ?? data?.message ?? `No se pudo iniciar la voz (HTTP ${res.status}).`);
+        }
+        return json<{ value: string; expiresAt: number | null }>(res);
+      },
+
+      synthesize: async (conversationId: string, text: string, traceId?: string): Promise<Blob> => {
+        const requestHeaders = headers(config, { 'Content-Type': 'application/json', Accept: 'audio/mpeg' });
+        if (traceId) requestHeaders['X-Voice-Trace-Id'] = traceId;
+        const res = await fetch(`${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/speech`, {
+          method: 'POST',
+          headers: requestHeaders,
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) {
+          const data = await json<{ error?: string; message?: string }>(res);
+          throw new ClientError(res.status, data?.error ?? data?.message ?? `No se pudo generar la voz (HTTP ${res.status}).`);
+        }
+        return res.blob();
+      },
+    },
+
     messages: {
       list: async (conversationId: string, options: MessageListOptions = {}): Promise<MessagePage> => {
         const query = new URLSearchParams();
@@ -337,6 +374,48 @@ export function createClient(config: ClientConfig) {
           if (isAbortError(error)) {
             return 'aborted';
           }
+          throw error;
+        }
+      },
+
+      edit: async (
+        conversationId: string,
+        messageId: string,
+        text: string,
+        expectedLaterMessages: number,
+        handlers: StreamHandlers = {},
+        signal?: AbortSignal,
+      ): Promise<'ok' | 'aborted'> => {
+        try {
+          const res = await fetch(
+            `${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/edit`,
+            {
+              method: 'POST',
+              headers: headers(config, {
+                'Content-Type': 'application/json',
+                Accept: 'text/event-stream',
+              }),
+              body: JSON.stringify({ text, expectedLaterMessages }),
+              signal,
+            },
+          );
+
+          if (!res.ok) {
+            const parsed = await json<unknown>(res);
+            const message = typeof parsed === 'object' && parsed !== null
+              ? (parsed as { error?: string; message?: string }).error
+                ?? (parsed as { error?: string; message?: string }).message
+                ?? `Error HTTP ${res.status}`
+              : `Error HTTP ${res.status}`;
+            throw new ClientError(res.status, message);
+          }
+          if (!res.body) throw new ClientError(502, 'El asistente no está disponible.');
+          await consumeUiMessageStream(res.body, handlers);
+          if (signal?.aborted) return 'aborted';
+          handlers.onFinish?.();
+          return 'ok';
+        } catch (error) {
+          if (isAbortError(error)) return 'aborted';
           throw error;
         }
       },

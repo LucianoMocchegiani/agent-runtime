@@ -68,6 +68,40 @@ export type SaveMessageParams = {
   toolResult?: JsonValue | null;
 };
 
+export type EditMessageParams = {
+  conversationId: string;
+  messageId: string;
+  userId: string;
+  content: string;
+  /** Número de mensajes posteriores confirmado por el usuario en la UI. */
+  expectedLaterMessages: number;
+};
+
+export type EditMessageResult = {
+  deletedLaterMessages: number;
+};
+
+export class MessageNotEditableError extends Error {
+  constructor(message = 'Message cannot be edited') {
+    super(message);
+    this.name = 'MessageNotEditableError';
+  }
+}
+
+export class MessageEditConflictError extends Error {
+  constructor() {
+    super('Conversation changed since the edit was confirmed');
+    this.name = 'MessageEditConflictError';
+  }
+}
+
+export class MessageContainsUnstoredAttachmentError extends Error {
+  constructor() {
+    super('Messages with unstored attachments cannot be edited');
+    this.name = 'MessageContainsUnstoredAttachmentError';
+  }
+}
+
 export type CreateConversationParams = {
   userId: string;
   title?: string | null;
@@ -195,6 +229,7 @@ export interface MemoryService {
   getContext(params: GetContextParams): Promise<GetContextResult>;
   saveSummary(params: SaveSummaryParams): Promise<boolean>;
   saveMessage(params: SaveMessageParams): Promise<void>;
+  editMessageAndTruncate(params: EditMessageParams): Promise<EditMessageResult>;
   listMessages(params: ListMessagesParams): Promise<ListMessagesResult>;
   listConversations(params: ListConversationsParams): Promise<ConversationDto[]>;
   createConversation(

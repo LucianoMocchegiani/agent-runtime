@@ -15,6 +15,23 @@ function sortMessages(items) {
   return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
+function compareMessageOrder(a, b) {
+  return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
+}
+
+function isMessageAfter(message, target) {
+  return compareMessageOrder(message, target) > 0;
+}
+
+function isMessageBefore(message, target) {
+  return compareMessageOrder(message, target) < 0;
+}
+
+function hasUnstoredImage(message) {
+  return message.content.includes('[Imagen adjunta; no almacenada]')
+    || message.content.includes('imágenes adjuntas; no almacenadas]');
+}
+
 const DELEGATION_ACTIVE_STATUSES = new Set(['queued', 'running']);
 const DELEGATION_LABELS = {
   queued: 'Conversación delegada · en cola',
@@ -34,6 +51,8 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [input, setInput] = useState('');
+  const [editingMessage, setEditingMessage] = useState(null);
+  const inputBeforeEditRef = useRef('');
   const [images, setImages] = useState([]);
   const [pendingImageReads, setPendingImageReads] = useState(0);
   const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
@@ -43,11 +62,26 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [activity, setActivity] = useState('idle');
+  const [voiceState, setVoiceState] = useState('idle');
+  const [voiceAvailable, setVoiceAvailable] = useState(false);
+  const [voiceAudioUrl, setVoiceAudioUrl] = useState(null);
+  const [isPreparingVoice, setIsPreparingVoice] = useState(false);
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [error, setError] = useState(null);
   const [visibleDelegationStatus, setVisibleDelegationStatus] = useState(delegationStatus);
   const scrollContainerRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
+  const voiceSessionRef = useRef(null);
+  const voiceStartIdRef = useRef(0);
+  const voiceTranscriptRef = useRef([]);
+  const voiceAudioRef = useRef(null);
+  const voiceAudioUrlRef = useRef(null);
+  const voiceAudioUrlsRef = useRef([]);
+  const voicePlaybackIndexRef = useRef(0);
+  const voicePlaybackEnabledRef = useRef(false);
+  const voiceSynthesisIdRef = useRef(0);
+  const voiceTraceIdRef = useRef(null);
   const imagePreviewsRef = useRef([]);
   const messageLoadRequestRef = useRef(0);
   const messagesRef = useRef([]);
@@ -135,7 +169,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   }
 
   function handleInputPaste(e) {
-    if (isLoading) return;
+    if (isLoading || editingMessage) return;
     const files = [...(e.clipboardData?.items ?? [])]
       .filter(item => item.type.startsWith('image/'))
       .map(item => item.getAsFile())
@@ -149,6 +183,21 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     setInput(e.target.value);
   }
 
+  function startEditingMessage(message) {
+    if (isLoading || voiceState !== 'idle' || pendingImageReads > 0 || images.length > 0 || message.pending || message.role !== 'user') return;
+    inputBeforeEditRef.current = input;
+    setEditingMessage(message);
+    setInput(message.content);
+    setError(null);
+    requestAnimationFrame(() => messageInputRef.current?.focus());
+  }
+
+  function cancelEditingMessage() {
+    setEditingMessage(null);
+    setInput(inputBeforeEditRef.current);
+    inputBeforeEditRef.current = '';
+  }
+
   function handleImageSelection(e) {
     const files = [...(e.target.files ?? [])];
     e.target.value = '';
@@ -157,6 +206,11 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   }
 
   function handleInputKeyDown(e) {
+    if (e.key === 'Escape' && editingMessage) {
+      e.preventDefault();
+      cancelEditingMessage();
+      return;
+    }
     if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
     e.preventDefault();
 
@@ -250,6 +304,9 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     let isCurrent = true;
     setConversationTitle('');
     setIsEditingTitle(false);
+    setEditingMessage(null);
+    setInput('');
+    inputBeforeEditRef.current = '';
     Promise.all([client.conversations.get(conversationId), client.agentProfiles.list()]).then(([conversation, profiles]) => {
       if (!isCurrent) return;
       setAgentProfiles(profiles);
@@ -265,6 +322,15 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   useEffect(() => {
     loadMessages();
   }, [loadMessages]);
+
+  useEffect(() => {
+    let active = true;
+    setVoiceAvailable(false);
+    client.voice.status(conversationId)
+      .then(status => { if (active) setVoiceAvailable(status.available); })
+      .catch(() => { if (active) setVoiceAvailable(false); });
+    return () => { active = false; };
+  }, [conversationId]);
 
   useEffect(() => {
     if (!delegationStatus || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
@@ -285,7 +351,26 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     onActivityChange?.(conversationId, isLoading ? activity : null);
   }, [activity, conversationId, isLoading, onActivityChange]);
 
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    if (isVisible) return;
+    stopVoiceCapture(false);
+    stopVoicePlayback();
+  }, [isVisible]);
+
+  useEffect(() => () => {
+    abortRef.current?.abort();
+    voiceSynthesisIdRef.current++;
+    const session = voiceSessionRef.current;
+    if (session) {
+      window.clearTimeout(session.finishTimer);
+      window.clearTimeout(session.transcriptionTimer);
+      session.channel.close();
+      session.pc.close();
+      session.stream.getTracks().forEach(track => track.stop());
+    }
+    voiceAudioRef.current?.pause();
+    voiceAudioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+  }, []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -309,12 +394,27 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     if (container.scrollTop <= 100) void loadOlderMessages();
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if ((!input.trim() && images.length === 0) || isLoading || pendingImageReads > 0 || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
+  async function handleSubmit(e, submittedText, fromVoice = false) {
+    e?.preventDefault();
+    const text = typeof submittedText === 'string' ? submittedText.trim() : input.trim();
+    const editTarget = editingMessage;
+    const selectedImages = fromVoice || editTarget ? [] : images;
+    if ((!text && selectedImages.length === 0) || isLoading || pendingImageReads > 0 || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
+    if (editTarget) {
+      const laterCount = messages.filter(message => !message.pending && isMessageAfter(message, editTarget)).length;
+      const warning = `Al editar este mensaje se eliminarán ${laterCount} mensaje${laterCount === 1 ? '' : 's'} posterior${laterCount === 1 ? '' : 'es'} y se generará una respuesta nueva. No se puede deshacer. Los efectos externos de herramientas (por ejemplo, cambios en otros sistemas) no se revierten. ¿Querés continuar?`;
+      if (!window.confirm(warning)) return;
+    }
 
-    const text = input.trim();
-    const selectedImages = images;
+    let assistantResponseText = '';
+    const voiceTraceId = fromVoice
+      ? (globalThis.crypto?.randomUUID?.() ?? `voice-${Date.now()}-${Math.random().toString(16).slice(2)}`)
+      : null;
+    const voiceTurnStartedAt = Date.now();
+    let firstVoiceTextLogged = false;
+    if (fromVoice) {
+      console.info('[voice-debug] turn-submitted', JSON.stringify({ traceId: voiceTraceId, textChars: text.length }));
+    }
     const imageNote = selectedImages.length === 1
       ? '[Imagen adjunta; no almacenada]'
       : `[${selectedImages.length} imágenes adjuntas; no almacenadas]`;
@@ -322,6 +422,10 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       ? `${text}${text ? '\n\n' : ''}${imageNote}`
       : text;
     setInput('');
+    if (editTarget) {
+      setEditingMessage(null);
+      inputBeforeEditRef.current = '';
+    }
     replaceImages([]);
     setIsLoading(true);
     setActivity('thinking');
@@ -332,15 +436,27 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     if (selectedImages.length) {
       imagePreviewsRef.current.push({ content: persistedContent, dataUrls: selectedImages.map(image => image.dataUrl) });
     }
-    setMessages(prev => [...prev, {
-      id: userKey, conversationId, role: 'user', pending: true,
-      content: persistedContent, imageDataUrls: selectedImages.map(image => image.dataUrl),
-      toolName: null, toolArgs: null, toolResult: null,
-      createdAt: new Date().toISOString(),
-    }]);
+    setMessages(prev => {
+      const retained = editTarget
+        ? prev.filter(message => !message.pending && isMessageBefore(message, editTarget))
+        : prev;
+      return [...retained, {
+        id: userKey, conversationId, role: 'user', pending: true,
+        content: persistedContent, imageDataUrls: selectedImages.map(image => image.dataUrl),
+        toolName: null, toolArgs: null, toolResult: null,
+        createdAt: new Date().toISOString(),
+      }];
+    });
 
     const handlers = {
       onTextDelta: (delta) => {
+        if (fromVoice && !firstVoiceTextLogged) {
+          firstVoiceTextLogged = true;
+          console.info('[voice-debug] first-text-delta', JSON.stringify({
+            traceId: voiceTraceId, msFromTurnSubmit: Date.now() - voiceTurnStartedAt,
+          }));
+        }
+        assistantResponseText += delta;
         setActivity('responding');
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -382,21 +498,45 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     abortRef.current = controller;
 
     try {
-      const result = await client.messages.send(conversationId, text, handlers, controller.signal, {
-        images: selectedImages.map(image => image.dataUrl),
-      });
-      if (result === 'ok') {
-        await loadMessages({ preserveHistory: true });
-        try {
-          const conversation = await client.conversations.get(conversationId);
+      const result = editTarget
+        ? await client.messages.edit(
+          conversationId,
+          editTarget.id,
+          text,
+          messages.filter(message => !message.pending && isMessageAfter(message, editTarget)).length,
+          handlers,
+          controller.signal,
+        )
+        : await client.messages.send(conversationId, text, handlers, controller.signal, {
+          images: selectedImages.map(image => image.dataUrl),
+        });
+      if (editTarget || result === 'ok') {
+        if (fromVoice) {
+          console.info('[voice-debug] assistant-stream-complete', JSON.stringify({
+            traceId: voiceTraceId, msFromTurnSubmit: Date.now() - voiceTurnStartedAt,
+            replyChars: assistantResponseText.length,
+          }));
+        }
+        // Cerramos el turno del chat en cuanto termina el stream. La recarga del historial
+        // y la síntesis de voz son tareas secundarias y no deben dejar «Respondiendo» activo.
+        void loadMessages({ preserveHistory: true });
+        void client.conversations.get(conversationId).then(conversation => {
           setConversationTitle(conversation.title ?? '');
           onConversationUpdated?.(conversation);
-        } catch (e) {
-          setError(e.message);
+        }).catch(e => setError(e.message));
+        if (fromVoice && assistantResponseText.trim()) {
+          void speakAssistantReply(assistantResponseText, voiceTraceId, voiceTurnStartedAt);
+        } else if (fromVoice) {
+          console.warn('[voice-debug] no-assistant-text', JSON.stringify({ traceId: voiceTraceId, result }));
         }
       }
     } catch (e) {
       const wasAborted = e.name === 'AbortError';
+      if (editTarget) {
+        setInput(text);
+        setEditingMessage(null);
+        void loadMessages({ preserveHistory: true });
+      }
       setMessages(prev => prev.map(message =>
         message.role === 'tool' && message.status === 'running'
           ? { ...message, status: wasAborted ? 'cancelled' : 'error' }
@@ -454,6 +594,308 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     setIsEditingTitle(false);
   }
 
+  function stopVoicePlayback({ discard = false } = {}) {
+    voicePlaybackEnabledRef.current = false;
+    const audio = voiceAudioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      voiceAudioRef.current = null;
+    }
+    setIsPlayingVoice(false);
+    if (discard) {
+      // Invalida cualquier síntesis anterior que todavía esté en vuelo.
+      voiceSynthesisIdRef.current++;
+      voicePlaybackIndexRef.current = 0;
+      voiceAudioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+      voiceAudioUrlsRef.current = [];
+      voiceAudioUrlRef.current = null;
+      setVoiceAudioUrl(null);
+    }
+  }
+
+  async function speakAssistantReply(rawText, turnTraceId, turnStartedAt) {
+    const traceId = turnTraceId || (globalThis.crypto?.randomUUID?.() ?? `voice-${Date.now()}-${Math.random().toString(16).slice(2)}`);
+    voiceTraceIdRef.current = traceId;
+    const replyReadyAt = Date.now();
+    const text = rawText
+      .replace(/```[\s\S]*?```/g, ' fragmento de código omitido ')
+      .replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/[`*_>#~]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!text) {
+      console.warn('[voice-debug] empty-reply', JSON.stringify({ traceId }));
+      return;
+    }
+    // Chunks chicos permiten empezar a hablar sin esperar a que se sintetice
+    // la respuesta entera, que podía tardar minutos en respuestas largas.
+    // El primer clip es corto para empezar a hablar antes; los siguientes son más largos
+    // para evitar multiplicar las llamadas de síntesis durante toda la respuesta.
+    const chunks = splitSpeechText(text, 600, 220);
+    console.info('[voice-debug] reply-ready', JSON.stringify({
+      traceId, textChars: text.length, chunkCount: chunks.length,
+      msFromTurnSubmit: turnStartedAt ? Date.now() - turnStartedAt : null,
+    }));
+    stopVoicePlayback({ discard: true });
+    const synthesisId = voiceSynthesisIdRef.current;
+    const urls = [];
+    voicePlaybackEnabledRef.current = true;
+    voicePlaybackIndexRef.current = 0;
+    setIsPreparingVoice(true);
+    try {
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        const requestStartedAt = Date.now();
+        console.info('[voice-debug] synthesis-start', JSON.stringify({
+          traceId, chunkIndex: chunkIndex + 1, chunkCount: chunks.length, textChars: chunk.length,
+        }));
+        const slowRequestTimer = window.setTimeout(() => {
+          console.warn('[voice-debug] synthesis-still-pending', JSON.stringify({
+            traceId, chunkIndex: chunkIndex + 1, elapsedMs: Date.now() - requestStartedAt,
+          }));
+        }, 10_000);
+        try {
+          const blob = await client.voice.synthesize(conversationId, chunk, traceId);
+          window.clearTimeout(slowRequestTimer);
+          const synthesisMs = Date.now() - requestStartedAt;
+          console.info('[voice-debug] synthesis-ready', JSON.stringify({
+            traceId, chunkIndex: chunkIndex + 1, chunkCount: chunks.length,
+            synthesisMs, audioBytes: blob.size,
+          }));
+          if (synthesisId !== voiceSynthesisIdRef.current) {
+            console.info('[voice-debug] synthesis-discarded', JSON.stringify({ traceId, chunkIndex: chunkIndex + 1 }));
+            return;
+          }
+          const url = URL.createObjectURL(blob);
+          urls.push(url);
+          voiceAudioUrlsRef.current = urls;
+          if (urls.length === 1) {
+            voiceAudioUrlRef.current = url;
+            setVoiceAudioUrl(url);
+            console.info('[voice-debug] first-audio-ready', JSON.stringify({
+              traceId, msFromReplyReady: Date.now() - replyReadyAt,
+              msFromTurnSubmit: turnStartedAt ? Date.now() - turnStartedAt : null, audioBytes: blob.size,
+            }));
+            // El resto de la respuesta se sigue sintetizando en segundo plano.
+            setIsPreparingVoice(false);
+          }
+          // Arranca el primer fragmento apenas llega. Los siguientes se generan
+          // mientras se reproduce el actual y se encolan para continuar al terminar.
+          if (voicePlaybackEnabledRef.current && !voiceAudioRef.current && voicePlaybackIndexRef.current === urls.length - 1) {
+            playVoiceTrack(voicePlaybackIndexRef.current);
+          }
+        } catch (e) {
+          window.clearTimeout(slowRequestTimer);
+          console.error('[voice-debug] synthesis-failed', JSON.stringify({
+            traceId, chunkIndex: chunkIndex + 1, chunkCount: chunks.length,
+            synthesisMs: Date.now() - requestStartedAt, error: e?.message || String(e),
+          }));
+          throw e;
+        }
+      }
+    } catch (e) {
+      if (synthesisId === voiceSynthesisIdRef.current) {
+        setError(`La respuesta quedó guardada, pero no se pudo generar el audio: ${e.message}`);
+      }
+    } finally {
+      if (synthesisId === voiceSynthesisIdRef.current) setIsPreparingVoice(false);
+    }
+  }
+
+  function playVoiceTrack(index) {
+    const urls = voiceAudioUrlsRef.current;
+    const traceId = voiceTraceIdRef.current;
+    if (!urls[index]) {
+      console.info('[voice-debug] playback-queue-empty', JSON.stringify({ traceId, chunkIndex: index + 1, readyChunks: urls.length }));
+      voiceAudioRef.current = null;
+      voicePlaybackIndexRef.current = index;
+      setIsPlayingVoice(false);
+      return;
+    }
+    voicePlaybackIndexRef.current = index;
+    console.info('[voice-debug] playback-start-request', JSON.stringify({ traceId, chunkIndex: index + 1, readyChunks: urls.length }));
+    const audio = new Audio(urls[index]);
+    voiceAudioRef.current = audio;
+    audio.onplaying = () => {
+      console.info('[voice-debug] playback-playing', JSON.stringify({ traceId, chunkIndex: index + 1 }));
+    };
+    audio.onwaiting = () => {
+      console.warn('[voice-debug] playback-waiting', JSON.stringify({ traceId, chunkIndex: index + 1, readyState: audio.readyState }));
+    };
+    audio.onstalled = () => {
+      console.warn('[voice-debug] playback-stalled', JSON.stringify({ traceId, chunkIndex: index + 1, readyState: audio.readyState, networkState: audio.networkState }));
+    };
+    audio.onended = () => {
+      console.info('[voice-debug] playback-ended', JSON.stringify({ traceId, chunkIndex: index + 1 }));
+      if (voiceAudioRef.current === audio) {
+        voiceAudioRef.current = null;
+        if (voicePlaybackEnabledRef.current) playVoiceTrack(index + 1);
+        else setIsPlayingVoice(false);
+      }
+    };
+    audio.onerror = () => {
+      console.error('[voice-debug] playback-error', JSON.stringify({
+        traceId, chunkIndex: index + 1, mediaErrorCode: audio.error?.code ?? null,
+        readyState: audio.readyState, networkState: audio.networkState,
+      }));
+      if (voiceAudioRef.current === audio) {
+        voiceAudioRef.current = null;
+        voicePlaybackEnabledRef.current = false;
+        setIsPlayingVoice(false);
+        setError('No se pudo reproducir la respuesta de voz. Podés intentar reproducirla de nuevo.');
+      }
+    };
+    setIsPlayingVoice(true);
+    void audio.play().catch(e => {
+      console.error('[voice-debug] playback-rejected', JSON.stringify({
+        traceId, chunkIndex: index + 1, errorName: e?.name || null, error: e?.message || String(e),
+      }));
+      if (voiceAudioRef.current === audio) {
+        voiceAudioRef.current = null;
+        voicePlaybackEnabledRef.current = false;
+        setIsPlayingVoice(false);
+        const message = e?.name === 'NotAllowedError'
+          ? 'El navegador bloqueó la reproducción automática. Tocá «Reproducir voz» para escuchar la respuesta.'
+          : `No se pudo iniciar la reproducción de voz: ${e.message}`;
+        setError(message);
+      }
+    });
+  }
+
+  function finishVoiceCapture(session, submitTranscript) {
+    if (session?.finished) return;
+    if (session) {
+      session.finished = true;
+      window.clearTimeout(session.finishTimer);
+      window.clearTimeout(session.transcriptionTimer);
+      if (voiceSessionRef.current === session) voiceSessionRef.current = null;
+      session.channel.close();
+      session.pc.close();
+      session.stream.getTracks().forEach(track => track.stop());
+    }
+    setVoiceState('idle');
+    const text = voiceTranscriptRef.current.join(' ').replace(/\s+/g, ' ').trim();
+    voiceTranscriptRef.current = [];
+    if (submitTranscript && text) void handleSubmit(null, text, true);
+    else if (submitTranscript) setError(session?.errorMessage || 'No se reconoció voz. Probá de nuevo o escribí el mensaje.');
+  }
+
+  function stopVoiceCapture(submitTranscript = true) {
+    voiceStartIdRef.current++;
+    const session = voiceSessionRef.current;
+    if (!session) {
+      voiceTranscriptRef.current = [];
+      setVoiceState('idle');
+      if (submitTranscript) setError('No se reconoció voz. Probá de nuevo o escribí el mensaje.');
+      return;
+    }
+    if (!submitTranscript) {
+      voiceTranscriptRef.current = [];
+      finishVoiceCapture(session, false);
+      return;
+    }
+    if (session.stopRequested) return;
+    // Detener la pista avisa al servidor que terminó el audio. Mantenemos el
+    // canal de eventos abierto para que llegue la transcripción final.
+    session.stopRequested = true;
+    setVoiceState('transcribing');
+    session.stream.getTracks().forEach(track => track.stop());
+    session.finishTimer = window.setTimeout(() => finishVoiceCapture(session, true), 5000);
+  }
+
+  function handleTranscriptionEvent(session, transcript) {
+    if (typeof transcript === 'string' && transcript.trim()) {
+      voiceTranscriptRef.current.push(transcript.trim());
+    }
+    if (session.stopRequested) {
+      // Puede haber más de un segmento de transcripción en camino; dejamos que
+      // termine de llegar el lote antes de cerrar el canal.
+      window.clearTimeout(session.transcriptionTimer);
+      session.transcriptionTimer = window.setTimeout(() => finishVoiceCapture(session, true), 500);
+    }
+  }
+
+  function handleVoiceError(session, message) {
+    session.errorMessage = message || 'Falló el reconocimiento de voz.';
+    if (session.stopRequested) finishVoiceCapture(session, true);
+    else setError(session.errorMessage);
+  }
+
+  async function startVoiceCapture() {
+    const startId = ++voiceStartIdRef.current;
+    setError(null);
+    stopVoicePlayback();
+    voiceTranscriptRef.current = [];
+    setVoiceState('connecting');
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) {
+        throw new Error('Este navegador no admite captura de voz WebRTC.');
+      }
+      const token = await client.voice.createRealtimeToken(conversationId);
+      if (startId !== voiceStartIdRef.current) return;
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+      if (startId !== voiceStartIdRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+      const pc = new RTCPeerConnection();
+      const channel = pc.createDataChannel('oai-events');
+      const session = { pc, channel, stream, stopRequested: false, finished: false, finishTimer: null, transcriptionTimer: null };
+      voiceSessionRef.current = session;
+      stream.getTracks().forEach(track => pc.addTrack(track, stream));
+      channel.onmessage = event => {
+        let message;
+        try { message = JSON.parse(event.data); } catch { return; }
+        if (message.type === 'conversation.item.input_audio_transcription.completed') {
+          handleTranscriptionEvent(session, message.transcript);
+        } else if (message.type === 'error') {
+          handleVoiceError(session, message.error?.message);
+        }
+      };
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'failed' && voiceSessionRef.current === session) {
+          setError('Se perdió la conexión de voz. Probá nuevamente.');
+          stopVoiceCapture(false);
+        }
+      };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      const answer = await fetch('https://api.openai.com/v1/realtime/calls', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/sdp' },
+        body: pc.localDescription?.sdp,
+      });
+      if (!answer.ok) throw new Error(`OpenAI rechazó la conexión de voz (HTTP ${answer.status}).`);
+      await pc.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
+      if (startId === voiceStartIdRef.current) setVoiceState('listening');
+    } catch (e) {
+      if (startId !== voiceStartIdRef.current) return;
+      stopVoiceCapture(false);
+      setError(e.message || 'No se pudo iniciar el reconocimiento de voz.');
+    }
+  }
+
+  function handleVoiceButton() {
+    if (voiceState === 'transcribing') return;
+    if (voiceState === 'connecting') {
+      stopVoiceCapture(false);
+      setError(null);
+    } else if (voiceState === 'listening') {
+      stopVoiceCapture(true);
+    } else {
+      void startVoiceCapture();
+    }
+  }
+
+  function handleReplayVoice() {
+    if (!voiceAudioUrlsRef.current.length) return;
+    setError(null);
+    stopVoicePlayback();
+    voicePlaybackEnabledRef.current = true;
+    playVoiceTrack(0);
+  }
+
   function handleAbort() {
     setMessages(prev => prev.map(message =>
       message.role === 'tool' && message.status === 'running'
@@ -505,6 +947,12 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         </div>
         <span className="header-spacer" />
         <div className="toolbar">
+          {isPreparingVoice && <span role="status">Preparando audio…</span>}
+          {voiceAudioUrl && (
+            <button type="button" onClick={isPlayingVoice ? () => stopVoicePlayback() : handleReplayVoice} title={isPlayingVoice ? 'Detener la respuesta hablada' : 'Reproducir la última respuesta hablada'}>
+              {isPlayingVoice ? 'Detener voz' : 'Reproducir voz'}
+            </button>
+          )}
           <button className="reload-button" onClick={loadMessages} disabled={isLoading} title="Actualizar los mensajes" aria-label="Actualizar los mensajes"><Icon name="refresh" /><span>Recargar</span></button>
         </div>
       </header>
@@ -514,7 +962,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         onScroll={handleMessagesScroll}
       >
         {isLoadingOlder && <div className="history-loading" role="status">Cargando mensajes anteriores…</div>}
-        {renderMessageList(messages, onOpenConversation)}
+        {renderMessageList(messages, onOpenConversation, !isLoading && !isDelegatedActive && voiceState === 'idle' && images.length === 0 ? startEditingMessage : null)}
         {isLoading && (
           <div className="thinking-slot">
             {activity === 'thinking' && <ThinkingIndicator />}
@@ -529,6 +977,15 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       </div>
       {error && <div className="error-bar" role="alert">{error}</div>}
       <form onSubmit={handleSubmit} className="composer">
+        {editingMessage && (
+          <div className="message-edit-notice" role="status">
+            <div>
+              <strong>Editando mensaje</strong>
+              <span>Al reenviar se reemplazará y se eliminarán las respuestas posteriores.</span>
+            </div>
+            <button type="button" className="message-edit-cancel" onClick={cancelEditingMessage} disabled={isLoading}>Cancelar</button>
+          </div>
+        )}
         {images.length > 0 && (
           <div className="image-attachments-preview">
             {images.map((image, index) => (
@@ -559,7 +1016,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
             <button
               type="button"
               className="attach-button"
-              disabled={isLoading || isDelegatedActive}
+              disabled={isLoading || isDelegatedActive || Boolean(editingMessage)}
               aria-haspopup="menu"
               aria-expanded={isAttachMenuOpen}
               title="Adjuntar un archivo"
@@ -577,6 +1034,28 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
               </div>
             )}
           </div>
+          {voiceAvailable && <button
+            className={`voice-button${voiceState === 'listening' ? ' voice-listening' : ''}`}
+            type="button"
+            onClick={handleVoiceButton}
+            disabled={isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState === 'transcribing'}
+            title={voiceState === 'idle' ? 'Hablar por voz' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Esperando la transcripción de voz' : 'Terminar de hablar y enviar'}
+            aria-label={voiceState === 'idle' ? 'Hablar por voz' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Procesando voz' : 'Terminar de hablar y enviar'}
+          >
+            {voiceState === 'idle' ? '🎙 Hablar' : voiceState === 'connecting' ? 'Conectando…' : voiceState === 'transcribing' ? 'Procesando…' : 'Enviar voz'}
+          </button>}
+          {voiceAvailable && voiceState !== 'idle' && <button
+            className="voice-cancel-button"
+            type="button"
+            onClick={() => {
+              stopVoiceCapture(false);
+              setError(null);
+            }}
+            title="Cancelar y descartar la grabación de voz"
+            aria-label="Cancelar y descartar la grabación de voz"
+          >
+            Cancelar
+          </button>}
           <textarea
             ref={messageInputRef}
             className="message-input"
@@ -584,17 +1063,23 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
             onChange={handleInputChange}
             onPaste={handleInputPaste}
             onKeyDown={handleInputKeyDown}
-            placeholder="Escribí un mensaje..."
+            placeholder={editingMessage ? 'Editá el mensaje y reenviá...' : 'Escribí un mensaje...'}
             disabled={isLoading || isDelegatedActive}
             maxLength={MAX_MESSAGE_CHARS}
             rows={1}
             aria-label="Mensaje"
           />
-          <button className="send-button" type="submit" disabled={isLoading || isDelegatedActive || (!input.trim() && images.length === 0)} title="Enviar mensaje" aria-label="Enviar mensaje"><Icon name="send" /><span>Enviar</span></button>
+          <button className="send-button" type="submit" disabled={isLoading || isDelegatedActive || (!input.trim() && images.length === 0)} title={editingMessage ? 'Guardar la edición y generar una respuesta nueva' : 'Enviar mensaje'} aria-label={editingMessage ? 'Guardar y reenviar mensaje editado' : 'Enviar mensaje'}><Icon name="send" /><span>{editingMessage ? 'Guardar y reenviar' : 'Enviar'}</span></button>
           <button className="stop-button" type="button" disabled={!isLoading} onClick={handleAbort} title="Detener la respuesta" aria-label="Detener la respuesta"><Icon name="stop" /><span>Parar</span></button>
         </div>
         <small className="message-length" aria-label="Longitud del mensaje">
-          {input.length.toLocaleString('es-AR')} / {MAX_MESSAGE_CHARS.toLocaleString('es-AR')} caracteres · el límite de contexto del modelo también aplica
+          {voiceState === 'listening'
+            ? 'Escuchando. Tocá «Enviar voz» para enviar o «Cancelar» para descartarla.'
+            : voiceState === 'connecting'
+              ? 'Conectando con el reconocimiento de voz… Tocá «Cancelar» para salir.'
+              : voiceState === 'transcribing'
+                ? 'Procesando la transcripción… Podés cancelarla antes de que se envíe.'
+                : `${input.length.toLocaleString('es-AR')} / ${MAX_MESSAGE_CHARS.toLocaleString('es-AR')} caracteres · el límite de contexto del modelo también aplica`}
         </small>
       </form>
     </main>
@@ -617,14 +1102,14 @@ function ActivityDots() {
   );
 }
 
-function renderMessageList(messages, onOpenConversation) {
+function renderMessageList(messages, onOpenConversation, onEditMessage) {
   const rendered = [];
   let index = 0;
 
   while (index < messages.length) {
     const message = messages[index];
     if (!isStackableTool(message)) {
-      rendered.push(<MessageBubble key={message.id} message={message} onOpenConversation={onOpenConversation} />);
+      rendered.push(<MessageBubble key={message.id} message={message} onOpenConversation={onOpenConversation} onEditMessage={onEditMessage} />);
       index++;
       continue;
     }
@@ -637,8 +1122,8 @@ function renderMessageList(messages, onOpenConversation) {
     }
 
     rendered.push(stack.length > 1
-      ? <ToolStack key={`tool-stack-${stack[0].id}`} messages={stack} onOpenConversation={onOpenConversation} />
-      : <MessageBubble key={stack[0].id} message={stack[0]} onOpenConversation={onOpenConversation} />);
+      ? <ToolStack key={`tool-stack-${stack[0].id}`} messages={stack} onOpenConversation={onOpenConversation} onEditMessage={onEditMessage} />
+      : <MessageBubble key={stack[0].id} message={stack[0]} onOpenConversation={onOpenConversation} onEditMessage={onEditMessage} />);
   }
 
   return rendered;
@@ -648,7 +1133,7 @@ function isStackableTool(message) {
   return message?.role === 'tool';
 }
 
-function ToolStack({ messages, onOpenConversation }) {
+function ToolStack({ messages, onOpenConversation, onEditMessage }) {
   const names = [...new Set(messages.map(message => message.toolName || 'Herramienta'))];
   const nameSummary = names.slice(0, 3).join(', ');
   const remainingNames = names.length - 3;
@@ -664,13 +1149,13 @@ function ToolStack({ messages, onOpenConversation }) {
         {errorCount > 0 && <span className="tool-stack-status tool-status-error">{errorCount} con error</span>}
       </summary>
       <div className="tool-stack-items">
-        {messages.map(message => <MessageBubble key={message.id} message={message} onOpenConversation={onOpenConversation} />)}
+        {messages.map(message => <MessageBubble key={message.id} message={message} onOpenConversation={onOpenConversation} onEditMessage={onEditMessage} />)}
       </div>
     </details>
   );
 }
 
-function MessageBubble({ message, onOpenConversation }) {
+function MessageBubble({ message, onOpenConversation, onEditMessage }) {
   if (message.role === 'tool') {
     const delegation = message.toolName === 'delegate_to_conversation' ? parseDelegation(message.toolResult) : null;
     if (delegation) return <DelegationCard delegation={delegation} onOpenConversation={onOpenConversation} />;
@@ -703,6 +1188,14 @@ function MessageBubble({ message, onOpenConversation }) {
       {(message.imageDataUrls ?? (message.imageDataUrl ? [message.imageDataUrl] : [])).map((imageDataUrl, index) => (
         <img className="message-image" src={imageDataUrl} alt={`Imagen adjunta ${index + 1}`} key={`${message.id}-image-${index}`} />
       ))}
+      {message.role === 'user' && !message.pending && onEditMessage && !hasUnstoredImage(message) && (
+        <div className="message-actions">
+          <button type="button" className="message-edit-button" onClick={() => onEditMessage(message)} title="Editar y regenerar desde este mensaje" aria-label="Editar mensaje">
+            <Icon name="edit" />
+            <span>Editar</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -956,6 +1449,25 @@ function formatToolOutput(value, toolName, depth = 0) {
   } catch {
     return '[Resultado no disponible]';
   }
+}
+
+function splitSpeechText(text, maxLength, firstChunkMaxLength = maxLength) {
+  const chunks = [];
+  let remaining = text;
+  while (remaining.length > (chunks.length === 0 ? firstChunkMaxLength : maxLength)) {
+    const limit = chunks.length === 0 ? firstChunkMaxLength : maxLength;
+    let cut = remaining.lastIndexOf('. ', limit);
+    if (cut >= limit * 0.55) {
+      cut += 1;
+    } else {
+      cut = remaining.lastIndexOf(' ', limit);
+    }
+    if (cut <= 0) cut = limit;
+    chunks.push(remaining.slice(0, cut).trim());
+    remaining = remaining.slice(cut).trim();
+  }
+  if (remaining) chunks.push(remaining);
+  return chunks;
 }
 
 function fileAsDataUrl(file) {

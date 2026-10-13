@@ -6,6 +6,11 @@ import {
   type GetContextResult,
   type SaveSummaryParams,
   type SaveMessageParams,
+  type EditMessageParams,
+  type EditMessageResult,
+  MessageEditConflictError,
+  MessageNotEditableError,
+  MessageContainsUnstoredAttachmentError,
   type CreateConversationParams,
   type UpdateConversationPatch,
   type ListConversationsParams,
@@ -167,6 +172,66 @@ export async function saveMessage(
       toolArgs: toJsonPrisma(params.toolArgs) as Prisma.InputJsonValue,
       toolResult: toJsonPrisma(params.toolResult) as Prisma.InputJsonValue,
     },
+  });
+}
+
+export async function editMessageAndTruncate(
+  params: EditMessageParams,
+): Promise<EditMessageResult> {
+  const { conversationId, messageId, userId, content, expectedLaterMessages } = params;
+  if (!Number.isInteger(expectedLaterMessages) || expectedLaterMessages < 0) {
+    throw new MessageEditConflictError();
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const conversation = await tx.conversation.findFirst({
+      where: { id: conversationId, userId },
+      select: { id: true },
+    });
+    if (!conversation) throw new ConversationNotFoundError();
+
+    const message = await tx.message.findFirst({
+      where: { id: messageId, conversationId },
+      select: { id: true, role: true, content: true, createdAt: true },
+    });
+    if (!message || message.role !== 'user') throw new MessageNotEditableError();
+    if (message.content.includes('[Imagen adjunta; no almacenada]')
+      || message.content.includes('imágenes adjuntas; no almacenadas]')) {
+      throw new MessageContainsUnstoredAttachmentError();
+    }
+
+    const laterWhere = {
+      conversationId,
+      OR: [
+        { createdAt: { gt: message.createdAt } },
+        { createdAt: message.createdAt, id: { gt: message.id } },
+      ],
+    };
+    const laterCount = await tx.message.count({ where: laterWhere });
+    if (laterCount !== expectedLaterMessages) throw new MessageEditConflictError();
+
+    await tx.message.deleteMany({
+      where: {
+        conversationId,
+        OR: [
+          { createdAt: { gt: message.createdAt } },
+          { createdAt: message.createdAt, id: { gte: message.id } },
+        ],
+      },
+    });
+    await tx.conversation.update({
+      where: { id: conversationId },
+      data: {
+        summary: null,
+        summaryRevision: { increment: 1 },
+        summaryThroughMessageId: null,
+        summaryThroughCreatedAt: null,
+      },
+    });
+    await tx.message.create({
+      data: { conversationId, role: 'user', content },
+    });
+    return { deletedLaterMessages: laterCount };
   });
 }
 
