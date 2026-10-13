@@ -114,9 +114,17 @@ export type UpdateConversationPatch = {
   agentProfileId?: string | null;
 };
 
+export type ConversationCursor = {
+  updatedAt: string;
+  id: string;
+};
+
 export type ListConversationsParams = {
   userId: string;
+  /** Omit to include both active and archived conversations. */
   archived?: boolean;
+  limit?: number;
+  before?: ConversationCursor;
 };
 
 export type MessageCursor = {

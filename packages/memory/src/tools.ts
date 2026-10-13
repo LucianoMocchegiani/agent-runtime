@@ -276,13 +276,27 @@ export async function listMessages(
 export async function listConversations(
   params: ListConversationsParams,
 ): Promise<ConversationDto[]> {
+  const requestedLimit = params.limit ?? LIST_TAKE;
+  const limit = Math.max(1, Math.min(requestedLimit, LIST_TAKE));
+  const beforeUpdatedAt = params.before ? new Date(params.before.updatedAt) : null;
+  if (params.before && (!beforeUpdatedAt || !Number.isFinite(beforeUpdatedAt.getTime()))) {
+    throw new Error('Invalid conversation cursor');
+  }
   const rows = await prisma.conversation.findMany({
     where: {
       userId: params.userId,
-      archivedAt: params.archived ? { not: null } : null,
+      ...(params.archived === undefined ? {} : {
+        archivedAt: params.archived ? { not: null } : null,
+      }),
+      ...(params.before && beforeUpdatedAt ? {
+        OR: [
+          { updatedAt: { lt: beforeUpdatedAt } },
+          { updatedAt: beforeUpdatedAt, id: { lt: params.before.id } },
+        ],
+      } : {}),
     },
-    orderBy: { updatedAt: 'desc' },
-    take: LIST_TAKE,
+    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    take: limit,
   });
   return rows.map(toConversationDto);
 }

@@ -520,6 +520,17 @@ html, body, #root { min-width: 0; overflow: hidden; }
   background: rgba(22, 33, 62, 0.28);
 }
 .composer-row { align-items: flex-end; }
+.hands-free-control { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 38px; }
+.hands-free-button { min-height: 36px; padding: 5px 12px; color: var(--text); background: #20263b; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; }
+.hands-free-button:hover:not(:disabled) { border-color: var(--accent); background: #252f49; }
+.hands-free-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hands-free-button:disabled { opacity: .45; cursor: not-allowed; }
+.hands-free-button.hands-free-active { color: #fff; background: rgba(229,57,53,.17); border-color: rgba(229,57,53,.55); }
+.hands-free-status { display: inline-flex; align-items: center; gap: 7px; color: var(--text-muted); font-size: 12px; }
+.hands-free-status-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; background: var(--text-dim); }
+.hands-free-status-listening .hands-free-status-dot { background: #66bb6a; box-shadow: 0 0 8px rgba(102,187,106,.65); animation: activity-pulse 1.4s ease-in-out infinite; }
+.hands-free-status-processing .hands-free-status-dot { background: #ffca28; }
+.hands-free-status-speaking .hands-free-status-dot { background: var(--accent); box-shadow: 0 0 8px rgba(79,195,247,.55); }
 .attach-button {
   min-height: 44px;
   border-color: var(--border-input);

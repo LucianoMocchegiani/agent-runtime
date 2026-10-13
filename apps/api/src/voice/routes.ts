@@ -52,7 +52,8 @@ voiceRoutes.post('/token', async (c) => {
           input: {
             format: { type: 'audio/pcm', rate: 24000 },
             transcription: { model: 'gpt-4o-mini-transcribe', language: 'es' },
-            turn_detection: { type: 'server_vad' },
+            // Espera 2 s de silencio antes de dar por terminada la intervención.
+            turn_detection: { type: 'server_vad', silence_duration_ms: 2_000 },
           },
         },
       },
