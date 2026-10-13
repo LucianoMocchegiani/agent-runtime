@@ -281,6 +281,14 @@ html, body, #root { width: 100%; height: 100%; }
 }
 #sidebar h2 span { flex: 1; }
 #conv-list { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.conversation-list-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.conversation-list-tabs button { min-height: 36px; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; }
+.conversation-list-tabs button:hover { background: rgba(255,255,255,.05); }
+.conversation-list-tabs button.active { color: var(--text); background: rgba(79,195,247,.1); border-color: rgba(79,195,247,.35); }
+.conversation-list-state { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; overflow-wrap: anywhere; }
+.conversation-list-message { margin: 8px 10px 0; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.conversation-list-error { color: var(--error-text); background: var(--bg-error); }
+.conversation-list-notice { color: #a5e6ac; background: rgba(67,160,71,.12); }
 .conv-item {
   display: flex;
   align-items: center;
@@ -333,7 +341,10 @@ html, body, #root { width: 100%; height: 100%; }
 .message-input:disabled { opacity: 0.6; }
 .attachment-menu button:focus-visible { outline: 2px solid var(--accent); }
 .attach-button:disabled, .composer-row > button:disabled { cursor: not-allowed; }
-.error-bar { padding: 8px 16px; color: var(--error-text); background: var(--bg-error); font-size: 13px; overflow-wrap: anywhere; }
+.error-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; color: var(--error-text); background: var(--bg-error); font-size: 13px; overflow-wrap: anywhere; }
+.error-bar > span { min-width: 0; }
+.error-retry-button, .conversation-list-retry { flex: 0 0 auto; min-height: 34px; padding: 5px 10px; color: var(--text); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; }
+.error-retry-button:hover, .conversation-list-retry:hover { border-color: var(--accent); }
 
 /* Responsive layout and unified controls */
 html, body, #root { min-width: 0; overflow: hidden; }
@@ -510,7 +521,11 @@ html, body, #root { min-width: 0; overflow: hidden; }
 }
 .sidebar-action { color: var(--accent); font-size: 22px; }
 .archive-button { min-height: 36px; width: 36px; font-size: 20px; }
-.sidebar-action:hover, .archive-button:hover { color: var(--text); background: rgba(255,255,255,0.07); border-color: var(--border); }
+.restore-button { min-height: 34px; padding: 4px 8px; color: var(--accent); background: transparent; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 11px; white-space: nowrap; }
+.restore-button:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.sidebar-action:hover, .archive-button:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,0.07); border-color: var(--border); }
+.sidebar-action:disabled, .archive-button:disabled, .restore-button:disabled { opacity: .5; cursor: not-allowed; }
+.conv-select:disabled { color: inherit; opacity: .72; cursor: default; }
 
 .composer {
   flex: 0 0 auto;

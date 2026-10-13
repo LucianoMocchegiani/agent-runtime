@@ -125,8 +125,9 @@ export class ClientError extends Error {
 export function createClient(config: ClientConfig) {
   return {
     conversations: {
-      list: async (): Promise<Conversation[]> => {
-        const res = await fetch(`${baseUrl(config)}/v1/conversations`, {
+      list: async (options: { archived?: boolean } = {}): Promise<Conversation[]> => {
+        const query = options.archived ? '?archived=true' : '';
+        const res = await fetch(`${baseUrl(config)}/v1/conversations${query}`, {
           headers: headers(config, { Accept: 'application/json' }),
         });
         if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);

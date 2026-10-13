@@ -4,6 +4,12 @@
 
 Memory es un módulo interno del mismo proceso que Runtime. No se levanta un servidor MCP, puerto ni proceso aparte, y la API realiza llamadas directas a sus operaciones. Las menciones posteriores a “Memory MCP” y los diagramas de protocolo de este documento son conceptos históricos y no describen el transporte actual.
 
+### Capacidades confirmadas y pendientes
+
+- Las conversaciones y mensajes se persisten en PostgreSQL. Archivar es una baja lógica: la lista normal devuelve conversaciones activas; `GET /v1/conversations?archived=true` lista las archivadas. `DELETE /v1/conversations/:id` archiva y `PATCH /v1/conversations/:id` con `{ "archived": false }` restaura. Archivar no elimina mensajes; mientras está archivada, la conversación no admite nuevos turnos hasta restaurarla.
+- Memory persiste resúmenes de conversación, pero **no implementa checkpoints de sesión**. `getContext` devuelve actualmente `checkpoint: null`; un resumen no es un checkpoint ni permite reanudar el estado de una ejecución.
+- Los checkpoints, la restauración de estado de ejecución y los flujos de compaction descritos más abajo son objetivos de diseño, no capacidades disponibles hoy.
+
 ## 1. Objetivo
 
 El módulo **Memory** administra conversaciones y mensajes, recuerdos y preferencias, resúmenes y recuperación de contexto. Runtime coordina los turnos del agente y consume Memory directamente. Las herramientas MCP se reservan para integraciones externas.
@@ -123,9 +129,9 @@ Memory, en cambio, permite conservar información que debe sobrevivir más allá
 
 ---
 
-# 6. Memory + Compaction
+# 6. Memory + Compaction (flujo objetivo)
 
-El Memory MCP puede participar en el ciclo de compaction.
+El flujo descrito en esta sección es una posibilidad de diseño; hoy no existe integración de checkpoints con compaction ni restauración de estado de ejecución.
 
 Una posible secuencia:
 
@@ -161,11 +167,13 @@ En cambio:
 
 ---
 
-# 7. Checkpoints
+# 7. Checkpoints (capacidad planificada)
 
-El Memory MCP debería poder almacenar checkpoints de una sesión.
+La implementación actual **no almacena checkpoints**: `getContext` devuelve `checkpoint: null` y no hay una operación de guardado/recuperación de checkpoints. La persistencia de resúmenes y mensajes no equivale a guardar el estado de una ejecución ni permite reanudarla desde un punto intermedio.
 
-Un checkpoint puede representar:
+Como objetivo futuro, Memory podría almacenar checkpoints de una sesión.
+
+Un checkpoint podría representar:
 
 ```text
 Checkpoint
@@ -177,7 +185,7 @@ Checkpoint
  └── metadata
 ```
 
-Esto permite recuperar una ejecución después de:
+Si se implementan checkpoints y su restauración, podrían ayudar a recuperar una ejecución después de:
 
 * compaction
 * reinicio del Runtime
@@ -185,6 +193,8 @@ Esto permite recuperar una ejecución después de:
 * cambio de modelo
 * pausa de una sesión
 * ejecución prolongada
+
+Estos escenarios son objetivos de diseño, no comportamientos soportados por la implementación actual.
 
 Ejemplo:
 

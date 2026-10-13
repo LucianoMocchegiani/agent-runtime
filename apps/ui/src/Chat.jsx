@@ -62,6 +62,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const [isPreparingVoice, setIsPreparingVoice] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [error, setError] = useState(null);
+  const [isHistoryStale, setIsHistoryStale] = useState(false);
   const scrollContainerRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
@@ -265,8 +266,14 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       hasMoreMessagesRef.current = preserveHistory
         ? hasMoreMessagesRef.current || page.hasMore
         : page.hasMore;
+      setIsHistoryStale(false);
+      return true;
     } catch (e) {
-      if (requestId === messageLoadRequestRef.current) setError(e.message);
+      if (requestId === messageLoadRequestRef.current) {
+        setIsHistoryStale(true);
+        setError(e.message);
+      }
+      return false;
     }
   }, [addLocalImagePreviews, conversationId]);
 
@@ -408,6 +415,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
 
     let assistantResponseText = '';
     let assistantSpeechSegment = '';
+    let streamFailure = '';
     let willSpeakVoiceReply = false;
     const voiceTraceId = fromVoice
       ? (globalThis.crypto?.randomUUID?.() ?? `voice-${Date.now()}-${Math.random().toString(16).slice(2)}`)
@@ -492,6 +500,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         ));
       },
       onError: (msg) => {
+        streamFailure = msg;
         setError(msg);
         setMessages(prev => prev.map(message =>
           message.role === 'tool' && message.status === 'running'
@@ -517,7 +526,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         : await client.messages.send(conversationId, text, handlers, controller.signal, {
           images: selectedImages.map(image => image.dataUrl),
         });
-      if (editTarget || result === 'ok') {
+      if (result === 'ok' && !streamFailure) {
         if (fromVoice) {
           console.info('[voice-debug] assistant-stream-complete', JSON.stringify({
             traceId: voiceTraceId, msFromTurnSubmit: Date.now() - voiceTurnStartedAt,
@@ -543,20 +552,27 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         } else if (fromVoice) {
           console.warn('[voice-debug] no-assistant-text', JSON.stringify({ traceId: voiceTraceId, result }));
         }
+      } else {
+        const reconciled = await loadMessages({ preserveHistory: true });
+        if (!reconciled) setMessages(prev => prev.filter(message => !message.pending));
+        setIsHistoryStale(!reconciled);
+        setError(`${streamFailure ? `El asistente informó un error: ${streamFailure}.` : 'El turno se interrumpió.'} ${reconciled ? 'Se actualizó el historial; revisá si quedó una respuesta antes de volver a enviarlo.' : 'No se pudo actualizar el historial; usá «Actualizar historial» antes de volver a enviarlo.'} Las herramientas pueden haber aplicado efectos externos aunque no haya llegado una respuesta.`);
       }
     } catch (e) {
       const wasAborted = e.name === 'AbortError';
       if (editTarget) {
         setInput(text);
         setEditingMessage(null);
-        void loadMessages({ preserveHistory: true });
       }
+      const reconciled = await loadMessages({ preserveHistory: true });
+      if (!reconciled) setMessages(prev => prev.filter(message => !message.pending));
+      setIsHistoryStale(!reconciled);
       setMessages(prev => prev.map(message =>
         message.role === 'tool' && message.status === 'running'
           ? { ...message, status: wasAborted ? 'cancelled' : 'error' }
           : message
       ));
-      if (!wasAborted) setError(e.message);
+      setError(`${wasAborted ? 'El turno se interrumpió.' : (e.message || 'Falló el envío del mensaje.')} ${reconciled ? 'Se actualizó el historial; revisá si quedó una respuesta antes de volver a enviarlo.' : 'No se pudo actualizar el historial; usá «Actualizar historial» antes de volver a enviarlo.'} Las herramientas pueden haber aplicado efectos externos aunque no haya llegado una respuesta.`);
     } finally {
       abortRef.current = null;
       setIsLoading(false);
@@ -1006,6 +1022,14 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     abortRef.current?.abort();
   }
 
+  async function retryHistoryLoad() {
+    const loaded = await loadMessages({ preserveHistory: true });
+    if (loaded) {
+      setIsHistoryStale(false);
+      setError(null);
+    }
+  }
+
   const isDelegatedActive = DELEGATION_ACTIVE_STATUSES.has(delegationStatus);
 
   return (
@@ -1054,7 +1078,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
               {isPlayingVoice ? 'Detener voz' : 'Reproducir voz'}
             </button>
           )}
-          <button className="reload-button" onClick={loadMessages} disabled={isLoading} title="Actualizar los mensajes" aria-label="Actualizar los mensajes"><Icon name="refresh" /><span>Recargar</span></button>
+          <button className="reload-button" onClick={() => loadMessages({ preserveHistory: true })} disabled={isLoading} title="Actualizar los mensajes" aria-label="Actualizar los mensajes"><Icon name="refresh" /><span>Recargar</span></button>
         </div>
       </header>
       <div
@@ -1070,7 +1094,12 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
           </div>
         )}
       </div>
-      {error && <div className="error-bar" role="alert">{error}</div>}
+      {error && (
+        <div className="error-bar" role="alert">
+          <span>{error}</span>
+          {isHistoryStale && <button type="button" className="error-retry-button" onClick={retryHistoryLoad}>Actualizar historial</button>}
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="composer">
         {editingMessage && (
           <div className="message-edit-notice" role="status">
