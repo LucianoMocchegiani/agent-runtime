@@ -1367,6 +1367,31 @@ function renderMarkdownBlocks(content, preserveWhitespace = false) {
       continue;
     }
 
+    if (index + 1 < lines.length && isMarkdownTableRow(line) && isMarkdownTableSeparator(lines[index + 1])) {
+      const headers = splitMarkdownTableRow(line);
+      const alignments = splitMarkdownTableRow(lines[index + 1]).map(getMarkdownTableAlignment);
+      const rows = [];
+      index += 2;
+      while (index < lines.length && isMarkdownTableRow(lines[index]) && lines[index].trim()) {
+        rows.push(splitMarkdownTableRow(lines[index++]));
+      }
+      blocks.push(
+        <div className="markdown-table-wrapper" key={`table-${index}`}>
+          <table className="markdown-table">
+            <thead><tr>{headers.map((cell, cellIndex) => (
+              <th key={cellIndex} scope="col" style={{ textAlign: alignments[cellIndex] || 'left' }}><MarkdownInline text={cell} /></th>
+            ))}</tr></thead>
+            <tbody>{rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>{headers.map((_, cellIndex) => (
+                <td key={cellIndex} style={{ textAlign: alignments[cellIndex] || 'left' }}><MarkdownInline text={row[cellIndex] || ''} /></td>
+              ))}</tr>
+            ))}</tbody>
+          </table>
+        </div>,
+      );
+      continue;
+    }
+
     const heading = line.match(/^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/);
     if (heading) {
       const Tag = `h${heading[1].length}`;
@@ -1418,6 +1443,47 @@ function renderMarkdownBlocks(content, preserveWhitespace = false) {
   }
 
   return blocks;
+}
+
+function splitMarkdownTableRow(line) {
+  const cells = [];
+  let cell = '';
+  const trimmed = line.trim();
+  const hasOuterLeadingPipe = trimmed.startsWith('|');
+  const trailingBackslashes = (trimmed.match(/\\+$/) || [''])[0].length;
+  const hasOuterTrailingPipe = trimmed.endsWith('|') && trailingBackslashes % 2 === 0;
+  const start = hasOuterLeadingPipe ? 1 : 0;
+  const end = hasOuterTrailingPipe ? trimmed.length - 1 : trimmed.length;
+
+  for (let index = start; index < end; index++) {
+    const character = trimmed[index];
+    if (character === '\\' && trimmed[index + 1] === '|') {
+      cell += '|';
+      index++;
+    } else if (character === '|') {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += character;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function isMarkdownTableRow(line) {
+  return splitMarkdownTableRow(line).length > 1;
+}
+
+function isMarkdownTableSeparator(line) {
+  const cells = splitMarkdownTableRow(line);
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function getMarkdownTableAlignment(separator) {
+  if (separator.startsWith(':') && separator.endsWith(':')) return 'center';
+  if (separator.endsWith(':')) return 'right';
+  return 'left';
 }
 
 function MarkdownInline({ text }) {

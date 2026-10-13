@@ -7,6 +7,10 @@ export {
 export type {
   ClientConfig,
   Conversation,
+  CursorPage,
+  CursorPageOptions,
+  UserPreference,
+  SavePreferenceOptions,
   Message,
   MessageCursor,
   MessagePage,

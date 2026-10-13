@@ -15,6 +15,7 @@ import { agentProfileListRoutes } from './runtime-config/agent-profile-list-rout
 import { mountUi } from './ui.js';
 import { delegationRoutes } from './delegations/routes.js';
 import { voiceRoutes } from './voice/routes.js';
+import { preferenceRoutes } from './memory/preferences-routes.js';
 
 type DependencyStatus = 'up' | 'down';
 
@@ -91,6 +92,7 @@ export function createApp(): Hono<AppEnv> {
   v1.route('/models', modelRoutes);
   v1.route('/agent-profiles', agentProfileListRoutes);
   v1.route('/delegations', delegationRoutes);
+  v1.route('/preferences', preferenceRoutes);
   app.route('/v1', v1);
 
   mountUi(app);

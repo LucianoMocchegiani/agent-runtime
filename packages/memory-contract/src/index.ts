@@ -212,8 +212,15 @@ export type SearchPreferencesParams = {
   limit?: number;
 };
 
+export type PreferenceCursor = {
+  createdAt: string;
+  id: string;
+};
+
 export type ListPreferencesParams = {
   userId: string;
+  limit?: number;
+  before?: PreferenceCursor;
 };
 
 export type DeletePreferenceParams = {

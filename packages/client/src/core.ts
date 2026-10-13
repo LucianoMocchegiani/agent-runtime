@@ -11,6 +11,14 @@ export type ClientConfig = {
   getMcpAuth?: () => Record<string, string> | null;
 };
 
+export type CursorPage<T, Cursor = string> = {
+  items: T[];
+  hasMore: boolean;
+  nextCursor: Cursor | null;
+};
+
+export type CursorPageOptions = { limit?: number; cursor?: string };
+
 export type Conversation = {
   id: string;
   userId: string;
@@ -22,6 +30,16 @@ export type Conversation = {
 };
 
 export type AgentProfileInfo = { id: string; name: string; modelId: string };
+
+export type UserPreference = {
+  id: string;
+  preference: string;
+  activationCondition: string;
+  category: string | null;
+  createdAt: string;
+};
+
+export type SavePreferenceOptions = Omit<UserPreference, 'id' | 'createdAt'>;
 
 export type DelegationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
 export type Delegation = {
@@ -48,11 +66,7 @@ export type Message = {
 };
 
 export type MessageCursor = { createdAt: string; id: string };
-export type MessagePage = {
-  items: Message[];
-  hasMore: boolean;
-  nextCursor: MessageCursor | null;
-};
+export type MessagePage = CursorPage<Message, MessageCursor>;
 export type MessageListOptions = { limit?: number; before?: MessageCursor };
 
 export type ModelInfo = {
@@ -123,17 +137,51 @@ export class ClientError extends Error {
 }
 
 export function createClient(config: ClientConfig) {
+  async function fetchConversationPage(
+    options: { archived?: boolean } & CursorPageOptions = {},
+  ): Promise<CursorPage<Conversation>> {
+    const query = new URLSearchParams();
+    if (options.archived) query.set('archived', 'true');
+    if (options.limit !== undefined) query.set('limit', String(options.limit));
+    if (options.cursor) query.set('cursor', options.cursor);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    const res = await fetch(`${baseUrl(config)}/v1/conversations${suffix}`, {
+      headers: headers(config, { Accept: 'application/json' }),
+    });
+    if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
+    const data = await json<CursorPage<Conversation>>(res);
+    return { items: data?.items ?? [], hasMore: data?.hasMore ?? false, nextCursor: data?.nextCursor ?? null };
+  }
+
+  async function fetchPreferencePage(options: CursorPageOptions = {}): Promise<CursorPage<UserPreference>> {
+    const query = new URLSearchParams();
+    if (options.limit !== undefined) query.set('limit', String(options.limit));
+    if (options.cursor) query.set('cursor', options.cursor);
+    const suffix = query.size ? `?${query.toString()}` : '';
+    const res = await fetch(`${baseUrl(config)}/v1/preferences${suffix}`, {
+      headers: headers(config, { Accept: 'application/json' }),
+    });
+    if (!res.ok) throw new ClientError(res.status, `No se pudieron cargar las preferencias (HTTP ${res.status}).`);
+    const data = await json<CursorPage<UserPreference>>(res);
+    return { items: data?.items ?? [], hasMore: data?.hasMore ?? false, nextCursor: data?.nextCursor ?? null };
+  }
+
   return {
     conversations: {
       list: async (options: { archived?: boolean } = {}): Promise<Conversation[]> => {
-        const query = options.archived ? '?archived=true' : '';
-        const res = await fetch(`${baseUrl(config)}/v1/conversations${query}`, {
-          headers: headers(config, { Accept: 'application/json' }),
-        });
-        if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
-        const data = await json<{ items: Conversation[] }>(res);
-        return data?.items ?? [];
+        const items: Conversation[] = [];
+        let cursor: string | undefined;
+        do {
+          const page = await fetchConversationPage({ ...options, limit: 20, ...(cursor ? { cursor } : {}) });
+          items.push(...page.items);
+          cursor = page.nextCursor ?? undefined;
+          if (!page.hasMore || items.length >= 100) break;
+        } while (cursor);
+        return items.slice(0, 100);
       },
+
+      listPage: async (options: { archived?: boolean } & CursorPageOptions = {}): Promise<CursorPage<Conversation>> =>
+        fetchConversationPage(options),
 
       create: async (options: { agentProfileId?: string } = {}): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations`, {
@@ -179,6 +227,41 @@ export function createClient(config: ClientConfig) {
         });
         if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
         return json<Conversation>(res);
+      },
+    },
+
+    preferences: {
+      list: async (): Promise<UserPreference[]> => {
+        const items: UserPreference[] = [];
+        let cursor: string | undefined;
+        do {
+          const page = await fetchPreferencePage({ limit: 20, ...(cursor ? { cursor } : {}) });
+          items.push(...page.items);
+          cursor = page.nextCursor ?? undefined;
+          if (!page.hasMore || items.length >= 100) break;
+        } while (cursor);
+        return items.slice(0, 100);
+      },
+
+      listPage: async (options: CursorPageOptions = {}): Promise<CursorPage<UserPreference>> =>
+        fetchPreferencePage(options),
+
+      save: async (preference: SavePreferenceOptions): Promise<UserPreference> => {
+        const res = await fetch(`${baseUrl(config)}/v1/preferences`, {
+          method: 'POST',
+          headers: headers(config, { 'Content-Type': 'application/json', Accept: 'application/json' }),
+          body: JSON.stringify(preference),
+        });
+        if (!res.ok) throw new ClientError(res.status, `No se pudo guardar la preferencia (HTTP ${res.status}).`);
+        return json<UserPreference>(res);
+      },
+
+      delete: async (id: string): Promise<void> => {
+        const res = await fetch(`${baseUrl(config)}/v1/preferences/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          headers: headers(config),
+        });
+        if (!res.ok) throw new ClientError(res.status, `No se pudo borrar la preferencia (HTTP ${res.status}).`);
       },
     },
 

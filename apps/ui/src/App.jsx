@@ -4,6 +4,7 @@ import Chat from './Chat.jsx';
 import client from './client.js';
 import Icon from './Icon.jsx';
 import AdminConfig from './AdminConfig.jsx';
+import MemoryManager from './MemoryManager.jsx';
 
 export default function App() {
   const [activeConv, setActiveConv] = useState(null);
@@ -12,6 +13,7 @@ export default function App() {
   const [delegationByConversation, setDelegationByConversation] = useState({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
+  const [showMemory, setShowMemory] = useState(false);
   const [conversationRefreshKey, setConversationRefreshKey] = useState(0);
   const refreshConversations = useCallback(() => setConversationRefreshKey(key => key + 1), []);
   const refreshDelegations = useCallback(async () => {
@@ -107,6 +109,7 @@ export default function App() {
       setMountedConversations(current => current.includes(id) ? current : [...current, id]);
     }
     setShowAdmin(false);
+    setShowMemory(false);
     setIsSidebarOpen(false);
   }
 
@@ -132,11 +135,18 @@ export default function App() {
 
   function openAdmin() {
     setShowAdmin(true);
+    setShowMemory(false);
+    setIsSidebarOpen(false);
+  }
+
+  function openMemory() {
+    setShowMemory(true);
+    setShowAdmin(false);
     setIsSidebarOpen(false);
   }
 
   return (
-    <div className={`app-shell${activeConv || showAdmin ? ' has-active-chat' : ''}${isSidebarOpen ? ' sidebar-open' : ''}`}>
+    <div className={`app-shell${activeConv || showAdmin || showMemory ? ' has-active-chat' : ''}${isSidebarOpen ? ' sidebar-open' : ''}`}>
       <ConversationList
         activeId={activeConv}
         activityByConversation={conversationActivity}
@@ -144,6 +154,7 @@ export default function App() {
         onSelect={selectConversation}
         onArchive={handleArchive}
         onOpenAdmin={openAdmin}
+        onOpenMemory={openMemory}
         refreshKey={conversationRefreshKey}
       />
       {isSidebarOpen && (
@@ -154,12 +165,12 @@ export default function App() {
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
-      <div className="chat-instances" hidden={showAdmin || !activeConv}>
+      <div className="chat-instances" hidden={showAdmin || showMemory || !activeConv}>
         {mountedConversations.map(id => (
-          <div key={id} className="chat-instance" hidden={showAdmin || id !== activeConv}>
+          <div key={id} className="chat-instance" hidden={showAdmin || showMemory || id !== activeConv}>
             <Chat
               conversationId={id}
-              isVisible={!showAdmin && id === activeConv}
+              isVisible={!showAdmin && !showMemory && id === activeConv}
               delegationStatus={delegationByConversation[id]?.status}
               onOpenSidebar={() => setIsSidebarOpen(true)}
               onConversationUpdated={handleConversationUpdated}
@@ -171,6 +182,8 @@ export default function App() {
       </div>
       {showAdmin ? (
         <AdminConfig onBack={() => setShowAdmin(false)} />
+      ) : showMemory ? (
+        <MemoryManager onBack={() => setShowMemory(false)} />
       ) : !activeConv ? (
         <div id="empty-state">
           <div>Seleccioná un chat o creá uno nuevo</div>

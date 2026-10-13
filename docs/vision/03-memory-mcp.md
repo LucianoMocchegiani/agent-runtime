@@ -8,6 +8,8 @@ Memory es un módulo interno del mismo proceso que Runtime. No se levanta un ser
 
 - Las conversaciones y mensajes se persisten en PostgreSQL. Archivar es una baja lógica: la lista normal devuelve conversaciones activas; `GET /v1/conversations?archived=true` lista las archivadas. `DELETE /v1/conversations/:id` archiva y `PATCH /v1/conversations/:id` con `{ "archived": false }` restaura. Archivar no elimina mensajes; mientras está archivada, la conversación no admite nuevos turnos hasta restaurarla.
 - Memory persiste resúmenes de conversación, pero **no implementa checkpoints de sesión**. `getContext` devuelve actualmente `checkpoint: null`; un resumen no es un checkpoint ni permite reanudar el estado de una ejecución.
+- Las preferencias persistentes se asocian a la identidad autenticada o a la sesión anónima estable del navegador. La UI permite listarlas, agregarlas, corregirlas y borrarlas; la API expone `GET /v1/preferences`, `POST /v1/preferences` y `DELETE /v1/preferences/:id`, siempre usando el principal autenticado para aislar los datos. No existe un endpoint para editar una preferencia en el lugar: la UI guarda la nueva versión y luego elimina la anterior; si el borrado falla, ambas quedan visibles para resolverlo manualmente.
+- Las conversaciones, mensajes y resúmenes persisten por separado de las preferencias. Borrar una preferencia no borra conversaciones ni resúmenes; la UI de preferencias no ofrece administración de esos datos.
 - Los checkpoints, la restauración de estado de ejecución y los flujos de compaction descritos más abajo son objetivos de diseño, no capacidades disponibles hoy.
 
 ## 1. Objetivo

@@ -70,13 +70,24 @@ export async function savePreference(params: SavePreferenceParams): Promise<User
 }
 
 export async function listPreferences(params: ListPreferencesParams): Promise<UserPreferenceDto[]> {
+  const requestedLimit = params.limit ?? 100;
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), 101))
+    : 100;
+  const beforeCreatedAt = params.before?.createdAt ?? null;
+  if (beforeCreatedAt !== null && !Number.isFinite(Date.parse(beforeCreatedAt))) {
+    throw new Error('Invalid preference cursor');
+  }
   const rows = await prisma.$queryRaw<PreferenceRow[]>`
     SELECT id, preference, activation_condition AS "activationCondition", category,
-      created_at AS "createdAt"
+      to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS "createdAt"
     FROM memory_user_preferences
     WHERE user_id = ${params.userId}
-    ORDER BY created_at DESC
-    LIMIT 100
+      AND (${beforeCreatedAt}::timestamptz IS NULL
+        OR created_at < ${beforeCreatedAt}::timestamptz
+        OR (created_at = ${beforeCreatedAt}::timestamptz AND id < ${params.before?.id ?? '00000000-0000-0000-0000-000000000000'}::uuid))
+    ORDER BY created_at DESC, id DESC
+    LIMIT ${limit}
   `;
   return rows.map(toDto);
 }

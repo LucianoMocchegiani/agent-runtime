@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/principal.js';
 import { getAgentProfile, getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { requireConversationId } from './ids.js';
+import { decodeOptionalConversationCursor, encodeConversationCursor } from '../agent/conversation-cursor.js';
 import {
   archiveConversation,
   createConversation,
@@ -38,8 +39,32 @@ export const conversationRoutes = new Hono<AppEnv>();
 
 conversationRoutes.get('/', async (c) => {
   const archived = c.req.query('archived') === 'true';
-  const items = await listConversations(c.get('principal'), archived);
-  return c.json({ items });
+  const scope = archived ? 'archived' : 'active';
+  const rawLimit = c.req.query('limit');
+  const limit = rawLimit === undefined ? 20 : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
+    throw new HTTPException(400, { message: 'limit debe ser un entero entre 1 y 20.' });
+  }
+  let before: { updatedAt: string; id: string } | undefined;
+  try {
+    before = decodeOptionalConversationCursor(c.req.query('cursor'), scope);
+  } catch (error) {
+    throw new HTTPException(400, { message: error instanceof Error ? error.message : 'Cursor de conversaciones inválido.' });
+  }
+  const rows = await listConversations(c.get('principal'), archived, {
+    limit: limit + 1,
+    ...(before ? { before } : {}),
+  });
+  const items = rows.slice(0, limit);
+  const last = items.at(-1);
+  const hasMore = rows.length > limit;
+  return c.json({
+    items,
+    hasMore,
+    nextCursor: hasMore && last
+      ? encodeConversationCursor({ updatedAt: last.updatedAt, id: last.id, scope })
+      : null,
+  });
 });
 
 conversationRoutes.post('/', async (c) => {

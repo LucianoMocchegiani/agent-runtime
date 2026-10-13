@@ -6,7 +6,6 @@ import type {
   UpdateConversationPatch,
 } from 'agent-runtime-memory-contract';
 
-const LIST_TAKE = 100;
 const TITLE_MAX = 200;
 
 /**
@@ -17,14 +16,16 @@ const TITLE_MAX = 200;
 export async function listConversations(
   principal: Principal,
   archived: boolean,
+  options: { limit: number; before?: { updatedAt: string; id: string } },
 ): Promise<ConversationDto[]> {
   const memory = await createMemoryClient();
   try {
-    const items = await memory.listConversations({
+    return await memory.listConversations({
       userId: principal.userId,
       archived,
+      limit: options.limit,
+      ...(options.before ? { before: options.before } : {}),
     });
-    return items.slice(0, LIST_TAKE);
   } finally {
   }
 }
