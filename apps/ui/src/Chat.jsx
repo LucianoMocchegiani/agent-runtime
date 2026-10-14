@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useId } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 
@@ -1348,6 +1348,41 @@ function MarkdownContent({ content, preserveWhitespace = false }) {
   return <div className="markdown-content">{renderMarkdownBlocks(content || '', preserveWhitespace)}</div>;
 }
 
+function MermaidDiagram({ chart }) {
+  const reactId = useId();
+  const [result, setResult] = useState({ svg: '', error: false });
+  const diagramId = `mermaid-${reactId.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+
+  useEffect(() => {
+    let isCurrent = true;
+    setResult({ svg: '', error: false });
+    import('mermaid').then(async ({ default: mermaid }) => {
+      mermaid.initialize({
+        startOnLoad: false,
+        securityLevel: 'strict',
+        theme: 'dark',
+        flowchart: { htmlLabels: false },
+      });
+      const { svg } = await mermaid.render(diagramId, chart);
+      if (isCurrent) setResult({ svg, error: false });
+    }).catch(() => {
+      if (isCurrent) setResult({ svg: '', error: true });
+    });
+    return () => { isCurrent = false; };
+  }, [chart, diagramId]);
+
+  if (result.error) {
+    return (
+      <div className="mermaid-fallback" role="status">
+        <p>No se pudo dibujar este diagrama. Se muestra el código para que puedas revisarlo.</p>
+        <pre className="markdown-code"><code>{chart}</code></pre>
+      </div>
+    );
+  }
+  if (!result.svg) return <div className="mermaid-loading" role="status">Dibujando diagrama…</div>;
+  return <div className="mermaid-diagram" role="img" aria-label="Diagrama Mermaid" dangerouslySetInnerHTML={{ __html: result.svg }} />;
+}
+
 function renderMarkdownBlocks(content, preserveWhitespace = false) {
   const lines = content.replace(/\r\n?/g, '\n').split('\n');
   const blocks = [];
@@ -1363,7 +1398,12 @@ function renderMarkdownBlocks(content, preserveWhitespace = false) {
       index++;
       while (index < lines.length && !/^\s*```\s*$/.test(lines[index])) code.push(lines[index++]);
       if (index < lines.length) index++;
-      blocks.push(<pre className="markdown-code" key={`code-${index}`}><code>{code.join('\n')}</code></pre>);
+      const source = code.join('\n');
+      if (fence[1].trim().toLowerCase() === 'mermaid') {
+        blocks.push(<MermaidDiagram key={`mermaid-${index}`} chart={source} />);
+      } else {
+        blocks.push(<pre className="markdown-code" key={`code-${index}`}><code>{source}</code></pre>);
+      }
       continue;
     }
 
