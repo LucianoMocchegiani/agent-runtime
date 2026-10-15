@@ -18,16 +18,13 @@ export async function listConversations(
   archived: boolean,
   options: { limit: number; before?: { updatedAt: string; id: string } },
 ): Promise<ConversationDto[]> {
-  const memory = await createMemoryClient();
-  try {
-    return await memory.listConversations({
-      userId: principal.userId,
-      archived,
-      limit: options.limit,
-      ...(options.before ? { before: options.before } : {}),
-    });
-  } finally {
-  }
+  const memory = createMemoryClient();
+  return memory.listConversations({
+    userId: principal.userId,
+    archived,
+    limit: options.limit,
+    ...(options.before ? { before: options.before } : {}),
+  });
 }
 
 /**
@@ -38,29 +35,23 @@ export async function createConversation(
   title: string | null,
   agentProfileId: string,
 ): Promise<ConversationDto> {
-  const memory = await createMemoryClient();
-  try {
-    return await memory.createConversation({
-      userId: principal.userId,
-      title,
-      agentProfileId,
-    });
-  } finally {
-  }
+  const memory = createMemoryClient();
+  return memory.createConversation({
+    userId: principal.userId,
+    title,
+    agentProfileId,
+  });
 }
 
 export async function getConversation(
   principal: Principal,
   id: string,
 ): Promise<ConversationDto> {
-  const memory = await createMemoryClient();
-  try {
-    return await memory.getConversation({
-      id,
-      userId: principal.userId,
-    });
-  } finally {
-  }
+  const memory = createMemoryClient();
+  return memory.getConversation({
+    id,
+    userId: principal.userId,
+  });
 }
 
 export async function updateConversation(
@@ -68,15 +59,12 @@ export async function updateConversation(
   id: string,
   patch: UpdateConversationPatch,
 ): Promise<ConversationDto> {
-  const memory = await createMemoryClient();
-  try {
-    return await memory.updateConversation({
-      id,
-      userId: principal.userId,
-      patch,
-    });
-  } finally {
-  }
+  const memory = createMemoryClient();
+  return memory.updateConversation({
+    id,
+    userId: principal.userId,
+    patch,
+  });
 }
 
 /**
@@ -89,15 +77,12 @@ export async function applyAutomaticTitle(
   conversationId: string,
   userText: string,
 ): Promise<string | null> {
-  const memory = await createMemoryClient();
-  try {
-    return await memory.applyAutomaticTitle({
-      conversationId,
-      userId: principal.userId,
-      userText,
-    });
-  } finally {
-  }
+  const memory = createMemoryClient();
+  return memory.applyAutomaticTitle({
+    conversationId,
+    userId: principal.userId,
+    userText,
+  });
 }
 
 /**

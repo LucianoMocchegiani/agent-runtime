@@ -4,6 +4,7 @@ import type { AppEnv } from '../auth/principal.js';
 import { getAgentProfile, getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { requireConversationId } from './ids.js';
 import { decodeOptionalConversationCursor, encodeConversationCursor } from '../agent/conversation-cursor.js';
+import { readJsonBody } from '../http/request-body.js';
 import {
   archiveConversation,
   createConversation,
@@ -12,18 +13,6 @@ import {
   parseTitleInput,
   updateConversation,
 } from './service.js';
-
-async function readJsonBody(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
-  const text = await c.req.text();
-  if (!text.trim()) {
-    return {};
-  }
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new HTTPException(400, { message: 'Invalid JSON' });
-  }
-}
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -68,7 +57,7 @@ conversationRoutes.get('/', async (c) => {
 });
 
 conversationRoutes.post('/', async (c) => {
-  const body = asRecord(await readJsonBody(c));
+  const body = asRecord(await readJsonBody(c.req.raw));
   const title = parseTitleInput(body.title);
   let profileId: string;
   if (body.agentProfileId === undefined || body.agentProfileId === null) {
@@ -96,7 +85,7 @@ conversationRoutes.get('/:id', async (c) => {
 
 conversationRoutes.patch('/:id', async (c) => {
   const id = requireConversationId(c.req.param('id'));
-  const body = asRecord(await readJsonBody(c));
+  const body = asRecord(await readJsonBody(c.req.raw));
   const title = parseTitleInput(body.title);
   let agentProfileId: string | undefined;
   if (body.agentProfileId === null) {

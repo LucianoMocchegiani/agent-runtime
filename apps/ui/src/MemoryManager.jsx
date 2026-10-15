@@ -175,7 +175,6 @@ export default function MemoryManager({ onBack }) {
         <ul>
           <li>Las preferencias de esta pantalla se guardan para tu identidad de sesión o cuenta y pueden recuperarse para orientar respuestas cuando se cumple la condición indicada.</li>
           <li>Las conversaciones, sus mensajes y los resúmenes también persisten, pero se administran por separado. Borrar una preferencia no borra esos datos.</li>
-          <li>Los checkpoints de ejecución no están implementados. Esta pantalla permite administrar preferencias, no conversaciones ni resúmenes.</li>
         </ul>
       </section>
 

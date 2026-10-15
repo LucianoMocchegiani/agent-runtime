@@ -8,7 +8,7 @@ import { getConversation } from '../conversations/service.js';
 import { resolveModel } from '../llm/provider.js';
 import { acquireConversationTurn } from './turn-lock.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
-import { readJsonBody } from './request-body.js';
+import { readJsonBody } from '../http/request-body.js';
 import {
   MessageContainsUnstoredAttachmentError,
   MessageEditConflictError,

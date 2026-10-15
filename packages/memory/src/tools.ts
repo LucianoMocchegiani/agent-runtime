@@ -135,7 +135,6 @@ export async function getContext(
     summaryRevision: conversation.summaryRevision,
     summaryThroughMessageId: conversation.summaryThroughMessageId,
     summaryThroughCreatedAt: conversation.summaryThroughCreatedAt?.toISOString() ?? null,
-    checkpoint: null,
   };
 }
 

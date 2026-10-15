@@ -35,7 +35,6 @@ export type ConversationDto = {
 export type GetContextParams = {
   conversationId: string;
   userId: string;
-  task?: string;
 };
 
 export type GetContextResult = {
@@ -44,7 +43,6 @@ export type GetContextResult = {
   summaryRevision: number;
   summaryThroughMessageId: string | null;
   summaryThroughCreatedAt: string | null;
-  checkpoint: JsonValue | null;
   /** True si existen mensajes anteriores a la página devuelta. */
   hasMore: boolean;
 };

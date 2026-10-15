@@ -1,7 +1,18 @@
 import { HTTPException } from 'hono/http-exception';
 
+const DEFAULT_MAX_BYTES = 1_000_000;
+
+export type ReadJsonBodyOptions = {
+  /** If false, an empty body is rejected instead of treated as an empty object. */
+  allowEmpty?: boolean;
+};
+
 /** Lee JSON con un límite de bytes también aplicado a cuerpos sin Content-Length. */
-export async function readJsonBody(request: Request, maxBytes: number): Promise<unknown> {
+export async function readJsonBody(
+  request: Request,
+  maxBytes = DEFAULT_MAX_BYTES,
+  { allowEmpty = true }: ReadJsonBodyOptions = {},
+): Promise<unknown> {
   const contentLength = request.headers.get('content-length');
   if (contentLength && /^\d+$/.test(contentLength) && Number(contentLength) > maxBytes) {
     throw new HTTPException(413, { message: 'La solicitud supera el tamaño máximo permitido.' });
@@ -27,6 +38,11 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
     }
   }
 
+  if (totalBytes === 0) {
+    if (!allowEmpty) throw new HTTPException(400, { message: 'Body must be a JSON object' });
+    return {};
+  }
+
   const bytes = new Uint8Array(totalBytes);
   let offset = 0;
   for (const chunk of chunks) {
@@ -40,7 +56,10 @@ export async function readJsonBody(request: Request, maxBytes: number): Promise<
   } catch {
     throw new HTTPException(400, { message: 'Invalid JSON' });
   }
-  if (!text.trim()) return {};
+  if (!text.trim()) {
+    if (!allowEmpty) throw new HTTPException(400, { message: 'Body must be a JSON object' });
+    return {};
+  }
   try {
     return JSON.parse(text) as unknown;
   } catch {

@@ -32,13 +32,12 @@ Un turno es una ejecución temporal. No hay procesos reservados por hilo. El cam
 
 ## Concurrencia de turnos
 
-La API mantiene un bloqueo en memoria por combinación de usuario y conversación. Al iniciar un turno, reserva esa clave; mientras siga activa, otro `POST /v1/conversations/:id/messages` para el mismo usuario y conversación recibe HTTP `409`. Las conversaciones distintas pueden ejecutar turnos en paralelo. El bloqueo se libera al terminar o fallar el stream, o cuando se cancela la respuesta.
+La API coordina los turnos mediante leases compartidos en PostgreSQL, identificados por usuario y conversación. Mientras un lease siga vigente, otro `POST /v1/conversations/:id/messages` para la misma clave recibe HTTP `409`; conversaciones distintas pueden ejecutar turnos en paralelo. El lease se renueva durante el turno y se libera al terminar o cancelar el stream.
 
-Este mecanismo coordina únicamente solicitudes atendidas por **el mismo proceso de API**: el estado reside en un `Set` local y no se guarda en PostgreSQL ni en otro coordinador compartido. Con varias réplicas, cada proceso tendría su propio bloqueo y dos solicitudes para el mismo hilo podrían ser aceptadas por réplicas diferentes; por lo tanto, no se garantiza exclusión mutua ni se evita que sus escrituras de mensajes se entremezclen. Reiniciar el proceso también elimina los bloqueos en memoria; los turnos interrumpidos por el reinicio no se recuperan mediante este mecanismo.
+La coordinación es compartida entre réplicas. Si una instancia cae, el lease vence al dejar de renovarse; no se recupera automáticamente el trabajo interrumpido, pero una solicitud posterior puede adquirir la clave vencida. La instancia también aborta el turno si pierde la renovación, para reducir el riesgo de escrituras concurrentes.
 
-El despliegue actual de Compose usa una sola instancia de la API, que es el escenario cubierto por este bloqueo. Antes de escalar a varias réplicas, hay que sustituirlo o complementarlo con coordinación compartida —por ejemplo, un bloqueo/advisory lock de PostgreSQL con alcance por usuario y conversación— y definir el comportamiento ante caídas y expiración de bloqueos.
+Este mecanismo impide turnos simultáneos para una conversación; no distribuye el trabajo entre agentes ni reserva un proceso por conversación.
 
-Este bloqueo solo impide turnos duplicados en una conversación; no distribuye el trabajo entre agentes ni reserva un proceso por conversación.
 
 ## Persistencia y despliegue
 

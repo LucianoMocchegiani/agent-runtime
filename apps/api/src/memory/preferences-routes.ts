@@ -3,18 +3,9 @@ import { HTTPException } from 'hono/http-exception';
 import { deletePreference, listPreferences, savePreference } from 'agent-runtime-memory';
 import type { AppEnv } from '../auth/principal.js';
 import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './preference-cursor.js';
+import { readJsonBody } from '../http/request-body.js';
 
 export const preferenceRoutes = new Hono<AppEnv>();
-
-async function readBody(c: { req: { text: () => Promise<string> } }): Promise<unknown> {
-  const text = await c.req.text();
-  if (!text.trim()) throw new HTTPException(400, { message: 'Body must be a JSON object' });
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    throw new HTTPException(400, { message: 'Invalid JSON' });
-  }
-}
 
 function asRecord(value: unknown): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -64,7 +55,7 @@ preferenceRoutes.get('/', async (c) => {
 });
 
 preferenceRoutes.post('/', async (c) => {
-  const body = asRecord(await readBody(c));
+  const body = asRecord(await readJsonBody(c.req.raw, undefined, { allowEmpty: false }));
   let category: string | null | undefined;
   if (body.category !== undefined) {
     if (body.category !== null && typeof body.category !== 'string') {

@@ -36,3 +36,13 @@ test('rechaza JSON inválido y UTF-8 malformado como solicitudes 400', async () 
     error instanceof HTTPException && error.status === 400,
   );
 });
+
+test('permite cuerpo vacío por defecto y puede exigir JSON', async () => {
+  const empty = new Request('http://runtime.test/preferences', { method: 'POST' });
+  assert.deepEqual(await readJsonBody(empty), {});
+
+  const required = new Request('http://runtime.test/preferences', { method: 'POST' });
+  await assert.rejects(readJsonBody(required, undefined, { allowEmpty: false }), (error: unknown) =>
+    error instanceof HTTPException && error.status === 400,
+  );
+});

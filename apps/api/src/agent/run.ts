@@ -343,13 +343,7 @@ export async function streamAgentTurn(
     ? `${runtimeSettings.chatSystemPrompt}\n\nDelegaciones: solo usá delegate_to_conversation cuando el usuario haya pedido explícitamente delegar trabajo a otro hilo. Nunca elijas ni delegues tareas por iniciativa propia. No interpretes la mera disponibilidad de la herramienta como autorización.`
     : runtimeSettings.chatSystemPrompt;
 
-  let memory: MemoryService;
-  try {
-    memory = await createMemoryClient();
-  } catch (error) {
-    console.error(error);
-    throw new HTTPException(502, { message: failMessage });
-  }
+  const memory: MemoryService = createMemoryClient();
 
   let registry: McpRegistry;
   try {

@@ -137,14 +137,18 @@ export class ClientError extends Error {
 }
 
 export function createClient(config: ClientConfig) {
-  async function fetchConversationPage(
-    options: { archived?: boolean } & CursorPageOptions = {},
-  ): Promise<CursorPage<Conversation>> {
+  function cursorQuery(options: CursorPageOptions & { archived?: boolean } = {}): string {
     const query = new URLSearchParams();
     if (options.archived) query.set('archived', 'true');
     if (options.limit !== undefined) query.set('limit', String(options.limit));
     if (options.cursor) query.set('cursor', options.cursor);
-    const suffix = query.size ? `?${query.toString()}` : '';
+    return query.size ? `?${query.toString()}` : '';
+  }
+
+  async function fetchConversationPage(
+    options: { archived?: boolean } & CursorPageOptions = {},
+  ): Promise<CursorPage<Conversation>> {
+    const suffix = cursorQuery(options);
     const res = await fetch(`${baseUrl(config)}/v1/conversations${suffix}`, {
       headers: headers(config, { Accept: 'application/json' }),
     });
@@ -154,16 +158,51 @@ export function createClient(config: ClientConfig) {
   }
 
   async function fetchPreferencePage(options: CursorPageOptions = {}): Promise<CursorPage<UserPreference>> {
-    const query = new URLSearchParams();
-    if (options.limit !== undefined) query.set('limit', String(options.limit));
-    if (options.cursor) query.set('cursor', options.cursor);
-    const suffix = query.size ? `?${query.toString()}` : '';
+    const suffix = cursorQuery(options);
     const res = await fetch(`${baseUrl(config)}/v1/preferences${suffix}`, {
       headers: headers(config, { Accept: 'application/json' }),
     });
     if (!res.ok) throw new ClientError(res.status, `No se pudieron cargar las preferencias (HTTP ${res.status}).`);
     const data = await json<CursorPage<UserPreference>>(res);
     return { items: data?.items ?? [], hasMore: data?.hasMore ?? false, nextCursor: data?.nextCursor ?? null };
+  }
+
+  async function streamTurn(
+    path: string,
+    body: Record<string, unknown>,
+    handlers: StreamHandlers,
+    signal?: AbortSignal,
+  ): Promise<'ok' | 'aborted'> {
+    try {
+      const res = await fetch(`${baseUrl(config)}${path}`, {
+        method: 'POST',
+        headers: headers(config, {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        }),
+        body: JSON.stringify(body),
+        signal,
+      });
+
+      if (!res.ok) {
+        const parsed = await json<unknown>(res);
+        const message = typeof parsed === 'object' && parsed !== null
+          ? (parsed as { error?: string; message?: string }).error
+            ?? (parsed as { error?: string; message?: string }).message
+            ?? `Error HTTP ${res.status}`
+          : `Error HTTP ${res.status}`;
+        throw new ClientError(res.status, message);
+      }
+      if (!res.body) throw new ClientError(502, 'El asistente no está disponible.');
+
+      await consumeUiMessageStream(res.body, handlers);
+      if (signal?.aborted) return 'aborted';
+      handlers.onFinish?.();
+      return 'ok';
+    } catch (error) {
+      if (isAbortError(error)) return 'aborted';
+      throw error;
+    }
   }
 
   return {
@@ -414,53 +453,16 @@ export function createClient(config: ClientConfig) {
         handlers: StreamHandlers = {},
         signal?: AbortSignal,
         options: SendOptions = {},
-      ): Promise<'ok' | 'aborted'> => {
-        try {
-          const res = await fetch(
-            `${baseUrl(config)}/v1/conversations/${conversationId}/messages`,
-            {
-              method: 'POST',
-              headers: headers(config, {
-                'Content-Type': 'application/json',
-                Accept: 'text/event-stream',
-              }),
-              body: JSON.stringify({
-                text,
-                ...(options.images?.length ? { images: options.images } : {}),
-                ...(!options.images?.length && options.image ? { image: options.image } : {}),
-              }),
-              signal,
-            },
-          );
-
-          if (!res.ok) {
-            const parsed = await json<unknown>(res);
-            const message =
-              typeof parsed === 'object' && parsed !== null
-                ? (parsed as { error?: string; message?: string }).error ??
-                  (parsed as { error?: string; message?: string }).message ??
-                  `Error HTTP ${res.status}`
-                : `Error HTTP ${res.status}`;
-            throw new ClientError(res.status, message);
-          }
-
-          if (!res.body) {
-            throw new ClientError(502, 'El asistente no está disponible.');
-          }
-
-          await consumeUiMessageStream(res.body, handlers);
-          if (signal?.aborted) {
-            return 'aborted';
-          }
-          handlers.onFinish?.();
-          return 'ok';
-        } catch (error) {
-          if (isAbortError(error)) {
-            return 'aborted';
-          }
-          throw error;
-        }
-      },
+      ): Promise<'ok' | 'aborted'> => streamTurn(
+        `/v1/conversations/${encodeURIComponent(conversationId)}/messages`,
+        {
+          text,
+          ...(options.images?.length ? { images: options.images } : {}),
+          ...(!options.images?.length && options.image ? { image: options.image } : {}),
+        },
+        handlers,
+        signal,
+      ),
 
       edit: async (
         conversationId: string,
@@ -469,40 +471,12 @@ export function createClient(config: ClientConfig) {
         expectedLaterMessages: number,
         handlers: StreamHandlers = {},
         signal?: AbortSignal,
-      ): Promise<'ok' | 'aborted'> => {
-        try {
-          const res = await fetch(
-            `${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/edit`,
-            {
-              method: 'POST',
-              headers: headers(config, {
-                'Content-Type': 'application/json',
-                Accept: 'text/event-stream',
-              }),
-              body: JSON.stringify({ text, expectedLaterMessages }),
-              signal,
-            },
-          );
-
-          if (!res.ok) {
-            const parsed = await json<unknown>(res);
-            const message = typeof parsed === 'object' && parsed !== null
-              ? (parsed as { error?: string; message?: string }).error
-                ?? (parsed as { error?: string; message?: string }).message
-                ?? `Error HTTP ${res.status}`
-              : `Error HTTP ${res.status}`;
-            throw new ClientError(res.status, message);
-          }
-          if (!res.body) throw new ClientError(502, 'El asistente no está disponible.');
-          await consumeUiMessageStream(res.body, handlers);
-          if (signal?.aborted) return 'aborted';
-          handlers.onFinish?.();
-          return 'ok';
-        } catch (error) {
-          if (isAbortError(error)) return 'aborted';
-          throw error;
-        }
-      },
+      ): Promise<'ok' | 'aborted'> => streamTurn(
+        `/v1/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/edit`,
+        { text, expectedLaterMessages },
+        handlers,
+        signal,
+      ),
     },
   };
 }
