@@ -3,8 +3,8 @@ import client from './client.js';
 import Icon from './Icon.jsx';
 import { MessageList, ThinkingIndicator } from './ChatMessages.jsx';
 import useConversationSettings from './useConversationSettings.js';
+import useChatAttachments, { MAX_IMAGES } from './useChatAttachments.js';
 
-const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
 const MESSAGE_PAGE_SIZE = 50;
 const BOTTOM_SCROLL_THRESHOLD = 2;
@@ -48,14 +48,23 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     startEditingTitle,
     cancelEditingTitle,
   } = useConversationSettings({ conversationId, onConversationUpdated, onError: setError });
+  const {
+    images,
+    pendingImageReads,
+    isAttachMenuOpen,
+    setIsAttachMenuOpen,
+    clearImages,
+    removeImage,
+    handlePaste,
+    handleFileSelection,
+    addLocalImagePreviews,
+    rememberLocalImagePreview,
+    imageFileInputRef,
+    attachmentMenuRef,
+  } = useChatAttachments({ setError });
   const [input, setInput] = useState('');
   const [editingMessage, setEditingMessage] = useState(null);
   const inputBeforeEditRef = useRef('');
-  const [images, setImages] = useState([]);
-  const [pendingImageReads, setPendingImageReads] = useState(0);
-  const [isAttachMenuOpen, setIsAttachMenuOpen] = useState(false);
-  const imagesRef = useRef([]);
-  const imageReadQueueRef = useRef(Promise.resolve());
   const [isLoading, setIsLoading] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
@@ -87,15 +96,12 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const voicePlaybackEnabledRef = useRef(false);
   const voiceSynthesisIdRef = useRef(0);
   const voiceTraceIdRef = useRef(null);
-  const imagePreviewsRef = useRef([]);
   const messageLoadRequestRef = useRef(0);
   const messagesRef = useRef([]);
   const hasMoreMessagesRef = useRef(false);
   const loadingOlderRef = useRef(false);
   const scrollRestoreRef = useRef(null);
   const messageInputRef = useRef(null);
-  const imageFileInputRef = useRef(null);
-  const attachmentMenuRef = useRef(null);
   messagesRef.current = messages;
   hasMoreMessagesRef.current = hasMoreMessages;
 
@@ -107,82 +113,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     textarea.style.height = `${Math.min(textarea.scrollHeight, Number.isFinite(maxHeight) ? maxHeight : textarea.scrollHeight)}px`;
     textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
   }, [input]);
-
-  useEffect(() => {
-    if (!isAttachMenuOpen) return;
-    function handlePointerDown(event) {
-      if (!attachmentMenuRef.current?.contains(event.target)) {
-        setIsAttachMenuOpen(false);
-      }
-    }
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') setIsAttachMenuOpen(false);
-    }
-    document.addEventListener('pointerdown', handlePointerDown);
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown);
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isAttachMenuOpen]);
-
-  function replaceImages(nextImages) {
-    const next = typeof nextImages === 'function' ? nextImages(imagesRef.current) : nextImages;
-    imagesRef.current = next;
-    setImages(next);
-  }
-
-  function handleImageFiles(files) {
-    if (!files?.length) return;
-    setError(null);
-    const supportedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-    const accepted = [];
-    for (const file of files) {
-      if (!supportedTypes.includes(file.type)) {
-        setError('Formato no compatible. Adjuntá imágenes JPEG, PNG, WebP o GIF.');
-        continue;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        setError(`La imagen ${file.name || ''} supera el límite de 5 MB.`.trim());
-        continue;
-      }
-      accepted.push(file);
-    }
-    if (!accepted.length) return;
-
-    setPendingImageReads(count => count + 1);
-    const task = imageReadQueueRef.current.then(async () => {
-      const remaining = Math.max(0, MAX_IMAGES - imagesRef.current.length);
-      if (remaining === 0) {
-        setError(`Podés adjuntar hasta ${MAX_IMAGES} imágenes por mensaje.`);
-        return;
-      }
-      if (accepted.length > remaining) {
-        setError(`Podés adjuntar hasta ${MAX_IMAGES} imágenes por mensaje; se agregaron las primeras ${remaining}.`);
-      }
-      const selected = accepted.slice(0, remaining);
-      const loaded = await Promise.all(selected.map(async file => ({
-        dataUrl: await fileAsDataUrl(file),
-        name: file.name || 'Imagen pegada',
-      })));
-      replaceImages(current => [...current, ...loaded]);
-    }).catch(() => {
-      setError('No se pudo leer una imagen. Probá con otro archivo.');
-    });
-    imageReadQueueRef.current = task;
-    void task.finally(() => setPendingImageReads(count => Math.max(0, count - 1)));
-  }
-
-  function handleInputPaste(e) {
-    if (isLoading || editingMessage) return;
-    const files = [...(e.clipboardData?.items ?? [])]
-      .filter(item => item.type.startsWith('image/'))
-      .map(item => item.getAsFile())
-      .filter(Boolean);
-    if (!files.length) return;
-    e.preventDefault();
-    void handleImageFiles(files);
-  }
 
   function handleInputChange(e) {
     setInput(e.target.value);
@@ -201,13 +131,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     setEditingMessage(null);
     setInput(inputBeforeEditRef.current);
     inputBeforeEditRef.current = '';
-  }
-
-  function handleImageSelection(e) {
-    const files = [...(e.target.files ?? [])];
-    e.target.value = '';
-    setIsAttachMenuOpen(false);
-    if (files.length) void handleImageFiles(files);
   }
 
   function handleInputKeyDown(e) {
@@ -233,17 +156,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     e.currentTarget.form?.requestSubmit();
   }
   
-  const addLocalImagePreviews = useCallback((items) => {
-    const previews = [...imagePreviewsRef.current];
-    return items.map(message => {
-      if (message.role !== 'user') return message;
-      const previewIndex = previews.findIndex(preview => preview.content === message.content);
-      if (previewIndex < 0) return message;
-      const [preview] = previews.splice(previewIndex, 1);
-      return { ...message, imageDataUrls: preview.dataUrls };
-    });
-  }, []);
-
   const loadMessages = useCallback(async ({ preserveHistory = false } = {}) => {
     const requestId = ++messageLoadRequestRef.current;
     if (!preserveHistory) {
@@ -428,7 +340,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       setEditingMessage(null);
       inputBeforeEditRef.current = '';
     }
-    replaceImages([]);
+    clearImages();
     setIsLoading(true);
     setActivity('thinking');
     setError(null);
@@ -436,7 +348,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     const userKey = `user-${Date.now()}`;
     const assistantKey = `assistant-${Date.now()}`;
     if (selectedImages.length) {
-      imagePreviewsRef.current.push({ content: persistedContent, dataUrls: selectedImages.map(image => image.dataUrl) });
+      rememberLocalImagePreview(persistedContent, selectedImages);
     }
     setMessages(prev => {
       const retained = editTarget
@@ -1065,7 +977,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
                   <span className="attachment-name" title={image.name}>{image.name}</span>
                   <small>No se guardará en el historial</small>
                 </div>
-                <button type="button" onClick={() => replaceImages(current => current.filter((_, imageIndex) => imageIndex !== index))} disabled={isLoading} aria-label={`Quitar ${image.name}`} title="Quitar imagen"><Icon name="close" /></button>
+                <button type="button" onClick={() => removeImage(index)} disabled={isLoading} aria-label={`Quitar ${image.name}`} title="Quitar imagen"><Icon name="close" /></button>
               </div>
             ))}
           </div>
@@ -1076,7 +988,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif"
           multiple
-          onChange={handleImageSelection}
+          onChange={handleFileSelection}
           tabIndex={-1}
           aria-hidden="true"
         />
@@ -1150,7 +1062,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
             className="message-input"
             value={input}
             onChange={handleInputChange}
-            onPaste={handleInputPaste}
+            onPaste={event => handlePaste(event, isLoading || Boolean(editingMessage))}
             onKeyDown={handleInputKeyDown}
             placeholder={editingMessage ? 'Editá el mensaje y reenviá...' : 'Escribí un mensaje...'}
             disabled={isLoading || isDelegatedActive || handsFreeMode}
@@ -1194,13 +1106,4 @@ function splitSpeechText(text, maxLength, firstChunkMaxLength = maxLength) {
   }
   if (remaining) chunks.push(remaining);
   return chunks;
-}
-
-function fileAsDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('Invalid image'));
-    reader.onerror = () => reject(reader.error ?? new Error('Could not read image'));
-    reader.readAsDataURL(file);
-  });
 }

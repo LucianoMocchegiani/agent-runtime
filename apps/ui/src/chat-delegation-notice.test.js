@@ -5,9 +5,20 @@ import test from 'node:test';
 const chatSource = await readFile(new URL('./Chat.jsx', import.meta.url), 'utf8');
 const chatMessagesSource = await readFile(new URL('./ChatMessages.jsx', import.meta.url), 'utf8');
 const conversationListSource = await readFile(new URL('./ConversationList.jsx', import.meta.url), 'utf8');
+const chatAttachmentsSource = await readFile(new URL('./useChatAttachments.js', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
+});
+
+test('la selección, lectura y retención de adjuntos de imagen quedan en su hook', () => {
+  assert.match(chatSource, /import useChatAttachments, \{ MAX_IMAGES \} from '\.\/useChatAttachments\.js'/);
+  assert.match(chatSource, /useChatAttachments\(\{ setError \}\)/);
+  assert.doesNotMatch(chatSource, /FileReader|imageReadQueueRef|imagePreviewsRef|SUPPORTED_IMAGE_TYPES/);
+  assert.match(chatAttachmentsSource, /function fileAsDataUrl/);
+  assert.match(chatAttachmentsSource, /handlePaste/);
+  assert.match(chatAttachmentsSource, /addLocalImagePreviews/);
+  assert.match(chatAttachmentsSource, /rememberLocalImagePreview/);
 });
 
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {
