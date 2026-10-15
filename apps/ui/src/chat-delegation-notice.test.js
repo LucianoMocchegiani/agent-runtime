@@ -8,6 +8,7 @@ const conversationListSource = await readFile(new URL('./ConversationList.jsx', 
 const chatAttachmentsSource = await readFile(new URL('./useChatAttachments.js', import.meta.url), 'utf8');
 const chatVoiceSource = await readFile(new URL('./useChatVoice.js', import.meta.url), 'utf8');
 const chatHistorySource = await readFile(new URL('./useChatHistory.js', import.meta.url), 'utf8');
+const chatTurnSource = await readFile(new URL('./useChatTurn.js', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
@@ -41,11 +42,22 @@ test('la carga, paginación y scroll del historial quedan en su hook', () => {
   assert.match(chatHistorySource, /retryHistoryLoad/);
 });
 
+test('el envío, el streaming y la cancelación del turno quedan en su hook', () => {
+  assert.match(chatSource, /import useChatTurn, \{ DELEGATION_ACTIVE_STATUSES \} from '\.\/useChatTurn\.js'/);
+  assert.match(chatSource, /useChatTurn\(\{[\s\S]*rememberLocalImagePreview,[\s\S]*voice,/);
+  assert.doesNotMatch(chatSource, /client\.messages\.(send|edit)|new AbortController\(|onTextDelta:/);
+  assert.match(chatTurnSource, /client\.messages\.send/);
+  assert.match(chatTurnSource, /client\.messages\.edit/);
+  assert.match(chatTurnSource, /onToolStart/);
+  assert.match(chatTurnSource, /function handleAbort/);
+  assert.match(chatTurnSource, /finishVoiceReply\(\)/);
+});
+
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {
   assert.match(chatSource, /import \{ MessageList, ThinkingIndicator \} from '\.\/ChatMessages\.jsx'/);
   assert.match(chatSource, /<MessageList messages=\{messages\}/);
   assert.doesNotMatch(chatSource, /formatToolOutput/);
-  assert.match(chatSource, /status: 'done', toolName: name, toolResult: output/);
+  assert.match(chatTurnSource, /status: 'done', toolName: name, toolResult: output/);
   assert.match(chatMessagesSource, /export function MessageList/);
   assert.match(chatMessagesSource, /function DelegationCard/);
   assert.match(chatMessagesSource, /delegation-events/);
