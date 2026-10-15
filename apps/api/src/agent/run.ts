@@ -1,14 +1,12 @@
-import { type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
 import { getRuntimeSettings, type AgentProfile } from '../runtime-config/store.js';
 import type { ResolvedModel } from '../llm/provider.js';
-import { McpRegistry } from '../mcp/registry.js';
 import { createMemoryClient } from '../memory/client.js';
 import type { MemoryService } from 'agent-runtime-memory-contract';
 import { prepareTurnContext, type IncomingImage } from './turn-context.js';
 import type { Principal } from '../auth/principal.js';
 import { delegationEncryptionEnabled } from '../delegations/payload.js';
-import { AgentToolNameConflictError, buildAgentTools } from './tools.js';
+import { prepareAgentTurnTools } from './turn-tools.js';
 import { streamPreparedAgentTurn } from './turn-stream.js';
 
 /**
@@ -38,34 +36,15 @@ export async function streamAgentTurn(
 
   const memory: MemoryService = createMemoryClient();
 
-  let registry: McpRegistry;
-  try {
-    registry = new McpRegistry(runtimeSettings.mcpConfig);
-    await registry.connect(accessToken, mcpTokens);
-  } catch (error) {
-    console.error(error);
-    throw new HTTPException(502, { message: failMessage });
-  }
-
-  let tools: Record<string, Tool>;
-  try {
-    const mcpTools = await registry.getAllTools() as Record<string, Tool>;
-    tools = buildAgentTools(mcpTools, {
-      memory,
-      principal,
-      conversationId,
-      accessToken,
-      mcpTokens,
-      delegationEnabled: delegationEncryptionEnabled(),
-    });
-  } catch (error) {
-    await registry.close().catch(() => undefined);
-    if (error instanceof AgentToolNameConflictError) {
-      throw new HTTPException(502, { message: failMessage });
-    }
-    console.error(error);
-    throw new HTTPException(502, { message: failMessage });
-  }
+  const { registry, tools } = await prepareAgentTurnTools({
+    mcpConfig: runtimeSettings.mcpConfig,
+    accessToken,
+    mcpTokens,
+    memory,
+    principal,
+    conversationId,
+    delegationEnabled: delegationEncryptionEnabled(),
+  });
 
   if (!options.userMessageAlreadySaved) {
     await memory.saveMessage({
