@@ -1,22 +1,13 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 import { MessageList, ThinkingIndicator } from './ChatMessages.jsx';
 import useConversationSettings from './useConversationSettings.js';
 import useChatAttachments, { MAX_IMAGES } from './useChatAttachments.js';
 import useChatVoice from './useChatVoice.js';
+import useChatHistory from './useChatHistory.js';
 
 const MAX_MESSAGE_CHARS = 100_000;
-const MESSAGE_PAGE_SIZE = 50;
-const BOTTOM_SCROLL_THRESHOLD = 2;
-
-function messageCursor(message) {
-  return message ? { createdAt: message.createdAt, id: message.id } : null;
-}
-
-function sortMessages(items) {
-  return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-}
 
 function compareMessageOrder(a, b) {
   return a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id);
@@ -32,7 +23,6 @@ function isMessageBefore(message, target) {
 
 const DELEGATION_ACTIVE_STATUSES = new Set(['queued', 'running']);
 export default function Chat({ conversationId, isVisible, delegationStatus, onOpenSidebar, onConversationUpdated, onActivityChange, onOpenConversation }) {
-  const [messages, setMessages] = useState([]);
   const [error, setError] = useState(null);
   const {
     conversationTitle,
@@ -63,6 +53,17 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     imageFileInputRef,
     attachmentMenuRef,
   } = useChatAttachments({ setError });
+  const {
+    messages,
+    setMessages,
+    loadMessages,
+    isLoadingOlder,
+    isHistoryStale,
+    setIsHistoryStale,
+    scrollContainerRef,
+    handleMessagesScroll,
+    retryHistoryLoad,
+  } = useChatHistory({ conversationId, isVisible, delegationStatus, addLocalImagePreviews, setError });
   const voice = useChatVoice({
     conversationId,
     isVisible,
@@ -79,21 +80,9 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const [editingMessage, setEditingMessage] = useState(null);
   const inputBeforeEditRef = useRef('');
   const [isLoading, setIsLoading] = useState(false);
-  const [hasMoreMessages, setHasMoreMessages] = useState(false);
-  const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [activity, setActivity] = useState('idle');
-  const [isHistoryStale, setIsHistoryStale] = useState(false);
-  const scrollContainerRef = useRef(null);
-  const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
-  const messageLoadRequestRef = useRef(0);
-  const messagesRef = useRef([]);
-  const hasMoreMessagesRef = useRef(false);
-  const loadingOlderRef = useRef(false);
-  const scrollRestoreRef = useRef(null);
   const messageInputRef = useRef(null);
-  messagesRef.current = messages;
-  hasMoreMessagesRef.current = hasMoreMessages;
 
   useEffect(() => {
     const textarea = messageInputRef.current;
@@ -146,73 +135,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     e.currentTarget.form?.requestSubmit();
   }
   
-  const loadMessages = useCallback(async ({ preserveHistory = false } = {}) => {
-    const requestId = ++messageLoadRequestRef.current;
-    if (!preserveHistory) {
-      setMessages([]);
-      setHasMoreMessages(false);
-      hasMoreMessagesRef.current = false;
-      loadingOlderRef.current = false;
-      setIsLoadingOlder(false);
-      shouldStickToBottomRef.current = true;
-      scrollRestoreRef.current = null;
-    }
-    try {
-      const page = await client.messages.list(conversationId, { limit: MESSAGE_PAGE_SIZE });
-      if (requestId !== messageLoadRequestRef.current) return;
-      const latestItems = addLocalImagePreviews(page.items);
-      if (preserveHistory) {
-        const retained = messagesRef.current.filter(message => !message.pending);
-        const merged = new Map([...retained, ...latestItems].map(message => [message.id, message]));
-        setMessages(sortMessages([...merged.values()]));
-        setHasMoreMessages(hasMoreMessagesRef.current || page.hasMore);
-      } else {
-        setMessages(latestItems);
-        setHasMoreMessages(page.hasMore);
-      }
-      hasMoreMessagesRef.current = preserveHistory
-        ? hasMoreMessagesRef.current || page.hasMore
-        : page.hasMore;
-      setIsHistoryStale(false);
-      return true;
-    } catch (e) {
-      if (requestId === messageLoadRequestRef.current) {
-        setIsHistoryStale(true);
-        setError(e.message);
-      }
-      return false;
-    }
-  }, [addLocalImagePreviews, conversationId]);
-
-  const loadOlderMessages = useCallback(async () => {
-    const currentMessages = messagesRef.current;
-    const before = messageCursor(currentMessages[0]);
-    if (!before || !hasMoreMessagesRef.current || loadingOlderRef.current) return;
-
-    const requestId = messageLoadRequestRef.current;
-    const container = scrollContainerRef.current;
-    const previousHeight = container?.scrollHeight ?? 0;
-    const previousTop = container?.scrollTop ?? 0;
-    loadingOlderRef.current = true;
-    setIsLoadingOlder(true);
-    try {
-      const page = await client.messages.list(conversationId, { limit: MESSAGE_PAGE_SIZE, before });
-      if (requestId !== messageLoadRequestRef.current) return;
-      const combined = new Map([...messagesRef.current, ...addLocalImagePreviews(page.items)].map(message => [message.id, message]));
-      scrollRestoreRef.current = { height: previousHeight, top: previousTop };
-      setMessages(sortMessages([...combined.values()]));
-      setHasMoreMessages(page.hasMore);
-      hasMoreMessagesRef.current = page.hasMore;
-    } catch (e) {
-      if (requestId === messageLoadRequestRef.current) setError(e.message);
-    } finally {
-      if (requestId === messageLoadRequestRef.current) {
-        loadingOlderRef.current = false;
-        setIsLoadingOlder(false);
-      }
-    }
-  }, [addLocalImagePreviews, conversationId]);
-
   useEffect(() => {
     setEditingMessage(null);
     setInput('');
@@ -220,41 +142,10 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   }, [conversationId]);
 
   useEffect(() => {
-    loadMessages();
-  }, [loadMessages]);
-
-  useEffect(() => {
-    if (!delegationStatus || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
-    void loadMessages({ preserveHistory: true });
-  }, [delegationStatus, loadMessages]);
-
-  useEffect(() => {
     onActivityChange?.(conversationId, isLoading ? activity : null);
   }, [activity, conversationId, isLoading, onActivityChange]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
-
-  useEffect(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !isVisible) return;
-    if (scrollRestoreRef.current) {
-      const { height, top } = scrollRestoreRef.current;
-      container.scrollTop = top + (container.scrollHeight - height);
-      scrollRestoreRef.current = null;
-      shouldStickToBottomRef.current = false;
-    } else if (shouldStickToBottomRef.current) {
-      container.scrollTop = container.scrollHeight;
-    }
-  }, [isVisible, messages]);
-
-  function handleMessagesScroll() {
-    const container = scrollContainerRef.current;
-    if (!container) return;
-    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
-    // Solo retomamos el seguimiento cuando el usuario vuelve realmente al final.
-    shouldStickToBottomRef.current = distanceFromBottom <= BOTTOM_SCROLL_THRESHOLD;
-    if (container.scrollTop <= 100) void loadOlderMessages();
-  }
 
   async function handleSubmit(e, submittedText, fromVoice = false) {
     e?.preventDefault();
@@ -440,14 +331,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         : message
     ));
     abortRef.current?.abort();
-  }
-
-  async function retryHistoryLoad() {
-    const loaded = await loadMessages({ preserveHistory: true });
-    if (loaded) {
-      setIsHistoryStale(false);
-      setError(null);
-    }
   }
 
   const isDelegatedActive = DELEGATION_ACTIVE_STATUSES.has(delegationStatus);

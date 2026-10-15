@@ -7,6 +7,7 @@ const chatMessagesSource = await readFile(new URL('./ChatMessages.jsx', import.m
 const conversationListSource = await readFile(new URL('./ConversationList.jsx', import.meta.url), 'utf8');
 const chatAttachmentsSource = await readFile(new URL('./useChatAttachments.js', import.meta.url), 'utf8');
 const chatVoiceSource = await readFile(new URL('./useChatVoice.js', import.meta.url), 'utf8');
+const chatHistorySource = await readFile(new URL('./useChatHistory.js', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
@@ -29,6 +30,15 @@ test('la captura, síntesis y reproducción de voz quedan en su hook', () => {
   assert.match(chatVoiceSource, /navigator\.mediaDevices\?\.getUserMedia/);
   assert.match(chatVoiceSource, /client\.voice\.synthesize/);
   assert.match(chatVoiceSource, /function handleCancelVoice/);
+});
+
+test('la carga, paginación y scroll del historial quedan en su hook', () => {
+  assert.match(chatSource, /import useChatHistory from '\.\/useChatHistory\.js'/);
+  assert.match(chatSource, /useChatHistory\(\{ conversationId, isVisible, delegationStatus, addLocalImagePreviews, setError \}\)/);
+  assert.doesNotMatch(chatSource, /messageLoadRequestRef|loadOlderMessages|scrollRestoreRef|MESSAGE_PAGE_SIZE/);
+  assert.match(chatHistorySource, /client\.messages\.list\(conversationId, \{ limit: MESSAGE_PAGE_SIZE, before \}\)/);
+  assert.match(chatHistorySource, /container\.scrollTop = top \+ \(container\.scrollHeight - height\)/);
+  assert.match(chatHistorySource, /retryHistoryLoad/);
 });
 
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {
