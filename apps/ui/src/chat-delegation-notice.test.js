@@ -6,6 +6,7 @@ const chatSource = await readFile(new URL('./Chat.jsx', import.meta.url), 'utf8'
 const chatMessagesSource = await readFile(new URL('./ChatMessages.jsx', import.meta.url), 'utf8');
 const conversationListSource = await readFile(new URL('./ConversationList.jsx', import.meta.url), 'utf8');
 const chatAttachmentsSource = await readFile(new URL('./useChatAttachments.js', import.meta.url), 'utf8');
+const chatVoiceSource = await readFile(new URL('./useChatVoice.js', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
@@ -19,6 +20,15 @@ test('la selección, lectura y retención de adjuntos de imagen quedan en su hoo
   assert.match(chatAttachmentsSource, /handlePaste/);
   assert.match(chatAttachmentsSource, /addLocalImagePreviews/);
   assert.match(chatAttachmentsSource, /rememberLocalImagePreview/);
+});
+
+test('la captura, síntesis y reproducción de voz quedan en su hook', () => {
+  assert.match(chatSource, /import useChatVoice from '\.\/useChatVoice\.js'/);
+  assert.match(chatSource, /useChatVoice\(\{[\s\S]*onSubmitTranscript:/);
+  assert.doesNotMatch(chatSource, /RTCPeerConnection|createRealtimeToken|voiceSynthesisQueueRef|new Audio\(/);
+  assert.match(chatVoiceSource, /navigator\.mediaDevices\?\.getUserMedia/);
+  assert.match(chatVoiceSource, /client\.voice\.synthesize/);
+  assert.match(chatVoiceSource, /function handleCancelVoice/);
 });
 
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {

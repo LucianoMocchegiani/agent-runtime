@@ -4,6 +4,7 @@ import Icon from './Icon.jsx';
 import { MessageList, ThinkingIndicator } from './ChatMessages.jsx';
 import useConversationSettings from './useConversationSettings.js';
 import useChatAttachments, { MAX_IMAGES } from './useChatAttachments.js';
+import useChatVoice from './useChatVoice.js';
 
 const MAX_MESSAGE_CHARS = 100_000;
 const MESSAGE_PAGE_SIZE = 50;
@@ -62,6 +63,18 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     imageFileInputRef,
     attachmentMenuRef,
   } = useChatAttachments({ setError });
+  const voice = useChatVoice({
+    conversationId,
+    isVisible,
+    onError: setError,
+    onSubmitTranscript: text => handleSubmit(null, text, true),
+  });
+  const {
+    voiceState, voiceAvailable, handsFreeMode, handsFreeStatus, voiceAudioUrl,
+    isPreparingVoice, isPlayingVoice, isHandsFreeMode, stopVoicePlayback,
+    enqueueVoiceSpeech, finishVoiceReply, restartHandsFreeCapture,
+    toggleHandsFree, handleVoiceButton, handleReplayVoice, handleCancelVoice,
+  } = voice;
   const [input, setInput] = useState('');
   const [editingMessage, setEditingMessage] = useState(null);
   const inputBeforeEditRef = useRef('');
@@ -69,33 +82,10 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const [hasMoreMessages, setHasMoreMessages] = useState(false);
   const [isLoadingOlder, setIsLoadingOlder] = useState(false);
   const [activity, setActivity] = useState('idle');
-  const [voiceState, setVoiceState] = useState('idle');
-  const [voiceAvailable, setVoiceAvailable] = useState(false);
-  const [handsFreeMode, setHandsFreeMode] = useState(false);
-  const [handsFreeStatus, setHandsFreeStatus] = useState('off');
-  const [voiceAudioUrl, setVoiceAudioUrl] = useState(null);
-  const [isPreparingVoice, setIsPreparingVoice] = useState(false);
-  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
   const [isHistoryStale, setIsHistoryStale] = useState(false);
   const scrollContainerRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
   const abortRef = useRef(null);
-  const voiceSessionRef = useRef(null);
-  const handsFreeModeRef = useRef(false);
-  const handsFreeRestartRef = useRef(false);
-  const speechSynthesisFinishedRef = useRef(false);
-  const voiceSynthesisPendingRef = useRef(0);
-  const voiceSynthesisQueueRef = useRef(Promise.resolve());
-  const voiceSpeechPipelineRef = useRef(false);
-  const voiceStartIdRef = useRef(0);
-  const voiceTranscriptRef = useRef([]);
-  const voiceAudioRef = useRef(null);
-  const voiceAudioUrlRef = useRef(null);
-  const voiceAudioUrlsRef = useRef([]);
-  const voicePlaybackIndexRef = useRef(0);
-  const voicePlaybackEnabledRef = useRef(false);
-  const voiceSynthesisIdRef = useRef(0);
-  const voiceTraceIdRef = useRef(null);
   const messageLoadRequestRef = useRef(0);
   const messagesRef = useRef([]);
   const hasMoreMessagesRef = useRef(false);
@@ -234,15 +224,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   }, [loadMessages]);
 
   useEffect(() => {
-    let active = true;
-    setVoiceAvailable(false);
-    client.voice.status(conversationId)
-      .then(status => { if (active) setVoiceAvailable(status.available); })
-      .catch(() => { if (active) setVoiceAvailable(false); });
-    return () => { active = false; };
-  }, [conversationId]);
-
-  useEffect(() => {
     if (!delegationStatus || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
     void loadMessages({ preserveHistory: true });
   }, [delegationStatus, loadMessages]);
@@ -251,37 +232,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     onActivityChange?.(conversationId, isLoading ? activity : null);
   }, [activity, conversationId, isLoading, onActivityChange]);
 
-  useEffect(() => {
-    if (isVisible) return;
-    handsFreeModeRef.current = false;
-    setHandsFreeMode(false);
-    setHandsFreeStatus('off');
-    stopVoiceCapture(false);
-    stopVoicePlayback({ discard: true });
-  }, [isVisible]);
-
-  useEffect(() => {
-    handsFreeModeRef.current = false;
-    setHandsFreeMode(false);
-    setHandsFreeStatus('off');
-    stopVoiceCapture(false);
-    stopVoicePlayback({ discard: true });
-  }, [conversationId]);
-
-  useEffect(() => () => {
-    abortRef.current?.abort();
-    voiceSynthesisIdRef.current++;
-    const session = voiceSessionRef.current;
-    if (session) {
-      window.clearTimeout(session.finishTimer);
-      window.clearTimeout(session.transcriptionTimer);
-      session.channel.close();
-      session.pc.close();
-      session.stream.getTracks().forEach(track => track.stop());
-    }
-    voiceAudioRef.current?.pause();
-    voiceAudioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-  }, []);
+  useEffect(() => () => abortRef.current?.abort(), []);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -447,9 +398,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
           }
           // La síntesis de los segmentos ya enviados sigue en segundo plano. La
           // captura manos libres se reanuda solo cuando se reproduzcan todos.
-          speechSynthesisFinishedRef.current = true;
-          willSpeakVoiceReply = handsFreeModeRef.current;
-          if (voiceSynthesisPendingRef.current === 0) completeHandsFreeSpeechIfReady();
+          willSpeakVoiceReply = finishVoiceReply();
         } else if (fromVoice) {
           console.warn('[voice-debug] no-assistant-text', JSON.stringify({ traceId: voiceTraceId, result }));
         }
@@ -478,396 +427,10 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       abortRef.current = null;
       setIsLoading(false);
       setActivity('idle');
-      if (fromVoice && handsFreeModeRef.current && !willSpeakVoiceReply) {
+      if (fromVoice && isHandsFreeMode() && !willSpeakVoiceReply) {
         void restartHandsFreeCapture();
       }
     }
-  }
-
-  function stopVoicePlayback({ discard = false } = {}) {
-    voicePlaybackEnabledRef.current = false;
-    const audio = voiceAudioRef.current;
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-      voiceAudioRef.current = null;
-    }
-    setIsPlayingVoice(false);
-    if (discard) {
-      // Invalida cualquier síntesis anterior que todavía esté en vuelo.
-      voiceSynthesisIdRef.current++;
-      voiceSynthesisPendingRef.current = 0;
-      voiceSpeechPipelineRef.current = false;
-      voicePlaybackIndexRef.current = 0;
-      voiceAudioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
-      voiceAudioUrlsRef.current = [];
-      voiceAudioUrlRef.current = null;
-      setVoiceAudioUrl(null);
-      setIsPreparingVoice(false);
-    }
-  }
-
-  function completeHandsFreeSpeechIfReady() {
-    if (!speechSynthesisFinishedRef.current || voiceSynthesisPendingRef.current > 0) return;
-    if (voiceAudioRef.current || voicePlaybackIndexRef.current < voiceAudioUrlsRef.current.length) return;
-    setIsPlayingVoice(false);
-    voiceSpeechPipelineRef.current = false;
-    if (handsFreeModeRef.current) void restartHandsFreeCapture();
-  }
-
-  function enqueueVoiceSpeech(rawText, turnTraceId, turnStartedAt) {
-    const traceId = turnTraceId || (globalThis.crypto?.randomUUID?.() ?? `voice-${Date.now()}-${Math.random().toString(16).slice(2)}`);
-    const text = rawText
-      .replace(/```[\s\S]*?```/g, ' fragmento de código omitido ')
-      .replace(/!?\[([^\]]+)\]\([^)]+\)/g, '$1')
-      .replace(/[`*_>#~]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!text) return;
-
-    if (!voiceSpeechPipelineRef.current) {
-      stopVoicePlayback({ discard: true });
-      speechSynthesisFinishedRef.current = false;
-      voiceSynthesisPendingRef.current = 0;
-      voiceSynthesisQueueRef.current = Promise.resolve();
-      voiceSpeechPipelineRef.current = true;
-      voiceTraceIdRef.current = traceId;
-      voicePlaybackEnabledRef.current = true;
-      voicePlaybackIndexRef.current = 0;
-      if (handsFreeModeRef.current) setHandsFreeStatus('processing');
-    }
-
-    const replyReadyAt = Date.now();
-    const chunks = splitSpeechText(text, 600, 220);
-    console.info('[voice-debug] reply-segment-ready', JSON.stringify({
-      traceId, textChars: text.length, chunkCount: chunks.length,
-      msFromTurnSubmit: turnStartedAt ? Date.now() - turnStartedAt : null,
-    }));
-    const synthesisId = voiceSynthesisIdRef.current;
-    voiceSynthesisPendingRef.current++;
-    setIsPreparingVoice(true);
-
-    const synthesizeSegment = async () => {
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        if (synthesisId !== voiceSynthesisIdRef.current) return;
-        const chunk = chunks[chunkIndex];
-        const requestStartedAt = Date.now();
-        console.info('[voice-debug] synthesis-start', JSON.stringify({
-          traceId, chunkIndex: chunkIndex + 1, chunkCount: chunks.length, textChars: chunk.length,
-        }));
-        const slowRequestTimer = window.setTimeout(() => {
-          console.warn('[voice-debug] synthesis-still-pending', JSON.stringify({
-            traceId, chunkIndex: chunkIndex + 1, elapsedMs: Date.now() - requestStartedAt,
-          }));
-        }, 10_000);
-        try {
-          const blob = await client.voice.synthesize(conversationId, chunk, traceId);
-          window.clearTimeout(slowRequestTimer);
-          const synthesisMs = Date.now() - requestStartedAt;
-          console.info('[voice-debug] synthesis-ready', JSON.stringify({
-            traceId, chunkIndex: chunkIndex + 1, chunkCount: chunks.length,
-            synthesisMs, audioBytes: blob.size,
-          }));
-          if (synthesisId !== voiceSynthesisIdRef.current) {
-            console.info('[voice-debug] synthesis-discarded', JSON.stringify({ traceId, chunkIndex: chunkIndex + 1 }));
-            return;
-          }
-          const urls = voiceAudioUrlsRef.current;
-          const url = URL.createObjectURL(blob);
-          urls.push(url);
-          voiceAudioUrlsRef.current = urls;
-          if (urls.length === 1) {
-            voiceAudioUrlRef.current = url;
-            setVoiceAudioUrl(url);
-            console.info('[voice-debug] first-audio-ready', JSON.stringify({
-              traceId, msFromReplyReady: Date.now() - replyReadyAt,
-              msFromTurnSubmit: turnStartedAt ? Date.now() - turnStartedAt : null, audioBytes: blob.size,
-            }));
-          }
-          // Los segmentos se sintetizan en orden, pero la reproducción empieza
-          // en cuanto llega el primer clip, mientras la herramienta/turno continúa.
-          if (voicePlaybackEnabledRef.current && !voiceAudioRef.current && voicePlaybackIndexRef.current === urls.length - 1) {
-            playVoiceTrack(voicePlaybackIndexRef.current);
-          }
-        } catch (e) {
-          window.clearTimeout(slowRequestTimer);
-          console.error('[voice-debug] synthesis-failed', JSON.stringify({
-            traceId, chunkIndex: chunkIndex + 1, chunkCount: chunks.length,
-            synthesisMs: Date.now() - requestStartedAt, error: e?.message || String(e),
-          }));
-          if (synthesisId === voiceSynthesisIdRef.current) {
-            setError(`La respuesta quedó guardada, pero no se pudo generar el audio: ${e.message}`);
-          }
-          break;
-        }
-      }
-    };
-
-    voiceSynthesisQueueRef.current = voiceSynthesisQueueRef.current
-      .catch(() => {})
-      .then(synthesizeSegment)
-      .finally(() => {
-        if (synthesisId !== voiceSynthesisIdRef.current) return;
-        voiceSynthesisPendingRef.current = Math.max(0, voiceSynthesisPendingRef.current - 1);
-        if (voiceSynthesisPendingRef.current === 0) setIsPreparingVoice(false);
-        completeHandsFreeSpeechIfReady();
-      });
-  }
-
-  function playVoiceTrack(index) {
-    const urls = voiceAudioUrlsRef.current;
-    const traceId = voiceTraceIdRef.current;
-    if (!urls[index]) {
-      console.info('[voice-debug] playback-queue-empty', JSON.stringify({ traceId, chunkIndex: index + 1, readyChunks: urls.length }));
-      voiceAudioRef.current = null;
-      voicePlaybackIndexRef.current = index;
-      setIsPlayingVoice(false);
-      completeHandsFreeSpeechIfReady();
-      return;
-    }
-    voicePlaybackIndexRef.current = index;
-    console.info('[voice-debug] playback-start-request', JSON.stringify({ traceId, chunkIndex: index + 1, readyChunks: urls.length }));
-    const audio = new Audio(urls[index]);
-    voiceAudioRef.current = audio;
-    audio.onplaying = () => {
-      console.info('[voice-debug] playback-playing', JSON.stringify({ traceId, chunkIndex: index + 1 }));
-      if (handsFreeModeRef.current) setHandsFreeStatus('speaking');
-    };
-    audio.onwaiting = () => {
-      console.warn('[voice-debug] playback-waiting', JSON.stringify({ traceId, chunkIndex: index + 1, readyState: audio.readyState }));
-    };
-    audio.onstalled = () => {
-      console.warn('[voice-debug] playback-stalled', JSON.stringify({ traceId, chunkIndex: index + 1, readyState: audio.readyState, networkState: audio.networkState }));
-    };
-    audio.onended = () => {
-      console.info('[voice-debug] playback-ended', JSON.stringify({ traceId, chunkIndex: index + 1 }));
-      if (voiceAudioRef.current === audio) {
-        voiceAudioRef.current = null;
-        if (voicePlaybackEnabledRef.current) playVoiceTrack(index + 1);
-        else setIsPlayingVoice(false);
-      }
-    };
-    audio.onerror = () => {
-      console.error('[voice-debug] playback-error', JSON.stringify({
-        traceId, chunkIndex: index + 1, mediaErrorCode: audio.error?.code ?? null,
-        readyState: audio.readyState, networkState: audio.networkState,
-      }));
-      if (voiceAudioRef.current === audio) {
-        voiceAudioRef.current = null;
-        voicePlaybackEnabledRef.current = false;
-        voicePlaybackIndexRef.current = voiceAudioUrlsRef.current.length;
-        setIsPlayingVoice(false);
-        setError('No se pudo reproducir la respuesta de voz. Podés intentar reproducirla de nuevo.');
-        completeHandsFreeSpeechIfReady();
-      }
-    };
-    setIsPlayingVoice(true);
-    void audio.play().catch(e => {
-      console.error('[voice-debug] playback-rejected', JSON.stringify({
-        traceId, chunkIndex: index + 1, errorName: e?.name || null, error: e?.message || String(e),
-      }));
-      if (voiceAudioRef.current === audio) {
-        voiceAudioRef.current = null;
-        voicePlaybackEnabledRef.current = false;
-        voicePlaybackIndexRef.current = voiceAudioUrlsRef.current.length;
-        setIsPlayingVoice(false);
-        const message = e?.name === 'NotAllowedError'
-          ? 'El navegador bloqueó la reproducción automática. Tocá «Reproducir voz» para escuchar la respuesta.'
-          : `No se pudo iniciar la reproducción de voz: ${e.message}`;
-        setError(message);
-        completeHandsFreeSpeechIfReady();
-      }
-    });
-  }
-
-  function finishVoiceCapture(session, submitTranscript) {
-    if (session?.finished) return;
-    const continueHandsFree = Boolean(session?.handsFree && handsFreeModeRef.current);
-    if (session) {
-      session.finished = true;
-      window.clearTimeout(session.finishTimer);
-      window.clearTimeout(session.transcriptionTimer);
-      if (voiceSessionRef.current === session) voiceSessionRef.current = null;
-      session.channel.close();
-      session.pc.close();
-      session.stream.getTracks().forEach(track => track.stop());
-    }
-    setVoiceState('idle');
-    if (continueHandsFree) setHandsFreeStatus('processing');
-    const text = voiceTranscriptRef.current.join(' ').replace(/\s+/g, ' ').trim();
-    voiceTranscriptRef.current = [];
-    if (submitTranscript && text) void handleSubmit(null, text, true);
-    else if (submitTranscript && !continueHandsFree) setError(session?.errorMessage || 'No se reconoció voz. Probá de nuevo o escribí el mensaje.');
-    else if (continueHandsFree) void restartHandsFreeCapture();
-  }
-
-  function stopVoiceCapture(submitTranscript = true) {
-    voiceStartIdRef.current++;
-    const session = voiceSessionRef.current;
-    if (!session) {
-      voiceTranscriptRef.current = [];
-      setVoiceState('idle');
-      if (submitTranscript) setError('No se reconoció voz. Probá de nuevo o escribí el mensaje.');
-      return;
-    }
-    if (!submitTranscript) {
-      voiceTranscriptRef.current = [];
-      finishVoiceCapture(session, false);
-      return;
-    }
-    if (session.stopRequested) return;
-    // Detener la pista avisa al servidor que terminó el audio. Mantenemos el
-    // canal de eventos abierto para que llegue la transcripción final.
-    session.stopRequested = true;
-    setVoiceState('transcribing');
-    session.stream.getTracks().forEach(track => track.stop());
-    session.finishTimer = window.setTimeout(() => finishVoiceCapture(session, true), 5000);
-  }
-
-  function handleTranscriptionEvent(session, transcript) {
-    if (typeof transcript === 'string' && transcript.trim()) {
-      voiceTranscriptRef.current.push(transcript.trim());
-    }
-    if (session.handsFree && handsFreeModeRef.current) {
-      session.stopRequested = true;
-      session.stream.getTracks().forEach(track => track.stop());
-      finishVoiceCapture(session, true);
-    } else if (session.stopRequested) {
-      // Puede haber más de un segmento de transcripción en camino; dejamos que
-      // termine de llegar el lote antes de cerrar el canal.
-      window.clearTimeout(session.transcriptionTimer);
-      session.transcriptionTimer = window.setTimeout(() => finishVoiceCapture(session, true), 500);
-    }
-  }
-
-  function handleVoiceError(session, message) {
-    session.errorMessage = message || 'Falló el reconocimiento de voz.';
-    if (session.stopRequested) finishVoiceCapture(session, true);
-    else {
-      setError(session.errorMessage);
-      if (session.handsFree) disableHandsFree();
-    }
-  }
-
-  async function startVoiceCapture(handsFree = false) {
-    const startId = ++voiceStartIdRef.current;
-    let pendingStream = null;
-    setError(null);
-    stopVoicePlayback();
-    voiceTranscriptRef.current = [];
-    setVoiceState('connecting');
-    if (handsFree) setHandsFreeStatus('connecting');
-    try {
-      if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) {
-        throw new Error('Este navegador no admite captura de voz WebRTC.');
-      }
-      const token = await client.voice.createRealtimeToken(conversationId);
-      if (startId !== voiceStartIdRef.current) return;
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-      pendingStream = stream;
-      if (startId !== voiceStartIdRef.current) {
-        stream.getTracks().forEach(track => track.stop());
-        pendingStream = null;
-        return;
-      }
-      const pc = new RTCPeerConnection();
-      const channel = pc.createDataChannel('oai-events');
-      const session = { pc, channel, stream, handsFree, stopRequested: false, finished: false, finishTimer: null, transcriptionTimer: null };
-      pendingStream = null;
-      voiceSessionRef.current = session;
-      stream.getTracks().forEach(track => pc.addTrack(track, stream));
-      channel.onmessage = event => {
-        let message;
-        try { message = JSON.parse(event.data); } catch { return; }
-        if (message.type === 'input_audio_buffer.speech_stopped' && session.handsFree && !session.stopRequested) {
-          session.stopRequested = true;
-          setHandsFreeStatus('processing');
-          session.stream.getTracks().forEach(track => track.stop());
-          session.finishTimer = window.setTimeout(() => finishVoiceCapture(session, true), 5000);
-        } else if (message.type === 'conversation.item.input_audio_transcription.completed') {
-          handleTranscriptionEvent(session, message.transcript);
-        } else if (message.type === 'error') {
-          handleVoiceError(session, message.error?.message);
-        }
-      };
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === 'failed' && voiceSessionRef.current === session) {
-          setError('Se perdió la conexión de voz. Probá nuevamente.');
-          if (session.handsFree) disableHandsFree();
-          else stopVoiceCapture(false);
-        }
-      };
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      const answer = await fetch('https://api.openai.com/v1/realtime/calls', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/sdp' },
-        body: pc.localDescription?.sdp,
-      });
-      if (!answer.ok) throw new Error(`OpenAI rechazó la conexión de voz (HTTP ${answer.status}).`);
-      await pc.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
-      if (startId === voiceStartIdRef.current) {
-        setVoiceState('listening');
-        if (handsFree) setHandsFreeStatus('listening');
-      }
-    } catch (e) {
-      pendingStream?.getTracks().forEach(track => track.stop());
-      if (startId !== voiceStartIdRef.current) return;
-      if (handsFree) disableHandsFree();
-      else stopVoiceCapture(false);
-      setError(e.message || 'No se pudo iniciar el reconocimiento de voz.');
-    }
-  }
-
-  async function restartHandsFreeCapture() {
-    if (!handsFreeModeRef.current || handsFreeRestartRef.current) return;
-    handsFreeRestartRef.current = true;
-    try {
-      await startVoiceCapture(true);
-    } finally {
-      handsFreeRestartRef.current = false;
-    }
-  }
-
-  function disableHandsFree() {
-    handsFreeModeRef.current = false;
-    setHandsFreeMode(false);
-    setHandsFreeStatus('off');
-    if (voiceSessionRef.current) stopVoiceCapture(false);
-    else voiceStartIdRef.current++;
-    stopVoicePlayback({ discard: true });
-  }
-
-  function toggleHandsFree() {
-    if (handsFreeModeRef.current) {
-      disableHandsFree();
-      return;
-    }
-    if (isLoading || isDelegatedActive || editingMessage || voiceState !== 'idle') return;
-    handsFreeModeRef.current = true;
-    setHandsFreeMode(true);
-    setHandsFreeStatus('connecting');
-    void startVoiceCapture(true);
-  }
-
-  function handleVoiceButton() {
-    if (voiceState === 'transcribing') return;
-    if (voiceState === 'connecting') {
-      stopVoiceCapture(false);
-      setError(null);
-    } else if (voiceState === 'listening') {
-      stopVoiceCapture(true);
-    } else {
-      void startVoiceCapture();
-    }
-  }
-
-  function handleReplayVoice() {
-    if (!voiceAudioUrlsRef.current.length) return;
-    setError(null);
-    stopVoicePlayback();
-    voicePlaybackEnabledRef.current = true;
-    playVoiceTrack(0);
   }
 
   function handleAbort() {
@@ -996,7 +559,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
           <button
             type="button"
             className={`hands-free-button${handsFreeMode ? ' hands-free-active' : ''}`}
-            onClick={toggleHandsFree}
+            onClick={() => toggleHandsFree({ isLoading, isDelegatedActive, editingMessage })}
             disabled={!handsFreeMode && (isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState !== 'idle')}
             aria-pressed={handsFreeMode}
             title={handsFreeMode ? 'Salir del modo manos libres y apagar el micrófono' : 'Activar conversación por voz sin tener que apretar para hablar'}
@@ -1048,10 +611,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
           {voiceAvailable && !handsFreeMode && voiceState !== 'idle' && <button
             className="voice-cancel-button"
             type="button"
-            onClick={() => {
-              stopVoiceCapture(false);
-              setError(null);
-            }}
+            onClick={handleCancelVoice}
             title="Cancelar y descartar la grabación de voz"
             aria-label="Cancelar y descartar la grabación de voz"
           >
@@ -1087,23 +647,4 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       </form>
     </main>
   );
-}
-
-function splitSpeechText(text, maxLength, firstChunkMaxLength = maxLength) {
-  const chunks = [];
-  let remaining = text;
-  while (remaining.length > (chunks.length === 0 ? firstChunkMaxLength : maxLength)) {
-    const limit = chunks.length === 0 ? firstChunkMaxLength : maxLength;
-    let cut = remaining.lastIndexOf('. ', limit);
-    if (cut >= limit * 0.55) {
-      cut += 1;
-    } else {
-      cut = remaining.lastIndexOf(' ', limit);
-    }
-    if (cut <= 0) cut = limit;
-    chunks.push(remaining.slice(0, cut).trim());
-    remaining = remaining.slice(cut).trim();
-  }
-  if (remaining) chunks.push(remaining);
-  return chunks;
 }
