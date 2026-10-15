@@ -8,7 +8,6 @@ import {
   createMemoryClient,
 } from '../memory/client.js';
 import {
-  toJsonValue,
   type GetContextResult,
   type MemoryService,
   type MessageDto,
@@ -23,49 +22,11 @@ import { createConversation, getConversation } from '../conversations/service.js
 import { getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { decodeOptionalConversationCursor, encodeConversationCursor, type ConversationListScope } from './conversation-cursor.js';
 import { formatLlmRequestTrace } from './llm-trace.js';
+import { persistAgentTurn, type AgentTurnStep } from './turn-persistence.js';
 import { delegationEncryptionEnabled } from '../delegations/payload.js';
 import { enqueueDelegation, getDelegationForUser } from '../delegations/store.js';
 
 type IncomingImage = { data: Uint8Array; mediaType: string };
-
-type LooseTool = {
-  toolName?: string;
-  args?: unknown;
-  input?: unknown;
-  result?: unknown;
-  output?: unknown;
-};
-
-type LooseStep = {
-  text?: string;
-  toolCalls?: LooseTool[];
-  toolResults?: LooseTool[];
-};
-
-function toolNameOf(item: LooseTool, fallback = 'tool'): string {
-  return typeof item.toolName === 'string' && item.toolName.length > 0
-    ? item.toolName
-    : fallback;
-}
-
-function toolArgsOf(item: LooseTool): unknown {
-  return item.input ?? item.args;
-}
-
-function toolOutputOf(item: LooseTool): unknown {
-  return item.output ?? item.result;
-}
-
-function assistantTextOf(text: string | undefined, steps: LooseStep[]): string {
-  if (text && text.trim()) {
-    return text.trim();
-  }
-  return steps
-    .map((step) => (typeof step.text === 'string' ? step.text.trim() : ''))
-    .filter(Boolean)
-    .join('\n')
-    .trim();
-}
 
 function messagesAfterSummaryCursor(
   rows: MessageDto[],
@@ -137,57 +98,6 @@ async function compactOmittedMessages(
   } catch (error) {
     console.warn('No se pudo actualizar el resumen persistente de la conversación.', error);
     return context.summary;
-  }
-}
-
-async function persistAgentTurn(
-  memory: MemoryService,
-  conversationId: string,
-  userId: string,
-  text: string | undefined,
-  steps: LooseStep[],
-): Promise<void> {
-  let savedStepText = false;
-  for (const step of steps) {
-    const stepText = step.text?.trim();
-    if (stepText) {
-      await memory.saveMessage({
-        conversationId,
-        userId,
-        role: 'assistant',
-        content: stepText,
-      });
-      savedStepText = true;
-    }
-
-    const calls = step.toolCalls ?? [];
-    const results = step.toolResults ?? [];
-    const n = Math.max(calls.length, results.length);
-    for (let i = 0; i < n; i += 1) {
-      const call = calls[i] ?? {};
-      const result = results[i] ?? {};
-      const name = toolNameOf(result, toolNameOf(call));
-      const args = toolArgsOf(call) ?? toolArgsOf(result);
-      const output = toolOutputOf(result);
-      await memory.saveMessage({
-        conversationId,
-        userId,
-        role: 'tool',
-        toolName: name,
-        toolArgs: toJsonValue(args),
-        toolResult: toJsonValue(output),
-        content: shrinkToolContent(name, output, true),
-      });
-    }
-  }
-  const trimmed = text?.trim();
-  if (!savedStepText && trimmed) {
-    await memory.saveMessage({
-      conversationId,
-      userId,
-      role: 'assistant',
-      content: trimmed,
-    });
   }
 }
 
@@ -657,20 +567,20 @@ export async function streamAgentTurn(
   };
 
   let saved = false;
-  const acc: LooseStep[] = [];
+  const acc: AgentTurnStep[] = [];
   const saveOnce = async (text: string | undefined, steps: unknown) => {
     if (saved) {
       await closeAll();
       return;
     }
     saved = true;
-    const loose = Array.isArray(steps) ? (steps as LooseStep[]) : acc;
+    const loose = Array.isArray(steps) ? (steps as AgentTurnStep[]) : acc;
     try {
       await persistAgentTurn(
         memory,
         conversationId,
         principal.userId,
-        assistantTextOf(text, loose),
+        text,
         loose,
       );
     } catch (error) {
@@ -709,7 +619,7 @@ export async function streamAgentTurn(
         }
       },
       onStepFinish: (step) => {
-        acc.push(step as LooseStep);
+        acc.push(step as AgentTurnStep);
       },
       onFinish: async ({ text, steps, totalUsage, response }) => {
         logTurn('ok', {
@@ -722,7 +632,7 @@ export async function streamAgentTurn(
       },
       onAbort: async ({ steps }) => {
         logTurn('aborted', { steps: steps.length });
-        const fromEvent = Array.isArray(steps) ? (steps as LooseStep[]) : [];
+        const fromEvent = Array.isArray(steps) ? (steps as AgentTurnStep[]) : [];
         await saveOnce(undefined, fromEvent.length > 0 ? fromEvent : acc);
       },
       onError: async (event) => {
