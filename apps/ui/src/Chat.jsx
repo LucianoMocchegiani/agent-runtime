@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import client from './client.js';
 import Icon from './Icon.jsx';
 import { MessageList, ThinkingIndicator } from './ChatMessages.jsx';
+import useConversationSettings from './useConversationSettings.js';
 
 const MAX_IMAGES = 10;
 const MAX_MESSAGE_CHARS = 100_000;
@@ -31,13 +32,22 @@ function isMessageBefore(message, target) {
 const DELEGATION_ACTIVE_STATUSES = new Set(['queued', 'running']);
 export default function Chat({ conversationId, isVisible, delegationStatus, onOpenSidebar, onConversationUpdated, onActivityChange, onOpenConversation }) {
   const [messages, setMessages] = useState([]);
-  const [conversationTitle, setConversationTitle] = useState('');
-  const [agentProfileId, setAgentProfileId] = useState('');
-  const [agentProfiles, setAgentProfiles] = useState([]);
-  const [isChangingProfile, setIsChangingProfile] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [isSavingTitle, setIsSavingTitle] = useState(false);
+  const [error, setError] = useState(null);
+  const {
+    conversationTitle,
+    agentProfileId,
+    agentProfiles,
+    isChangingProfile,
+    titleDraft,
+    setTitleDraft,
+    isEditingTitle,
+    isSavingTitle,
+    refreshConversation,
+    changeAgentProfile,
+    saveConversationTitle,
+    startEditingTitle,
+    cancelEditingTitle,
+  } = useConversationSettings({ conversationId, onConversationUpdated, onError: setError });
   const [input, setInput] = useState('');
   const [editingMessage, setEditingMessage] = useState(null);
   const inputBeforeEditRef = useRef('');
@@ -57,7 +67,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const [voiceAudioUrl, setVoiceAudioUrl] = useState(null);
   const [isPreparingVoice, setIsPreparingVoice] = useState(false);
   const [isPlayingVoice, setIsPlayingVoice] = useState(false);
-  const [error, setError] = useState(null);
   const [isHistoryStale, setIsHistoryStale] = useState(false);
   const scrollContainerRef = useRef(null);
   const shouldStickToBottomRef = useRef(true);
@@ -303,23 +312,10 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   }, [addLocalImagePreviews, conversationId]);
 
   useEffect(() => {
-    let isCurrent = true;
-    setConversationTitle('');
-    setIsEditingTitle(false);
     setEditingMessage(null);
     setInput('');
     inputBeforeEditRef.current = '';
-    Promise.all([client.conversations.get(conversationId), client.agentProfiles.list()]).then(([conversation, profiles]) => {
-      if (!isCurrent) return;
-      setAgentProfiles(profiles);
-      setAgentProfileId(conversation.agentProfileId ?? '');
-      setConversationTitle(conversation.title ?? '');
-      onConversationUpdated?.(conversation);
-    }).catch(e => {
-      if (isCurrent) setError(e.message);
-    });
-    return () => { isCurrent = false; };
-  }, [conversationId, onConversationUpdated]);
+  }, [conversationId]);
 
   useEffect(() => {
     loadMessages();
@@ -532,10 +528,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         // Cerramos el turno del chat en cuanto termina el stream. La recarga del historial
         // y la síntesis de voz son tareas secundarias y no deben dejar «Respondiendo» activo.
         void loadMessages({ preserveHistory: true });
-        void client.conversations.get(conversationId).then(conversation => {
-          setConversationTitle(conversation.title ?? '');
-          onConversationUpdated?.(conversation);
-        }).catch(e => setError(e.message));
+        void refreshConversation().catch(e => setError(e.message));
         if (fromVoice && assistantResponseText.trim()) {
           if (assistantSpeechSegment.trim()) {
             void enqueueVoiceSpeech(assistantSpeechSegment, voiceTraceId, voiceTurnStartedAt);
@@ -577,50 +570,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         void restartHandsFreeCapture();
       }
     }
-  }
-
-  async function changeAgentProfile(event) {
-    const nextId = event.target.value;
-    if (!nextId || nextId === agentProfileId || isChangingProfile) return;
-    setIsChangingProfile(true);
-    setError(null);
-    try {
-      const conversation = await client.conversations.patch(conversationId, { agentProfileId: nextId });
-      setAgentProfileId(conversation.agentProfileId ?? '');
-      onConversationUpdated?.(conversation);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setIsChangingProfile(false);
-    }
-  }
-
-  async function saveConversationTitle(e) {
-    e.preventDefault();
-    if (isSavingTitle) return;
-    setIsSavingTitle(true);
-    setError(null);
-    try {
-      const conversation = await client.conversations.patch(conversationId, { title: titleDraft });
-      setConversationTitle(conversation.title ?? '');
-      setTitleDraft(conversation.title ?? '');
-      setIsEditingTitle(false);
-      onConversationUpdated?.(conversation);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setIsSavingTitle(false);
-    }
-  }
-
-  function startEditingTitle() {
-    setTitleDraft(conversationTitle);
-    setIsEditingTitle(true);
-  }
-
-  function cancelEditingTitle() {
-    setTitleDraft(conversationTitle);
-    setIsEditingTitle(false);
   }
 
   function stopVoicePlayback({ discard = false } = {}) {
