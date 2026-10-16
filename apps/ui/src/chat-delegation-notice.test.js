@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+const appSource = await readFile(new URL('./App.jsx', import.meta.url), 'utf8');
+const delegationTrackingSource = await readFile(new URL('./useDelegationTracking.js', import.meta.url), 'utf8');
 const chatSource = await readFile(new URL('./Chat.jsx', import.meta.url), 'utf8');
 const chatMessagesSource = await readFile(new URL('./ChatMessages.jsx', import.meta.url), 'utf8');
 const toolMessagesSource = await readFile(new URL('./ToolMessages.jsx', import.meta.url), 'utf8');
@@ -17,6 +19,16 @@ const chatHeaderSource = await readFile(new URL('./ChatHeader.jsx', import.meta.
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
+});
+
+test('la carga y el seguimiento SSE de delegaciones quedan en su hook', () => {
+  assert.match(appSource, /import useDelegationTracking from '\.\/useDelegationTracking\.js'/);
+  assert.match(appSource, /useDelegationTracking\(\)/);
+  assert.doesNotMatch(appSource, /client\.delegations\.(list|get|events)|new AbortController\(|activeDelegationIds/);
+  assert.match(delegationTrackingSource, /client\.delegations\.list\(\)/);
+  assert.match(delegationTrackingSource, /client\.delegations\.events/);
+  assert.match(delegationTrackingSource, /AbortController/);
+  assert.match(delegationTrackingSource, /refreshDelegations/);
 });
 
 test('la selección, lectura y retención de adjuntos de imagen quedan en su hook', () => {
