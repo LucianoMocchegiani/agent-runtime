@@ -1,24 +1,23 @@
 /** Punto de entrada público del SDK de agent-runtime. */
-export {
-  createClient,
-  consumeUiMessageStream,
-  ClientError,
-  isAbortError,
-} from './core.js';
+export { createClient, consumeUiMessageStream, ClientError, isAbortError } from './core.js';
 export type {
+  AgentProfileInfo,
   ClientConfig,
   Conversation,
   CursorPage,
   CursorPageOptions,
-  UserPreference,
-  SavePreferenceOptions,
+  Delegation,
+  DelegationEvent,
+  DelegationStatus,
   Message,
   MessageCursor,
-  MessagePage,
   MessageListOptions,
+  MessagePage,
   ModelInfo,
   ModelList,
+  SavePreferenceOptions,
   SendOptions,
   StreamHandlers,
+  UserPreference,
   ClientError as ClientErrorType,
 } from './core.js';

@@ -2,7 +2,7 @@
 
 Runtime para ejecutar agentes de IA con perfiles reutilizables, conversaciones persistentes y herramientas MCP. La aplicación de Runtime integra Memory dentro del mismo proceso: hay un solo servicio de aplicación y una base PostgreSQL persistente.
 
-Visión del producto: [`docs/vision/00-que-es.md`](./docs/vision/00-que-es.md). Diseño y módulos: [`docs/`](./docs/00-indice.md).
+Visión del producto: [`docs/vision/00-que-es.md`](./docs/vision/00-que-es.md). Diseño y módulos: [`docs/`](./docs/00-indice.md). Convenciones para contribuir: [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
 
 ## Componentes
 

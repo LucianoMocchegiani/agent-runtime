@@ -12,7 +12,6 @@ import {
   MessageNotEditableError,
   MessageContainsUnstoredAttachmentError,
   type CreateConversationParams,
-  type UpdateConversationPatch,
   type ListConversationsParams,
   type ListMessagesParams,
   type ListMessagesResult,

@@ -1,6 +1,6 @@
 # agent-runtime — documentación interna
 
-Setup y env: [`../README.md`](../README.md).
+Setup y env: [`../README.md`](../README.md). Convenciones de desarrollo: [`DEVELOPMENT.md`](./DEVELOPMENT.md).
 
 ## Visión — qué queremos que sea
 
