@@ -1,5 +1,5 @@
 import { jsonSchema, tool, type Tool } from 'ai';
-import { searchMemory } from '../../memory/search/service.js';
+import { searchMemory } from '../../memory-search/service.js';
 import {
   savePreference,
   listPreferences,

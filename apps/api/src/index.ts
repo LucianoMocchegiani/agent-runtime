@@ -2,7 +2,7 @@ import { serve } from '@hono/node-server';
 import { createApp } from './app.js';
 import { config } from './config.js';
 import { startRuntimeConfigStore } from './runtime-config/store.js';
-import { startEmbeddingWorker } from './memory/search/service.js';
+import { startEmbeddingWorker } from './memory-search/service.js';
 import { startDelegationWorker } from './delegations/worker.js';
 
 await startRuntimeConfigStore();

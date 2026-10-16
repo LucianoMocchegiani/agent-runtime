@@ -28,7 +28,7 @@ Memory conserva su propio dominio, contrato de tipos, Prisma y migraciones. Comp
 
 # 2. Memory como módulo interno
 
-La implementación de Memory forma parte de `apps/api`: búsqueda y contratos internos viven en `apps/api/src/memory/`, la persistencia está organizada por dominio y su schema Prisma y migraciones están en `apps/api/prisma/`. PostgreSQL es el servicio independiente que persiste los datos.
+La implementación de Memory forma parte de `apps/api`: la búsqueda semántica y sus contratos viven en `apps/api/src/memory-search/`, la persistencia está organizada por dominio y su schema Prisma y migraciones están en `apps/api/prisma/`. PostgreSQL es el servicio independiente que persiste los datos.
 
 ---
 

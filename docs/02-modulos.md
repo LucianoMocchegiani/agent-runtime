@@ -9,14 +9,14 @@ apps/api/
     ├── conversations/      rutas, servicios y persistencia de conversaciones
     ├── messages/           entrada HTTP y persistencia de mensajes
     ├── preferences/        rutas, cursores y persistencia de preferencias
-    ├── memory/             contratos internos y búsqueda semántica
+    ├── memory-search/      búsqueda semántica e indexación
     ├── db/                 cliente Prisma y preparación de la base
     ├── agent/              ejecución temporal de turnos
     ├── runtime-config/     configuración, perfiles y settings
     └── ...                 otros módulos de la API
 ```
 
-La persistencia se ubica con el dominio correspondiente. La búsqueda semántica y los contratos internos compartidos viven en `apps/api/src/memory/`; el schema y las migraciones están en `apps/api/prisma/`.
+La persistencia se ubica con el dominio correspondiente. La búsqueda semántica y sus contratos viven en `apps/api/src/memory-search/`; el schema y las migraciones están en `apps/api/prisma/`.
 
 ## API y ejecución
 
@@ -28,7 +28,7 @@ Los perfiles son propiedad de Runtime (`runtime.agent_profile_configs`). La conv
 
 ## Memory dentro de la API
 
-`conversations/persistence.ts`, `messages/persistence.ts` y `preferences/persistence.ts` agrupan las operaciones de datos con sus dominios. `memory/client.ts` reúne las operaciones que consume el agente mediante un contrato interno; no crea un cliente MCP ni realiza llamadas HTTP. `memory/search/` implementa la búsqueda semántica y el worker de indexación.
+`conversations/persistence.ts`, `messages/persistence.ts` y `preferences/persistence.ts` agrupan las operaciones de datos con sus dominios. `memory-search/` implementa la búsqueda semántica y el worker de indexación.
 
 Las embeddings se configuran en `runtime.config`; Runtime inyecta el valor directamente al módulo de búsqueda y arranca el worker dentro del proceso de la API. PostgreSQL puede tener esquemas distintos (`public` para los datos de la aplicación y `runtime` para configuración), en la misma base de datos.
 

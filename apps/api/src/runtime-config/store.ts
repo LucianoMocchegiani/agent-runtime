@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { config } from '../config.js';
-import { setEmbeddingConfig } from '../memory/search/service.js';
+import { setEmbeddingConfig } from '../memory-search/service.js';
 import { initializeNewChatDefaultProfile, seedDefaultAgentProfile, setAgentProfilePool } from './agent-profiles.js';
 import type { AgentProfile, EmbeddingConfig, RuntimeSettings } from './types.js';
 

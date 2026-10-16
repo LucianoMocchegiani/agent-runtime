@@ -1,4 +1,4 @@
-import { prisma } from '../../db/prisma.js';
+import { prisma } from '../db/prisma.js';
 import { EMBEDDING_VECTOR_DIMENSIONS } from './constants.js';
 import type {
   SearchDocument,

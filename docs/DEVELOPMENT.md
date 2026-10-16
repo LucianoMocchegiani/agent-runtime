@@ -20,7 +20,7 @@ docs/                       # Documentación del producto y de la implementació
 
 Es un monorepo npm workspaces. La API y la UI viven en `apps/`; el SDK compartido está en `packages/client`. Memory no es un workspace ni un servicio separado: su búsqueda y sus contratos internos forman parte de `apps/api`. MCP se utiliza para herramientas externas.
 
-Cada módulo mantiene sus contratos junto a su dominio (`conversations/contracts.ts`, `messages/contracts.ts`, `preferences/contracts.ts` y `memory/search/contracts.ts`). El agente importa las operaciones de persistencia que necesita directamente; no hay una fachada `MemoryService` que vuelva a agrupar dominios. Prisma, schema y migraciones pertenecen al workspace `apps/api`.
+Cada módulo mantiene sus contratos junto a su dominio (`conversations/contracts.ts`, `messages/contracts.ts`, `preferences/contracts.ts` y `memory-search/contracts.ts`). El agente importa las operaciones de persistencia que necesita directamente; no hay una fachada `MemoryService` que vuelva a agrupar dominios. Prisma, schema y migraciones pertenecen al workspace `apps/api`.
 
 ### Módulos de la API
 
@@ -38,7 +38,7 @@ src/
 ├── delegations/            # Rutas, almacenamiento, payload y worker de delegaciones
 ├── http/                   # Utilidades HTTP reutilizables, como lectura de requests
 ├── llm/                    # Proveedores y rutas de modelos
-├── memory/                 # Búsqueda semántica y contratos internos
+├── memory-search/          # Búsqueda semántica e indexación
 ├── messages/               # Entrada HTTP y persistencia de mensajes
 ├── preferences/            # Rutas, cursor HTTP y persistencia de preferencias
 ├── pagination/             # Utilidades de paginación compartidas
@@ -58,9 +58,9 @@ El árbol es orientativo: no hace falta que cada módulo tenga los mismos tipos 
 | Una ruta y el comportamiento HTTP de un dominio | El módulo de ese dominio, por ejemplo `conversations/`, `delegations/` o `runtime-config/` |
 | Reglas o coordinación propias del agente | `agent/`, en el submódulo responsable (`turn/`, `tools/` o `window/`) |
 | Un endpoint que recibe mensajes | `messages/`; mantené allí la entrada HTTP y delegá el trabajo del turno al módulo `agent/` cuando corresponda |
-| La integración con conversaciones, mensajes o preferencias | El módulo de dominio correspondiente; la búsqueda transversal vive en `memory/` |
+| La integración con conversaciones, mensajes o preferencias | El módulo de dominio correspondiente; la búsqueda transversal vive en `memory-search/` |
 | Un tipo usado solo por un módulo | Cerca de ese módulo |
-| Contrato de un dominio de la API | Junto al dominio que lo posee: `conversations/contracts.ts`, `messages/contracts.ts`, `preferences/contracts.ts` o `memory/search/contracts.ts` |
+| Contrato de un dominio de la API | Junto al dominio que lo posee: `conversations/contracts.ts`, `messages/contracts.ts`, `preferences/contracts.ts` o `memory-search/contracts.ts` |
 | Un comportamiento transversal de HTTP, autenticación o paginación | El módulo transversal existente (`http/`, `auth/`, `pagination/`); incorporá una abstracción solo si más de un consumidor la necesita |
 | Una pantalla o interacción de la UI | `apps/ui/src/`; el acceso a la API debe usar `packages/client` cuando aplique |
 | Cambios de schema o migraciones de persistencia | `apps/api/prisma/` |
@@ -127,4 +127,5 @@ npm run dev
 ```
 
 `npm run dev` prepara los paquetes y la base e inicia API y UI. Para configuración de entorno, Compose y despliegue, seguí las instrucciones del [README](../README.md).
+./README.md).
 ./README.md).

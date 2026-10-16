@@ -90,7 +90,7 @@ packages/
 └── client/              # SDK HTTP/stream para la UI y huéspedes
 ```
 
-Memory no es un servidor independiente ni un paquete: su búsqueda y contratos internos están en `apps/api/src/memory/`, y las operaciones de persistencia viven junto a conversaciones, mensajes y preferencias. Prisma y sus migraciones están en `apps/api/prisma/`. No hay un puerto ni un transporte MCP interno para Memory; MCP se reserva para herramientas externas.
+Memory no es un servidor independiente ni un paquete: la búsqueda semántica y sus contratos están en `apps/api/src/memory-search/`, y las operaciones de persistencia viven junto a conversaciones, mensajes y preferencias. Prisma y sus migraciones están en `apps/api/prisma/`. No hay un puerto ni un transporte MCP interno para Memory; MCP se reserva para herramientas externas.
 
 ## Desarrollo
 

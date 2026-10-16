@@ -1,5 +1,5 @@
 import { prisma } from '../db/prisma.js';
-import { EMBEDDING_VECTOR_DIMENSIONS } from '../memory/search/constants.js';
+import { EMBEDDING_VECTOR_DIMENSIONS } from '../memory-search/constants.js';
 import {
   PREFERENCE_LIST_DEFAULT_LIMIT,
   PREFERENCE_LIST_MAX_TAKE,
@@ -8,7 +8,7 @@ import {
   PREFERENCE_SEARCH_DEFAULT_LIMIT,
   PREFERENCE_SEARCH_MAX_LIMIT,
 } from './constants.js';
-import { embeddingProvider } from '../memory/search/service.js';
+import { embeddingProvider } from '../memory-search/service.js';
 import type {
   DeletePreferenceParams,
   ListPreferencesParams,
