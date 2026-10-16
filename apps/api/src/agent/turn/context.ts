@@ -4,7 +4,7 @@ import type {
   MemoryService,
   MessageDto,
   UserPreferenceDto,
-} from 'agent-runtime-memory-contract';
+} from 'agent-runtime-memory/contracts';
 import type { RuntimeSettings } from '../../runtime-config/store.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import {

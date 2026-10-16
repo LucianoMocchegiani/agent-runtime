@@ -13,13 +13,14 @@ apps/
 ├── ui/                     # UI React/Vite servida por la API
 packages/
 ├── client/                 # Cliente HTTP y de streaming
-├── memory/                 # Dominio Memory, Prisma y migraciones
-└── memory-contract/        # Contratos y DTOs de Memory
+└── memory/                 # Dominio, contratos, Prisma y migraciones de Memory
 
 docs/                       # Documentación del producto y de la implementación
 ```
 
 Es un monorepo npm workspaces. `apps/api` y `packages/memory` corren como partes de la misma aplicación; Memory no es un servicio separado. MCP se utiliza para herramientas externas.
+
+Los contratos internos entre la API y Memory viven por dominio en `packages/memory/src/contracts/`; `contracts.ts` los reexporta para conservar el subpath público `agent-runtime-memory/contracts`. Así quedan junto al módulo que los implementa, pero separados de la entrada que carga Prisma. La API ya depende de `agent-runtime-memory`, por lo que no hace falta un workspace adicional solo para compartir estos tipos y DTOs.
 
 ### Módulos de la API
 
@@ -36,9 +37,9 @@ src/
 ├── delegations/            # Rutas, almacenamiento, payload y worker de delegaciones
 ├── http/                   # Utilidades HTTP reutilizables, como lectura de requests
 ├── llm/                    # Proveedores y rutas de modelos
-├── memory/
-│   └── preferences/        # Adaptador de Memory y rutas/cursor de preferencias
+├── memory/                 # Adaptador hacia el módulo Memory
 ├── messages/               # Entrada HTTP de mensajes
+├── preferences/            # Rutas y cursor HTTP de preferencias
 ├── pagination/             # Utilidades de paginación compartidas
 ├── runtime-config/         # Configuración y administración de perfiles
 ├── voice/                  # Rutas y flujo de voz
@@ -125,3 +126,4 @@ npm run dev
 ```
 
 `npm run dev` prepara los paquetes y la base e inicia API y UI. Para configuración de entorno, Compose y despliegue, seguí las instrucciones del [README](../README.md).
+./README.md).

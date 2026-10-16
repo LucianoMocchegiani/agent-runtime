@@ -1,6 +1,6 @@
 import { type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import type { MemoryService } from 'agent-runtime-memory-contract';
+import type { MemoryService } from 'agent-runtime-memory/contracts';
 import type { Principal } from '../../auth/principal.js';
 import type { McpConfig } from '../../config.js';
 import { McpRegistry } from '../../mcp/registry.js';

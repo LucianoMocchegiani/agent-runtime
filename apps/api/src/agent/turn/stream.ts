@@ -1,6 +1,6 @@
 import { streamText, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import type { MemoryService } from 'agent-runtime-memory-contract';
+import type { MemoryService } from 'agent-runtime-memory/contracts';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { isAbortError, identifiedFacingLlmError } from '../../llm/errors.js';
 import type { McpRegistry } from '../../mcp/registry.js';

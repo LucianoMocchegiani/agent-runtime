@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { MemoryService, GetContextResult } from 'agent-runtime-memory-contract';
+import type { MemoryService, GetContextResult } from 'agent-runtime-memory/contracts';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { prepareTurnContext } from './context.js';
 

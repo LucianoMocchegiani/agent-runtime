@@ -16,7 +16,7 @@ import {
   searchPreferences,
   deletePreference,
 } from 'agent-runtime-memory';
-import type { MemoryService } from 'agent-runtime-memory-contract';
+import type { MemoryService } from 'agent-runtime-memory/contracts';
 
 /**
  * Adaptador del contrato Memory al módulo ejecutado dentro del mismo proceso.

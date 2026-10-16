@@ -15,7 +15,7 @@ import { agentProfileListRoutes } from './runtime-config/agent-profile-list-rout
 import { mountUi } from './ui.js';
 import { delegationRoutes } from './delegations/routes.js';
 import { voiceRoutes } from './voice/routes.js';
-import { preferenceRoutes } from './memory/preferences/routes.js';
+import { preferenceRoutes } from './preferences/routes.js';
 
 type DependencyStatus = 'up' | 'down';
 

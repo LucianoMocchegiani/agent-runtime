@@ -1,4 +1,5 @@
-import type { EmbeddingProvider, SearchHit, SearchIndex } from './contracts.js';
+import type { MemorySearchParams, MemorySearchResult } from '../contracts.js';
+import type { EmbeddingProvider, SearchHit, SearchIndex } from './ports.js';
 import { OpenAiCompatibleEmbeddingProvider } from './embedding-provider.js';
 import { PostgresSearchIndex } from './postgres-index.js';
 
@@ -15,20 +16,6 @@ function toEmbeddingInput(role: string, content: string): string {
   if (input.length <= MAX_EMBEDDING_INPUT_CHARS) return input;
   return `${input.slice(0, MAX_EMBEDDING_INPUT_CHARS - 20)} [truncated]`;
 }
-
-/** Parámetros de búsqueda expuestos por el módulo Memory. */
-export type SearchMemoryInput = {
-  userId: string;
-  query: string;
-  conversationId?: string;
-  limit?: number;
-};
-
-/** Resultados de búsqueda y modo de recuperación utilizado. */
-export type SearchMemoryOutput = {
-  mode: 'text' | 'hybrid';
-  items: SearchHit[];
-};
 
 export const searchIndex: SearchIndex = new PostgresSearchIndex();
 // Runtime owns embedding credentials and injects the saved value directly.
@@ -76,7 +63,7 @@ function fuseResults(textHits: SearchHit[], semanticHits: SearchHit[], limit: nu
 }
 
 /** Busca mensajes por texto y combina resultados semánticos cuando los embeddings están activos. */
-export async function searchMemory(input: SearchMemoryInput): Promise<SearchMemoryOutput> {
+export async function searchMemory(input: MemorySearchParams): Promise<MemorySearchResult> {
   const query = input.query.trim();
   if (!query) return { mode: 'text', items: [] };
   const limit = Math.max(1, Math.min(Math.floor(input.limit ?? 8), 20));

@@ -4,7 +4,7 @@ import type { Principal } from '../auth/principal.js';
 import type {
   ConversationDto,
   UpdateConversationPatch,
-} from 'agent-runtime-memory-contract';
+} from 'agent-runtime-memory/contracts';
 
 const TITLE_MAX = 200;
 

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Tool } from 'ai';
-import type { MemoryService } from 'agent-runtime-memory-contract';
+import type { MemoryService } from 'agent-runtime-memory/contracts';
 import type { Principal } from '../../auth/principal.js';
 import { AgentToolNameConflictError, buildAgentTools } from './index.js';
 

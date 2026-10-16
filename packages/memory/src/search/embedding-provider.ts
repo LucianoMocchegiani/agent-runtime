@@ -1,4 +1,4 @@
-import type { EmbeddingProvider } from './contracts.js';
+import type { EmbeddingProvider } from './ports.js';
 
 const EMBEDDING_DIMENSIONS = 1536;
 

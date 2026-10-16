@@ -6,7 +6,7 @@ import type {
   SavePreferenceParams,
   SearchPreferencesParams,
   UserPreferenceDto,
-} from 'agent-runtime-memory-contract';
+} from './contracts.js';
 
 const EMBEDDING_DIMENSIONS = 1536;
 const MIN_SEMANTIC_SCORE = 0.34;

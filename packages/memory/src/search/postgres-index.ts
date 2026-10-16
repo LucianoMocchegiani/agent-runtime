@@ -4,7 +4,7 @@ import type {
   SearchFilter,
   SearchHit,
   SearchIndex,
-} from './contracts.js';
+} from './ports.js';
 
 const EMBEDDING_DIMENSIONS = 1536;
 

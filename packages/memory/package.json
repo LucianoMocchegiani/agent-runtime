@@ -3,9 +3,18 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "exports": {
-    ".": "./dist/module.js"
+    ".": {
+      "types": "./dist/module.d.ts",
+      "import": "./dist/module.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
+    }
   },
   "scripts": {
     "build": "prisma generate && tsc",
@@ -21,7 +30,6 @@
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
-    "agent-runtime-memory-contract": "*",
     "pg": "^8.16.3",
     "prisma": "6.19.3"
   },

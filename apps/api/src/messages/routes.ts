@@ -13,7 +13,7 @@ import {
   MessageContainsUnstoredAttachmentError,
   MessageEditConflictError,
   MessageNotEditableError,
-} from 'agent-runtime-memory-contract';
+} from 'agent-runtime-memory';
 
 const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;

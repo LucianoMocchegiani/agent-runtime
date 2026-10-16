@@ -1,4 +1,5 @@
-import { toJsonValue, type MemoryService } from 'agent-runtime-memory-contract';
+import type { MemoryService } from 'agent-runtime-memory/contracts';
+import { toJsonValue } from './json.js';
 import { shrinkToolContent } from '../window/index.js';
 
 /** Forma normalizada de una llamada o resultado de herramienta del AI SDK. */

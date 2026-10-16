@@ -1,4 +1,4 @@
-import { decodeOptionalCursor, encodeCursor } from '../../pagination/cursor.js';
+import { decodeOptionalCursor, encodeCursor } from '../pagination/cursor.js';
 
 const PREFERENCE_SCOPE = 'preferences';
 

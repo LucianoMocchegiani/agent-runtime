@@ -2,7 +2,7 @@ import { HTTPException } from 'hono/http-exception';
 import { getRuntimeSettings, type AgentProfile } from '../../runtime-config/store.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { createMemoryClient } from '../../memory/client.js';
-import type { MemoryService } from 'agent-runtime-memory-contract';
+import type { MemoryService } from 'agent-runtime-memory/contracts';
 import { prepareTurnContext, type IncomingImage } from './context.js';
 import type { Principal } from '../../auth/principal.js';
 import { delegationEncryptionEnabled } from '../../delegations/payload.js';

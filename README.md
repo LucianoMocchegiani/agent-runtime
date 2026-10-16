@@ -88,8 +88,7 @@ apps/
 └── ui/                  # React/Vite, servida por API
 packages/
 ├── client/              # SDK HTTP/stream para la UI y huéspedes
-├── memory/              # workspace y entrada pública del módulo Memory
-└── memory-contract/     # tipos y DTOs internos de Memory
+└── memory/              # implementación, Prisma y contratos internos de Memory
 ```
 
 `packages/memory` es un workspace de código, no un servidor. Runtime llama al módulo directamente en el mismo proceso; no hay un servicio, puerto ni transporte MCP interno para Memory. MCP se reserva para herramientas externas.
