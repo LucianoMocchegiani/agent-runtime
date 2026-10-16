@@ -1,4 +1,12 @@
 import { Prisma } from '@prisma/client';
+import {
+  MESSAGE_CONTEXT_MAX_TAKE,
+  MESSAGE_LIST_DEFAULT_LIMIT,
+  MESSAGE_LIST_MAX_LIMIT,
+  MESSAGE_ROLE,
+  UNSAVED_IMAGE_NOTE,
+  UNSAVED_IMAGES_NOTE_SUFFIX,
+} from './constants.js';
 import { prisma } from '../db/prisma.js';
 import type {
   GetContextParams,
@@ -52,10 +60,6 @@ function toMessageDto(row: {
   };
 }
 
-const CONTEXT_MESSAGES_TAKE = 500;
-const DEFAULT_MESSAGES_TAKE = 50;
-const MAX_MESSAGES_TAKE = 100;
-
 /**
  * Carga el historial reciente y el estado del resumen tras verificar la propiedad del hilo.
  * @param params Identidad y conversación cuyo contexto se necesita.
@@ -79,12 +83,12 @@ export async function getContext(
     prisma.message.findMany({
       where: { conversationId },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
-      take: CONTEXT_MESSAGES_TAKE + 1,
+      take: MESSAGE_CONTEXT_MAX_TAKE + 1,
     }),
   ]);
   if (!conversation) throw new ConversationNotFoundError();
-  const hasMore = descendingRows.length > CONTEXT_MESSAGES_TAKE;
-  const rows = descendingRows.slice(0, CONTEXT_MESSAGES_TAKE).reverse();
+  const hasMore = descendingRows.length > MESSAGE_CONTEXT_MAX_TAKE;
+  const rows = descendingRows.slice(0, MESSAGE_CONTEXT_MAX_TAKE).reverse();
 
   return {
     messages: rows.map(toMessageDto),
@@ -159,9 +163,9 @@ export async function editMessageAndTruncate(
       where: { id: messageId, conversationId },
       select: { id: true, role: true, content: true, createdAt: true },
     });
-    if (!message || message.role !== 'user') throw new MessageNotEditableError();
-    if (message.content.includes('[Imagen adjunta; no almacenada]')
-      || message.content.includes('imágenes adjuntas; no almacenadas]')) {
+    if (!message || message.role !== MESSAGE_ROLE.USER) throw new MessageNotEditableError();
+    if (message.content.includes(UNSAVED_IMAGE_NOTE)
+      || message.content.includes(UNSAVED_IMAGES_NOTE_SUFFIX)) {
       throw new MessageContainsUnstoredAttachmentError();
     }
 
@@ -194,7 +198,7 @@ export async function editMessageAndTruncate(
       },
     });
     await tx.message.create({
-      data: { conversationId, role: 'user', content },
+      data: { conversationId, role: MESSAGE_ROLE.USER, content },
     });
     return { deletedLaterMessages: laterCount };
   });
@@ -207,8 +211,8 @@ export async function listMessages(
   const { conversationId, userId } = params;
   await assertConversationOwner(conversationId, userId);
 
-  const requestedLimit = Math.floor(params.limit ?? DEFAULT_MESSAGES_TAKE);
-  const limit = Math.max(1, Math.min(requestedLimit, MAX_MESSAGES_TAKE));
+  const requestedLimit = Math.floor(params.limit ?? MESSAGE_LIST_DEFAULT_LIMIT);
+  const limit = Math.max(1, Math.min(requestedLimit, MESSAGE_LIST_MAX_LIMIT));
   const beforeCreatedAt = params.before ? new Date(params.before.createdAt) : null;
   if (params.before && (!beforeCreatedAt || !Number.isFinite(beforeCreatedAt.getTime()))) {
     throw new Error('Invalid message cursor');

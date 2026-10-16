@@ -1,4 +1,17 @@
 import { Hono } from 'hono';
+import {
+  MESSAGE_BODY_MAX_BYTES,
+  MESSAGE_EDIT_BODY_MAX_BYTES,
+  MESSAGE_EDIT_MAX_LATER_MESSAGES,
+  MESSAGE_IMAGE_MAX_BYTES,
+  MESSAGE_LIST_DEFAULT_LIMIT,
+  MESSAGE_LIST_MAX_LIMIT,
+  MESSAGE_MAX_IMAGES,
+  MESSAGE_TEXT_MAX_LENGTH,
+  SUPPORTED_MESSAGE_IMAGE_TYPES,
+  UNSAVED_IMAGE_NOTE,
+  UNSAVED_IMAGES_NOTE_SUFFIX,
+} from './constants.js';
 import { HTTPException } from 'hono/http-exception';
 import { streamAgentTurn } from '../agent/turn/run.js';
 import type { AppEnv } from '../auth/principal.js';
@@ -14,14 +27,6 @@ import {
   MessageEditConflictError,
   MessageNotEditableError,
 } from './errors.js';
-
-const TEXT_MAX = 100_000;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const MAX_IMAGES = 10;
-// Hasta diez imágenes de 5 MiB codificadas en base64, más el JSON que las envuelve.
-const MAX_BODY_BYTES = 72_000_000;
-const MAX_EDIT_BODY_BYTES = 1_000_000;
-const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
 type IncomingImage = { data: Uint8Array; mediaType: string };
 
@@ -39,8 +44,8 @@ function readText(body: unknown): string {
     throw new HTTPException(400, { message: 'text must be a string' });
   }
   const trimmed = raw.trim();
-  if (trimmed.length > TEXT_MAX) {
-    throw new HTTPException(400, { message: `El mensaje no puede superar los ${TEXT_MAX.toLocaleString('es-AR')} caracteres.` });
+  if (trimmed.length > MESSAGE_TEXT_MAX_LENGTH) {
+    throw new HTTPException(400, { message: `El mensaje no puede superar los ${MESSAGE_TEXT_MAX_LENGTH.toLocaleString('es-AR')} caracteres.` });
   }
   return trimmed;
 }
@@ -55,11 +60,11 @@ function parseImage(raw: unknown): IncomingImage {
   }
   const mediaType = match[1].toLowerCase();
   const encoded = match[2];
-  if (!SUPPORTED_IMAGE_TYPES.has(mediaType) || !encoded || encoded.length % 4 !== 0) {
+  if (!SUPPORTED_MESSAGE_IMAGE_TYPES.has(mediaType) || !encoded || encoded.length % 4 !== 0) {
     throw new HTTPException(400, { message: 'Imagen inválida o vacía.' });
   }
   const buffer = Buffer.from(encoded, 'base64');
-  if (buffer.toString('base64') !== encoded || buffer.byteLength > MAX_IMAGE_BYTES) {
+  if (buffer.toString('base64') !== encoded || buffer.byteLength > MESSAGE_IMAGE_MAX_BYTES) {
     throw new HTTPException(413, { message: 'La imagen supera el límite de 5 MB o no es válida.' });
   }
   return { data: new Uint8Array(buffer), mediaType };
@@ -74,8 +79,8 @@ function readImages(body: unknown): IncomingImage[] {
     if (!Array.isArray(record.images)) {
       throw new HTTPException(400, { message: 'images must be an array' });
     }
-    if (record.images.length > MAX_IMAGES) {
-      throw new HTTPException(400, { message: `Podés adjuntar hasta ${MAX_IMAGES} imágenes por mensaje.` });
+    if (record.images.length > MESSAGE_MAX_IMAGES) {
+      throw new HTTPException(400, { message: `Podés adjuntar hasta ${MESSAGE_MAX_IMAGES} imágenes por mensaje.` });
     }
     return record.images.map(parseImage);
   }
@@ -133,9 +138,9 @@ messageRoutes.get('/', async (c) => {
   const principal = c.get('principal');
   const query = c.req.query();
   const rawLimit = query.limit;
-  const limit = rawLimit === undefined ? 50 : Number(rawLimit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    throw new HTTPException(400, { message: 'limit debe ser un entero entre 1 y 100.' });
+  const limit = rawLimit === undefined ? MESSAGE_LIST_DEFAULT_LIMIT : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > MESSAGE_LIST_MAX_LIMIT) {
+    throw new HTTPException(400, { message: `limit debe ser un entero entre 1 y ${MESSAGE_LIST_MAX_LIMIT}.` });
   }
 
   const beforeCreatedAt = query.beforeCreatedAt;
@@ -169,13 +174,13 @@ messageRoutes.post('/:messageId/edit', async (c) => {
   const conversation = await getConversation(c.get('principal'), id);
   if (conversation.archivedAt) throw new HTTPException(409, { message: 'Conversation archived' });
 
-  const body = bodyRecord(await readJsonBody(c.req.raw, MAX_EDIT_BODY_BYTES));
+  const body = bodyRecord(await readJsonBody(c.req.raw, MESSAGE_EDIT_BODY_MAX_BYTES));
   const text = readText(body);
   if (!text) throw new HTTPException(400, { message: 'El mensaje editado no puede estar vacío.' });
   const expectedLaterMessages = body.expectedLaterMessages;
   if (typeof expectedLaterMessages !== 'number' || !Number.isInteger(expectedLaterMessages)
-    || expectedLaterMessages < 0 || expectedLaterMessages > 10_000) {
-    throw new HTTPException(400, { message: 'expectedLaterMessages debe ser un entero entre 0 y 10000.' });
+    || expectedLaterMessages < 0 || expectedLaterMessages > MESSAGE_EDIT_MAX_LATER_MESSAGES) {
+    throw new HTTPException(400, { message: `expectedLaterMessages debe ser un entero entre 0 y ${MESSAGE_EDIT_MAX_LATER_MESSAGES}.` });
   }
   if (body.images !== undefined || body.image !== undefined) {
     throw new HTTPException(400, { message: 'Los adjuntos no se pueden volver a enviar al editar un mensaje.' });
@@ -247,7 +252,7 @@ messageRoutes.post('/', async (c) => {
   if (conversation.archivedAt) {
     throw new HTTPException(409, { message: 'Conversation archived' });
   }
-  const body = await readJsonBody(c.req.raw, MAX_BODY_BYTES);
+  const body = await readJsonBody(c.req.raw, MESSAGE_BODY_MAX_BYTES);
   const text = readText(body);
   const images = readImages(body);
   if (!text && images.length === 0) {
@@ -255,8 +260,8 @@ messageRoutes.post('/', async (c) => {
   }
   // Solo guardamos el texto y una nota; los bytes de las imágenes viven durante este turno.
   const imageNote = images.length === 1
-    ? '[Imagen adjunta; no almacenada]'
-    : `[${images.length} imágenes adjuntas; no almacenadas]`;
+    ? UNSAVED_IMAGE_NOTE
+    : `[${images.length} ${UNSAVED_IMAGES_NOTE_SUFFIX}`;
   const messageText = images.length
     ? `${text}${text ? '\n\n' : ''}${imageNote}`
     : text;

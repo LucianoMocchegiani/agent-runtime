@@ -8,8 +8,7 @@ import {
 } from './persistence.js';
 import type { Principal } from '../auth/principal.js';
 import type { ConversationDto, UpdateConversationPatch } from './contracts.js';
-
-const TITLE_MAX = 200;
+import { CONVERSATION_TITLE_MAX_LENGTH } from './constants.js';
 
 /**
  * Lista las conversaciones del principal, ordenadas por actividad reciente.
@@ -115,8 +114,8 @@ export function parseTitleInput(value: unknown): string | null | undefined {
   if (trimmed.length === 0) {
     return null;
   }
-  if (trimmed.length > TITLE_MAX) {
-    throw new HTTPException(400, { message: `title max ${TITLE_MAX} chars` });
+  if (trimmed.length > CONVERSATION_TITLE_MAX_LENGTH) {
+    throw new HTTPException(400, { message: `title max ${CONVERSATION_TITLE_MAX_LENGTH} chars` });
   }
   return trimmed;
 }

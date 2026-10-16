@@ -1,4 +1,13 @@
 import { prisma } from '../db/prisma.js';
+import { EMBEDDING_VECTOR_DIMENSIONS } from '../memory/search/constants.js';
+import {
+  PREFERENCE_LIST_DEFAULT_LIMIT,
+  PREFERENCE_LIST_MAX_TAKE,
+  PREFERENCE_MIN_SEMANTIC_SCORE,
+  PREFERENCE_MIN_TEXT_SCORE,
+  PREFERENCE_SEARCH_DEFAULT_LIMIT,
+  PREFERENCE_SEARCH_MAX_LIMIT,
+} from './constants.js';
 import { embeddingProvider } from '../memory/search/service.js';
 import type {
   DeletePreferenceParams,
@@ -7,10 +16,6 @@ import type {
   SearchPreferencesParams,
   UserPreferenceDto,
 } from './contracts.js';
-
-const EMBEDDING_DIMENSIONS = 1536;
-const MIN_SEMANTIC_SCORE = 0.34;
-const MIN_TEXT_SCORE = 0.30;
 
 type PreferenceRow = {
   id: string;
@@ -22,8 +27,8 @@ type PreferenceRow = {
 };
 
 function vectorLiteral(vector: number[]): string {
-  if (vector.length !== EMBEDDING_DIMENSIONS || vector.some((value) => !Number.isFinite(value))) {
-    throw new Error(`Embedding vector must contain ${EMBEDDING_DIMENSIONS} finite values`);
+  if (vector.length !== EMBEDDING_VECTOR_DIMENSIONS || vector.some((value) => !Number.isFinite(value))) {
+    throw new Error(`Embedding vector must contain ${EMBEDDING_VECTOR_DIMENSIONS} finite values`);
   }
   return `[${vector.join(',')}]`;
 }
@@ -72,10 +77,10 @@ export async function savePreference(params: SavePreferenceParams): Promise<User
 
 /** Lista preferencias propias por fecha descendente con paginación estable. */
 export async function listPreferences(params: ListPreferencesParams): Promise<UserPreferenceDto[]> {
-  const requestedLimit = params.limit ?? 100;
+  const requestedLimit = params.limit ?? PREFERENCE_LIST_DEFAULT_LIMIT;
   const limit = Number.isFinite(requestedLimit)
-    ? Math.max(1, Math.min(Math.floor(requestedLimit), 101))
-    : 100;
+    ? Math.max(1, Math.min(Math.floor(requestedLimit), PREFERENCE_LIST_MAX_TAKE))
+    : PREFERENCE_LIST_DEFAULT_LIMIT;
   const beforeCreatedAt = params.before?.createdAt ?? null;
   if (beforeCreatedAt !== null && !Number.isFinite(Date.parse(beforeCreatedAt))) {
     throw new Error('Invalid preference cursor');
@@ -107,7 +112,7 @@ export async function deletePreference(params: DeletePreferenceParams): Promise<
 export async function searchPreferences(params: SearchPreferencesParams): Promise<UserPreferenceDto[]> {
   const query = params.query.trim();
   if (!query || !params.userId.trim()) return [];
-  const limit = Math.max(1, Math.min(Math.floor(params.limit ?? 5), 10));
+  const limit = Math.max(1, Math.min(Math.floor(params.limit ?? PREFERENCE_SEARCH_DEFAULT_LIMIT), PREFERENCE_SEARCH_MAX_LIMIT));
   const candidates = new Map<string, PreferenceRow>();
 
   const [textRows, existingRows] = await Promise.all([
@@ -132,7 +137,7 @@ export async function searchPreferences(params: SearchPreferencesParams): Promis
     `,
   ]);
   for (const row of textRows) {
-    if ((row.score ?? 0) >= MIN_TEXT_SCORE) candidates.set(row.id, row);
+    if ((row.score ?? 0) >= PREFERENCE_MIN_TEXT_SCORE) candidates.set(row.id, row);
   }
 
   if (embeddingProvider && existingRows[0]?.hasPreferences) {
@@ -151,7 +156,7 @@ export async function searchPreferences(params: SearchPreferencesParams): Promis
       `;
       for (const row of semanticRows) {
         const score = row.score ?? 0;
-        if (score < MIN_SEMANTIC_SCORE) continue;
+        if (score < PREFERENCE_MIN_SEMANTIC_SCORE) continue;
         const current = candidates.get(row.id);
         candidates.set(row.id, { ...row, score: Math.max(score, current?.score ?? 0) });
       }

@@ -1,4 +1,7 @@
 /** DTOs y parámetros propios del dominio de mensajes. */
+import { MESSAGE_ROLES } from './constants.js';
+
+export type MessageRole = (typeof MESSAGE_ROLES)[number];
 
 /** Valor compatible con JSON, usado en argumentos y resultados de herramientas. */
 export type JsonValue =
@@ -13,7 +16,7 @@ export type JsonValue =
 export type MessageDto = {
   id: string;
   conversationId: string;
-  role: 'user' | 'assistant' | 'tool';
+  role: MessageRole;
   content: string;
   toolName: string | null;
   toolArgs: JsonValue | null;
@@ -52,7 +55,7 @@ export type SaveSummaryParams = {
 export type SaveMessageParams = {
   conversationId: string;
   userId: string;
-  role: 'user' | 'assistant' | 'tool';
+  role: MessageRole;
   content: string;
   toolName?: string | null;
   toolArgs?: JsonValue | null;

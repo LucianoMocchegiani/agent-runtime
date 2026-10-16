@@ -1,7 +1,8 @@
 import { decodeOptionalCursor, encodeCursor } from '../pagination/cursor.js';
+import { CONVERSATION_LIST_SCOPE } from './constants.js';
 
 /** Filtro incluido en el cursor para impedir reutilizarlo con otro alcance. */
-export type ConversationListScope = 'all' | 'active' | 'archived';
+export type ConversationListScope = (typeof CONVERSATION_LIST_SCOPE)[keyof typeof CONVERSATION_LIST_SCOPE];
 
 type CursorPayload = {
   updatedAt: string;

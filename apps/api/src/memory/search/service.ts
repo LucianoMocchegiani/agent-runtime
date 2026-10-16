@@ -1,15 +1,20 @@
 import type { MemorySearchParams, MemorySearchResult } from './contracts.js';
+import {
+  EMBEDDING_BATCH_SIZE,
+  EMBEDDING_MAX_RETRY_DELAY_MS,
+  EMBEDDING_RETRY_BASE_DELAY_MS,
+  EMBEDDING_RETRY_MAX_EXPONENT,
+  EMBEDDING_WORKER_POLL_INTERVAL_MS,
+  EMBEDDING_WORKER_WARNING_INTERVAL_MS,
+  HYBRID_SEARCH_RRF_K,
+  MAX_EMBEDDING_BATCHES_PER_CYCLE,
+  MAX_EMBEDDING_INPUT_CHARS,
+  MEMORY_SEARCH_DEFAULT_LIMIT,
+  MEMORY_SEARCH_MAX_LIMIT,
+} from './constants.js';
 import type { EmbeddingProvider, SearchHit, SearchIndex } from './ports.js';
 import { OpenAiCompatibleEmbeddingProvider } from './embedding-provider.js';
 import { PostgresSearchIndex } from './postgres-index.js';
-
-const BATCH_SIZE = 16;
-const MAX_BATCHES_PER_CYCLE = 8;
-const POLL_MS = 2_000;
-const MAX_RETRY_MS = 5 * 60_000;
-const RRF_K = 60;
-// Prevent a single long chat message from making the provider reject the whole batch.
-const MAX_EMBEDDING_INPUT_CHARS = 4_000;
 
 function toEmbeddingInput(role: string, content: string): string {
   const input = `${role}: ${content}`;
@@ -51,7 +56,7 @@ function fuseResults(textHits: SearchHit[], semanticHits: SearchHit[], limit: nu
   for (const [hits, weight] of [[textHits, 1], [semanticHits, 1]] as const) {
     hits.forEach((hit, index) => {
       const current = combined.get(hit.messageId);
-      const contribution = weight / (RRF_K + index + 1);
+      const contribution = weight / (HYBRID_SEARCH_RRF_K + index + 1);
       if (current) current.score += contribution;
       else combined.set(hit.messageId, { hit, score: contribution });
     });
@@ -66,7 +71,7 @@ function fuseResults(textHits: SearchHit[], semanticHits: SearchHit[], limit: nu
 export async function searchMemory(input: MemorySearchParams): Promise<MemorySearchResult> {
   const query = input.query.trim();
   if (!query) return { mode: 'text', items: [] };
-  const limit = Math.max(1, Math.min(Math.floor(input.limit ?? 8), 20));
+  const limit = Math.max(1, Math.min(Math.floor(input.limit ?? MEMORY_SEARCH_DEFAULT_LIMIT), MEMORY_SEARCH_MAX_LIMIT));
   // Some model/tool clients send an empty string for an omitted optional field.
   // Treat it as no conversation filter before PostgreSQL casts it to UUID.
   const conversationId = input.conversationId?.trim() || undefined;
@@ -88,7 +93,7 @@ export async function searchMemory(input: MemorySearchParams): Promise<MemorySea
 async function processPendingBatch(): Promise<boolean> {
   const provider = embeddingProvider;
   if (!provider) return false;
-  const documents = await searchIndex.claimPending(BATCH_SIZE);
+  const documents = await searchIndex.claimPending(EMBEDDING_BATCH_SIZE);
   if (documents.length === 0) return false;
   try {
     const vectors = await provider.embed(documents.map((document) => toEmbeddingInput(document.role, document.content)));
@@ -97,7 +102,10 @@ async function processPendingBatch(): Promise<boolean> {
       searchIndex.saveEmbedding(document.messageId, provider.model, vectors[index]),
     ));
   } catch (error) {
-    const delay = Math.min(1_000 * 2 ** Math.min(documents.length, 8), MAX_RETRY_MS);
+    const delay = Math.min(
+      EMBEDDING_RETRY_BASE_DELAY_MS * 2 ** Math.min(documents.length, EMBEDDING_RETRY_MAX_EXPONENT),
+      EMBEDDING_MAX_RETRY_DELAY_MS,
+    );
     await Promise.all(documents.map((document) => searchIndex.retryEmbedding(document.messageId, delay)));
     console.warn(`memory embedding batch failed; scheduled retry: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -111,17 +119,17 @@ export function startEmbeddingWorker(): void {
     try {
       if (embeddingProvider) {
         // Bound each drain cycle so the worker yields regularly under large queues.
-        for (let batch = 0; batch < MAX_BATCHES_PER_CYCLE; batch += 1) {
+        for (let batch = 0; batch < MAX_EMBEDDING_BATCHES_PER_CYCLE; batch += 1) {
           if (!(await processPendingBatch())) break;
         }
       }
     } catch (error) {
-      if (Date.now() - lastWarningAt >= 30_000) {
+      if (Date.now() - lastWarningAt >= EMBEDDING_WORKER_WARNING_INTERVAL_MS) {
         console.warn(`memory embedding/config sync unavailable: ${error instanceof Error ? error.message : String(error)}`);
         lastWarningAt = Date.now();
       }
     } finally {
-      setTimeout(() => void run(), POLL_MS).unref();
+      setTimeout(() => void run(), EMBEDDING_WORKER_POLL_INTERVAL_MS).unref();
     }
   };
   void run();

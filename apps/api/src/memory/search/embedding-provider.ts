@@ -1,6 +1,5 @@
 import type { EmbeddingProvider } from './ports.js';
-
-const EMBEDDING_DIMENSIONS = 1536;
+import { EMBEDDING_VECTOR_DIMENSIONS } from './constants.js';
 
 type EmbeddingsResponse = {
   data?: Array<{ index?: number; embedding?: number[] }>;
@@ -46,10 +45,10 @@ export class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
       const vector = row.embedding;
       if (
         !Array.isArray(vector) ||
-        vector.length !== EMBEDDING_DIMENSIONS ||
+        vector.length !== EMBEDDING_VECTOR_DIMENSIONS ||
         vector.some((value) => !Number.isFinite(value))
       ) {
-        throw new Error(`Embedding vector must contain ${EMBEDDING_DIMENSIONS} finite values`);
+        throw new Error(`Embedding vector must contain ${EMBEDDING_VECTOR_DIMENSIONS} finite values`);
       }
       return vector;
     });

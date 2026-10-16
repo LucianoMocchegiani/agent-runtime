@@ -1,4 +1,9 @@
 import { Hono } from 'hono';
+import {
+  CONVERSATION_LIST_DEFAULT_LIMIT,
+  CONVERSATION_LIST_MAX_LIMIT,
+  CONVERSATION_LIST_SCOPE,
+} from './constants.js';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/principal.js';
 import { getAgentProfile, getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
@@ -29,11 +34,11 @@ export const conversationRoutes = new Hono<AppEnv>();
 
 conversationRoutes.get('/', async (c) => {
   const archived = c.req.query('archived') === 'true';
-  const scope = archived ? 'archived' : 'active';
+  const scope = archived ? CONVERSATION_LIST_SCOPE.ARCHIVED : CONVERSATION_LIST_SCOPE.ACTIVE;
   const rawLimit = c.req.query('limit');
-  const limit = rawLimit === undefined ? 20 : Number(rawLimit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
-    throw new HTTPException(400, { message: 'limit debe ser un entero entre 1 y 20.' });
+  const limit = rawLimit === undefined ? CONVERSATION_LIST_DEFAULT_LIMIT : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > CONVERSATION_LIST_MAX_LIMIT) {
+    throw new HTTPException(400, { message: `limit debe ser un entero entre 1 y ${CONVERSATION_LIST_MAX_LIMIT}.` });
   }
   let before: { updatedAt: string; id: string } | undefined;
   try {

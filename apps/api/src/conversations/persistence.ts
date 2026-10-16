@@ -1,4 +1,8 @@
 import { prisma } from '../db/prisma.js';
+import {
+  CONVERSATION_PERSISTENCE_MAX_TAKE,
+  DEFAULT_CONVERSATION_TENANT_ID,
+} from './constants.js';
 import type {
   ConversationDto,
   ListConversationsParams,
@@ -32,14 +36,12 @@ function toConversationDto(row: {
   };
 }
 
-const LIST_TAKE = 100;
-
 /** Lista conversaciones del usuario con filtro opcional de archivo y cursor estable. */
 export async function listConversations(
   params: ListConversationsParams,
 ): Promise<ConversationDto[]> {
-  const requestedLimit = params.limit ?? LIST_TAKE;
-  const limit = Math.max(1, Math.min(requestedLimit, LIST_TAKE));
+  const requestedLimit = params.limit ?? CONVERSATION_PERSISTENCE_MAX_TAKE;
+  const limit = Math.max(1, Math.min(requestedLimit, CONVERSATION_PERSISTENCE_MAX_TAKE));
   const beforeUpdatedAt = params.before ? new Date(params.before.updatedAt) : null;
   if (params.before && (!beforeUpdatedAt || !Number.isFinite(beforeUpdatedAt.getTime()))) {
     throw new Error('Invalid conversation cursor');
@@ -70,7 +72,7 @@ export async function createConversation(
   const row = await prisma.conversation.create({
     data: {
       userId: params.userId,
-      tenantId: 'public',
+      tenantId: DEFAULT_CONVERSATION_TENANT_ID,
       title: params.title ?? null,
       agentProfileId: params.agentProfileId ?? null,
     },

@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { PREFERENCE_ROUTE_DEFAULT_LIMIT, PREFERENCE_ROUTE_MAX_LIMIT } from './constants.js';
 import { HTTPException } from 'hono/http-exception';
 import { deletePreference, listPreferences, savePreference } from './persistence.js';
 import type { AppEnv } from '../auth/principal.js';
@@ -28,9 +29,9 @@ function requiredText(value: unknown, field: string, maxLength: number): string 
 
 preferenceRoutes.get('/', async (c) => {
   const rawLimit = c.req.query('limit');
-  const limit = rawLimit === undefined ? 20 : Number(rawLimit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
-    throw new HTTPException(400, { message: 'limit debe ser un entero entre 1 y 20.' });
+  const limit = rawLimit === undefined ? PREFERENCE_ROUTE_DEFAULT_LIMIT : Number(rawLimit);
+  if (!Number.isInteger(limit) || limit < 1 || limit > PREFERENCE_ROUTE_MAX_LIMIT) {
+    throw new HTTPException(400, { message: `limit debe ser un entero entre 1 y ${PREFERENCE_ROUTE_MAX_LIMIT}.` });
   }
   let before: { createdAt: string; id: string } | undefined;
   try {

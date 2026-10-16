@@ -1,4 +1,5 @@
 import { prisma } from '../../db/prisma.js';
+import { EMBEDDING_VECTOR_DIMENSIONS } from './constants.js';
 import type {
   SearchDocument,
   SearchFilter,
@@ -6,16 +7,14 @@ import type {
   SearchIndex,
 } from './ports.js';
 
-const EMBEDDING_DIMENSIONS = 1536;
-
 type RawHit = Omit<SearchHit, 'createdAt'> & { createdAt: Date | string };
 
 function vectorLiteral(vector: number[]): string {
   if (
-    vector.length !== EMBEDDING_DIMENSIONS ||
+    vector.length !== EMBEDDING_VECTOR_DIMENSIONS ||
     vector.some((value) => !Number.isFinite(value))
   ) {
-    throw new Error(`Embedding vector must contain ${EMBEDDING_DIMENSIONS} finite values`);
+    throw new Error(`Embedding vector must contain ${EMBEDDING_VECTOR_DIMENSIONS} finite values`);
   }
   return `[${vector.join(',')}]`;
 }
