@@ -3,11 +3,17 @@ import { HTTPException } from 'hono/http-exception';
 const DEFAULT_MAX_BYTES = 1_000_000;
 
 export type ReadJsonBodyOptions = {
-  /** If false, an empty body is rejected instead of treated as an empty object. */
+  /** Si es `false`, rechaza un cuerpo vacío en lugar de interpretarlo como objeto vacío. */
   allowEmpty?: boolean;
 };
 
-/** Lee JSON con un límite de bytes también aplicado a cuerpos sin Content-Length. */
+/**
+ * Lee y parsea JSON aplicando el límite de bytes incluso si falta `Content-Length`.
+ * @param request Solicitud HTTP cuyo cuerpo se consume.
+ * @param maxBytes Máximo permitido en bytes.
+ * @param options Política para cuerpos vacíos.
+ * @throws {HTTPException} 400 si el JSON no es válido o 413 si se supera el límite.
+ */
 export async function readJsonBody(
   request: Request,
   maxBytes = DEFAULT_MAX_BYTES,

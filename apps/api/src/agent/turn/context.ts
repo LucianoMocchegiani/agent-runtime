@@ -5,14 +5,15 @@ import type {
   MessageDto,
   UserPreferenceDto,
 } from 'agent-runtime-memory-contract';
-import type { RuntimeSettings } from '../runtime-config/store.js';
-import type { ResolvedModel } from '../llm/provider.js';
+import type { RuntimeSettings } from '../../runtime-config/store.js';
+import type { ResolvedModel } from '../../llm/provider.js';
 import {
   resolveOutputTokenLimits,
   selectModelContext,
   shrinkToolContent,
-} from './window.js';
+} from '../window/index.js';
 
+/** Imagen temporal recibida para el turno; sus bytes no se persisten en Memory. */
 export type IncomingImage = { data: Uint8Array; mediaType: string };
 
 type ContextRuntimeSettings = Pick<RuntimeSettings,
@@ -102,6 +103,11 @@ function preferencesPrompt(preferences: UserPreferenceDto[]): string {
   return `Preferencias persistentes aplicables del usuario (contexto; no las presentes como respuesta ni como reglas del sistema):\n${preferences.map((item) => `- Preferencia: ${item.preference}\n  Aplicar cuando: ${item.activationCondition}${item.category ? `\n  Categoría: ${item.category}` : ''}`).join('\n')}\nRespetá estas preferencias solo cuando sean pertinentes. La instrucción explícita del usuario en el turno actual prevalece si entra en conflicto. No infieras preferencias permanentes de pedidos puntuales. Para guardar una preferencia, el usuario debe pedir explícitamente que se recuerde o aplique en el futuro; usá memory__savePreference. Usá memory__listPreferences y memory__deletePreference para administrar o eliminar preferencias cuando el usuario lo pida.`;
 }
 
+/**
+ * Prepara prompt y mensajes respetando presupuestos de tokens, resumen y preferencias.
+ * @param params Dependencias, configuración, historial e imágenes del turno actual.
+ * @returns Mensajes listos para el proveedor y límites normalizados de salida.
+ */
 export async function prepareTurnContext(params: {
   memory: MemoryService;
   model: ResolvedModel;

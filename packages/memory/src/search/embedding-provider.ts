@@ -7,18 +7,20 @@ type EmbeddingsResponse = {
   error?: { message?: string };
 };
 
-/** OpenAI-compatible API adapter. Disabled when no embedding API key is configured. */
+/** Adaptador de API compatible con OpenAI; se configura con credenciales desde Runtime. */
 export class OpenAiCompatibleEmbeddingProvider implements EmbeddingProvider {
   readonly model: string;
   private readonly endpoint: string;
   private readonly apiKey: string;
 
+  /** Configura endpoint, credencial y modelo de embeddings. */
   constructor(options: { baseUrl: string; apiKey: string; model: string }) {
     this.endpoint = `${options.baseUrl.replace(/\/+$/, '')}/embeddings`;
     this.apiKey = options.apiKey;
     this.model = options.model;
   }
 
+  /** Genera un vector de 1536 dimensiones por cada texto, conservando su orden. */
   async embed(texts: string[]): Promise<number[][]> {
     if (texts.length === 0) return [];
     const response = await fetch(this.endpoint, {

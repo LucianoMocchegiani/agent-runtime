@@ -27,7 +27,7 @@ function toHit(row: RawHit): SearchHit {
   };
 }
 
-/** PostgreSQL adapter; all DB-specific SQL and pgvector details stay behind SearchIndex. */
+/** Adaptador PostgreSQL; encapsula SQL y detalles de pgvector detrás de `SearchIndex`. */
 export class PostgresSearchIndex implements SearchIndex {
   async upsertDocument(document: SearchDocument): Promise<void> {
     await prisma.$executeRaw`

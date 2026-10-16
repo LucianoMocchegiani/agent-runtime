@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Tool } from 'ai';
 import type { MemoryService } from 'agent-runtime-memory-contract';
-import type { Principal } from '../auth/principal.js';
-import { AgentToolNameConflictError, buildAgentTools } from './tools.js';
+import type { Principal } from '../../auth/principal.js';
+import { AgentToolNameConflictError, buildAgentTools } from './index.js';
 
 const context = {
   memory: {} as MemoryService,

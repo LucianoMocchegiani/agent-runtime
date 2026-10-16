@@ -85,6 +85,11 @@ function formatTool(name: string, value: unknown): string[] {
   return lines;
 }
 
+/**
+ * Formatea una traza de la solicitud enviada al modelo, omitiendo datos sensibles y binarios.
+ * @param request Datos de sistema, mensajes, herramientas y modelo del paso actual.
+ * @returns Texto de diagnóstico con contenidos extensos acotados.
+ */
 export function formatLlmRequestTrace(request: {
   conversationId: string;
   step: number;

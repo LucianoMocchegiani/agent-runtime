@@ -3,11 +3,11 @@ import { createRequire } from 'node:module';
 import { Client } from 'pg';
 
 /**
- * Prepara la database antes del boot: la crea si no existe y aplica las migraciones.
+ * Prepara la base de datos antes del arranque: la crea si no existe y aplica las migraciones.
  *
- * @remarks El CREATE DATABASE cubre volúmenes de Postgres ya existentes (el init de
- * `/docker-entrypoint-initdb.d` solo corre en el primer boot). Prisma hereda el env de este
- * proceso, así `--env-file` sirve también para `migrate deploy`.
+ * @remarks `CREATE DATABASE` cubre volúmenes de Postgres ya existentes (la inicialización de
+ * `/docker-entrypoint-initdb.d` solo corre en el primer arranque). Prisma hereda el entorno de este
+ * proceso, por lo que `--env-file` también sirve para `migrate deploy`.
  */
 function adminConnectionString(databaseUrl: string): {
   adminUrl: string;

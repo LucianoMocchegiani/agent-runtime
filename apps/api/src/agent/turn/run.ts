@@ -1,19 +1,18 @@
 import { HTTPException } from 'hono/http-exception';
-import { getRuntimeSettings, type AgentProfile } from '../runtime-config/store.js';
-import type { ResolvedModel } from '../llm/provider.js';
-import { createMemoryClient } from '../memory/client.js';
+import { getRuntimeSettings, type AgentProfile } from '../../runtime-config/store.js';
+import type { ResolvedModel } from '../../llm/provider.js';
+import { createMemoryClient } from '../../memory/client.js';
 import type { MemoryService } from 'agent-runtime-memory-contract';
-import { prepareTurnContext, type IncomingImage } from './turn-context.js';
-import type { Principal } from '../auth/principal.js';
-import { delegationEncryptionEnabled } from '../delegations/payload.js';
-import { prepareAgentTurnTools } from './turn-tools.js';
-import { streamPreparedAgentTurn } from './turn-stream.js';
+import { prepareTurnContext, type IncomingImage } from './context.js';
+import type { Principal } from '../../auth/principal.js';
+import { delegationEncryptionEnabled } from '../../delegations/payload.js';
+import { prepareAgentTurnTools } from './tools.js';
+import { streamPreparedAgentTurn } from './stream.js';
 
 /**
- * Corre un turno: Memory interno + Domain MCP + OpenRouter + stream UI.
- *
- * @remarks Abort del cliente (`AbortSignal`) corta el LLM y guarda lo ya generado.
- * @throws {HTTPException} 502 si Memory, Domain MCP o OpenRouter no están disponibles.
+ * Ejecuta un turno completo: prepara herramientas/contexto, invoca el modelo y devuelve el stream UI.
+ * @remarks La cancelación del cliente interrumpe el modelo y persiste lo generado hasta ese punto.
+ * @throws {HTTPException} 502 si no se puede preparar o ejecutar la dependencia requerida.
  */
 export async function streamAgentTurn(
   conversationId: string,

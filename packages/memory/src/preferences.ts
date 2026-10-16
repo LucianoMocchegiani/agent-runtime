@@ -39,6 +39,7 @@ function toDto(row: PreferenceRow): UserPreferenceDto {
   };
 }
 
+/** Guarda una preferencia y, si hay embeddings disponibles, indexa su contenido semántico. */
 export async function savePreference(params: SavePreferenceParams): Promise<UserPreferenceDto> {
   const preference = params.preference.trim();
   const activationCondition = params.activationCondition.trim();
@@ -69,6 +70,7 @@ export async function savePreference(params: SavePreferenceParams): Promise<User
   return toDto(row);
 }
 
+/** Lista preferencias propias por fecha descendente con paginación estable. */
 export async function listPreferences(params: ListPreferencesParams): Promise<UserPreferenceDto[]> {
   const requestedLimit = params.limit ?? 100;
   const limit = Number.isFinite(requestedLimit)
@@ -92,6 +94,7 @@ export async function listPreferences(params: ListPreferencesParams): Promise<Us
   return rows.map(toDto);
 }
 
+/** Elimina una preferencia solo si corresponde al usuario indicado. */
 export async function deletePreference(params: DeletePreferenceParams): Promise<boolean> {
   const deleted = await prisma.$executeRaw`
     DELETE FROM memory_user_preferences
@@ -100,6 +103,7 @@ export async function deletePreference(params: DeletePreferenceParams): Promise<
   return deleted === 1;
 }
 
+/** Recupera preferencias relevantes mediante búsqueda textual e híbrida cuando es posible. */
 export async function searchPreferences(params: SearchPreferencesParams): Promise<UserPreferenceDto[]> {
   const query = params.query.trim();
   if (!query || !params.userId.trim()) return [];

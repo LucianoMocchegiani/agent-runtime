@@ -13,6 +13,7 @@ const providerLabels: Record<AiProvider, string> = {
   openai: 'OpenAI',
 };
 
+/** Metadatos públicos de un modelo habilitado en el runtime. */
 export type ModelInfo = {
   /** `proveedor/modelo`, el valor que manda el cliente. */
   id: string;
@@ -21,6 +22,7 @@ export type ModelInfo = {
   model: string;
 };
 
+/** Modelo habilitado junto con su instancia del proveedor y ventana de contexto efectiva. */
 export type ResolvedModel = ModelInfo & {
   languageModel: LanguageModel;
   /** Ventana total configurada; el límite común es fallback para modelos sin entrada explícita. */
@@ -29,7 +31,7 @@ export type ResolvedModel = ModelInfo & {
 
 const cache = new Map<string, LanguageModel>();
 
-/** Modelos habilitados (proveedores con apiKey real), en el orden de `AI_PROVIDERS`. */
+/** Lista los modelos configurados en proveedores que tienen una clave real, en orden de `AI_PROVIDERS`. */
 export function listModels(): ModelInfo[] {
   return AI_PROVIDERS.flatMap((provider) =>
     (config.ai.providers[provider]?.models ?? []).map((model) => ({
@@ -43,8 +45,9 @@ export function listModels(): ModelInfo[] {
 
 /**
  * Resuelve exclusivamente el modelo elegido por el perfil de agente.
- *
- * @returns null si no hay modelo o si el proveedor/modelo no está habilitado.
+ * @param id Identificador completo `proveedor/modelo`.
+ * @param fallbackContextWindow Ventana alternativa para modelos sin valor específico.
+ * @returns Modelo listo para usar o `null` si no está configurado/habilitado.
  */
 export function resolveModel(id: string | null | undefined, fallbackContextWindow: number): ResolvedModel | null {
   const fullId = id?.trim() ?? '';

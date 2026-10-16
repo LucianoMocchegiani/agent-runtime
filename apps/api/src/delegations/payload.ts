@@ -17,10 +17,14 @@ function encryptionKey(): Buffer | null {
   return Buffer.from(raw, 'hex');
 }
 
+/** Indica si hay una clave AES-256 válida y pueden habilitarse las delegaciones. */
 export function delegationEncryptionEnabled(): boolean {
   return encryptionKey() !== null;
 }
 
+/** Cifra el payload de una delegación con AES-256-GCM y nonce aleatorio.
+ * @throws {Error} Si falta la clave o no tiene el formato hexadecimal requerido.
+ */
 export function sealDelegationPayload(value: unknown): SealedPayload {
   const key = encryptionKey();
   if (!key) throw new Error(`${KEY_ENV} no está configurada; las delegaciones están deshabilitadas.`);
@@ -30,6 +34,9 @@ export function sealDelegationPayload(value: unknown): SealedPayload {
   return { ciphertext, nonce, tag: cipher.getAuthTag() };
 }
 
+/** Descifra y parsea el payload autenticado de una delegación.
+ * @throws {Error} Si falta la clave, falla la autenticación GCM o el JSON no es válido.
+ */
 export function openDelegationPayload<T>(sealed: SealedPayload): T {
   const key = encryptionKey();
   if (!key) throw new Error(`${KEY_ENV} no está configurada; no se puede procesar la delegación.`);

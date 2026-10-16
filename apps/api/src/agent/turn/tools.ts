@@ -1,14 +1,14 @@
 import { type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
 import type { MemoryService } from 'agent-runtime-memory-contract';
-import type { Principal } from '../auth/principal.js';
-import type { McpConfig } from '../config.js';
-import { McpRegistry } from '../mcp/registry.js';
-import { AgentToolNameConflictError, buildAgentTools } from './tools.js';
+import type { Principal } from '../../auth/principal.js';
+import type { McpConfig } from '../../config.js';
+import { McpRegistry } from '../../mcp/registry.js';
+import { AgentToolNameConflictError, buildAgentTools } from '../tools/index.js';
 
 const failMessage = 'El asistente no está disponible.';
 
-/** Connects the MCP servers and assembles the tools available to one agent turn. */
+/** Conecta los servidores MCP y reúne las herramientas disponibles para un turno. */
 export async function prepareAgentTurnTools(params: {
   mcpConfig: McpConfig;
   accessToken: string;

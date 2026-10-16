@@ -1,4 +1,4 @@
-// Public in-process Memory module consumed by the Runtime API.
+/** Punto de entrada del módulo Memory ejecutado en proceso y consumido por la API Runtime. */
 export {
   getContext,
   saveSummary,

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './preference-cursor.js';
+import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './cursor.js';
 
 const value = {
   createdAt: '2026-05-20T12:30:00.123456Z',

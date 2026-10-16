@@ -9,6 +9,14 @@ function estimateTokens(text: string): number {
 }
 
 /** Ajusta salida y reserva a la ventana efectiva sin permitir maxOutputTokens > reserveOutputTokens. */
+/**
+ * Ajusta salida y reserva a la ventana efectiva sin permitir `maxOutputTokens > reserveOutputTokens`.
+ * @param contextWindowTokens Ventana total del modelo.
+ * @param maxOutputTokens Máximo de tokens que puede generar la respuesta.
+ * @param reserveOutputTokens Presupuesto reservado para generación.
+ * @param safetyTokens Margen excluido del presupuesto utilizable.
+ * @returns Límites normalizados y acotados a la ventana disponible.
+ */
 export function resolveOutputTokenLimits(
   contextWindowTokens: number,
   maxOutputTokens: number,
@@ -37,6 +45,12 @@ function hitCount(value: unknown): number | null {
 }
 
 /** Representación acotada de resultados de herramientas para persistencia y resúmenes. */
+/**
+ * Representa resultados de herramientas de forma acotada para persistencia y resúmenes.
+ * @param toolName Nombre de la herramienta, usado como prefijo.
+ * @param result Resultado que se va a serializar.
+ * @param keepDetail Si es falso, devuelve solo un indicador o una cantidad.
+ */
 export function shrinkToolContent(toolName: string, result: unknown, keepDetail: boolean): string {
   const count = hitCount(result);
   if (!keepDetail) return count !== null ? `${toolName} → ${count} hits` : `${toolName} → ok`;
@@ -61,7 +75,12 @@ function promptOverhead(systemPrompt: string, tools: Record<string, Tool>): numb
 
 type TurnGroup = { rows: MessageDto[]; messages: ModelMessage[]; messageRows: MessageDto[] };
 
-/** Selecciona turnos recientes por tokens y cantidad; devuelve aparte lo que se compactará. */
+/**
+ * Selecciona turnos recientes por presupuesto de tokens y cantidad; separa las filas omitidas.
+ * @param rows Historial cronológico de la conversación.
+ * @param options Presupuesto, prompt, herramientas y límites de selección.
+ * @returns Mensajes para el modelo y filas candidatas a resumen.
+ */
 export function selectModelContext(
   rows: MessageDto[],
   options: {
@@ -130,7 +149,7 @@ export function selectModelContext(
   };
 }
 
-/** Compatibilidad con consumidores que solo necesitan los mensajes enviados al modelo. */
+/** Devuelve solo los mensajes seleccionados, sin las filas omitidas. */
 export function buildModelMessages(
   rows: MessageDto[],
   options: Parameters<typeof selectModelContext>[1],

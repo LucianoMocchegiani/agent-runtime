@@ -9,9 +9,10 @@ import type {
 const TITLE_MAX = 200;
 
 /**
- * Lista hilos del principal, más recientes primero.
- *
- * @param archived Si true, solo archivados; si false, solo activos.
+ * Lista las conversaciones del principal, ordenadas por actividad reciente.
+ * @param principal Identidad propietaria de los datos.
+ * @param archived Si es `true`, incluye archivadas; si es `false`, solo activas.
+ * @param options Límite y cursor de continuación.
  */
 export async function listConversations(
   principal: Principal,
@@ -28,7 +29,10 @@ export async function listConversations(
 }
 
 /**
- * Alta de hilo vacío. `userId` sale del principal.
+ * Crea un hilo vacío asociado al principal autenticado.
+ * @param principal Identidad propietaria del hilo.
+ * @param title Título inicial o `null` para asignarlo automáticamente.
+ * @param agentProfileId Perfil fijado al nuevo hilo.
  */
 export async function createConversation(
   principal: Principal,
@@ -43,6 +47,7 @@ export async function createConversation(
   });
 }
 
+/** Obtiene una conversación del principal; nunca permite consultar hilos ajenos. */
 export async function getConversation(
   principal: Principal,
   id: string,
@@ -54,6 +59,7 @@ export async function getConversation(
   });
 }
 
+/** Aplica un parche a una conversación propiedad del principal. */
 export async function updateConversation(
   principal: Principal,
   id: string,
@@ -68,9 +74,8 @@ export async function updateConversation(
 }
 
 /**
- * Pone título al primer mensaje si el hilo todavía no tiene uno.
- *
- * @returns El título aplicado, o null si ya había título.
+ * Asigna un título automático al primer mensaje solo si el hilo aún no tiene título.
+ * @returns El título aplicado o `null` si ya existía uno.
  */
 export async function applyAutomaticTitle(
   principal: Principal,
@@ -86,7 +91,7 @@ export async function applyAutomaticTitle(
 }
 
 /**
- * Archivo lógico (`archived_at`). Idempotente.
+ * Archiva lógicamente la conversación. La operación es idempotente.
  */
 export async function archiveConversation(
   principal: Principal,
@@ -95,6 +100,9 @@ export async function archiveConversation(
   return updateConversation(principal, id, { archived: true });
 }
 
+/** Valida y normaliza `title`, preservando la diferencia entre ausente y `null`.
+ * @throws {HTTPException} 400 si no es texto o excede el máximo permitido.
+ */
 export function parseTitleInput(value: unknown): string | null | undefined {
   if (value === undefined) {
     return undefined;

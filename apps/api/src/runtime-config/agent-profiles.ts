@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
 import { config } from '../config.js';
-import type { AgentProfile, AgentProfileConfig } from './store.js';
+import type { AgentProfile, AgentProfileConfig } from './types.js';
 
 let pool: Pool | undefined;
 const FIELDS = ['chatSystemPrompt', 'contextTokenBudget', 'maxContextMessages', 'maxOutputTokens', 'reserveOutputTokens', 'contextSafetyTokens', 'maxToolSteps', 'llmTraceRequests', 'summariesEnabled', 'summaryTokenBudget'] as const;
 
+/** Inyecta el pool PostgreSQL compartido para las operaciones de perfiles. */
 export function setAgentProfilePool(value: Pool): void { pool = value; }
 function db(): Pool { if (!pool) throw new Error('Agent profile store is not initialized'); return pool; }
 function dto(row: any): AgentProfile {
@@ -26,14 +27,17 @@ function validate(name: unknown, modelId: unknown, rawConfig: unknown): { name: 
   return { name: name.trim(), modelId: modelId.trim(), config: Object.fromEntries(FIELDS.map((field) => [field, c[field]])) as AgentProfileConfig };
 }
 
+/** Lista perfiles ordenados por creación; por defecto excluye los archivados. */
 export async function listAgentProfiles(includeArchived = false): Promise<AgentProfile[]> {
   const result = await db().query(`SELECT * FROM runtime.agent_profile_configs ${includeArchived ? '' : 'WHERE archived_at IS NULL'} ORDER BY created_at, id`);
   return result.rows.map(dto);
 }
+/** Busca un perfil por identificador; por defecto devuelve `null` si está archivado. */
 export async function getAgentProfile(id: string, includeArchived = false): Promise<AgentProfile | null> {
   const result = await db().query(`SELECT * FROM runtime.agent_profile_configs WHERE id = $1 ${includeArchived ? '' : 'AND archived_at IS NULL'}`, [id]);
   return result.rows[0] ? dto(result.rows[0]) : null;
 }
+/** Devuelve el primer perfil activo en orden de creación o falla si no hay ninguno. */
 export async function getFirstActiveAgentProfile(): Promise<AgentProfile> {
   const profiles = await listAgentProfiles();
   if (!profiles[0]) throw new Error('No hay perfiles de agente configurados');
@@ -41,6 +45,7 @@ export async function getFirstActiveAgentProfile(): Promise<AgentProfile> {
 }
 
 /** Perfil configurado para los chats nuevos. */
+/** Devuelve el ID del perfil activo predeterminado o el primer perfil activo como fallback. */
 export async function getNewChatDefaultProfileId(): Promise<string> {
   const result = await db().query<{ default_profile_id: string }>(
     "SELECT default_profile_id FROM runtime.agent_profile_preferences WHERE id = 'default'",
@@ -50,6 +55,7 @@ export async function getNewChatDefaultProfileId(): Promise<string> {
   return (await getFirstActiveAgentProfile()).id;
 }
 
+/** Establece el perfil predeterminado de nuevos chats si existe y está activo. */
 export async function setNewChatDefaultProfileId(profileId: string): Promise<boolean> {
   if (!await getAgentProfile(profileId)) return false;
   await db().query(
@@ -59,6 +65,7 @@ export async function setNewChatDefaultProfileId(profileId: string): Promise<boo
   return true;
 }
 
+/** Inicializa el perfil predeterminado solo si todavía no se guardó uno. */
 export async function initializeNewChatDefaultProfile(): Promise<void> {
   const first = await getFirstActiveAgentProfile();
   await db().query(
@@ -68,20 +75,24 @@ export async function initializeNewChatDefaultProfile(): Promise<void> {
 }
 
 /** Resuelve el perfil configurado para los chats nuevos. */
+/** Resuelve el perfil completo que se asignará por defecto a conversaciones nuevas. */
 export async function getNewChatDefaultAgentProfile(): Promise<AgentProfile> {
   return (await getAgentProfile(await getNewChatDefaultProfileId())) ?? getFirstActiveAgentProfile();
 }
+/** Valida y crea un perfil de agente activo. */
 export async function createAgentProfile(input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile> {
   const item = validate(input.name, input.modelId, input.config);
   // sort_order remains in the table for existing installations, but no longer carries behavior.
   const result = await db().query('INSERT INTO runtime.agent_profile_configs (id,name,model_id,sort_order,config) VALUES ($1,$2,$3,0,$4) RETURNING *', [randomUUID(), item.name, item.modelId, JSON.stringify(item.config)]);
   return dto(result.rows[0]);
 }
+/** Actualiza un perfil activo; devuelve `null` si no existe o ya fue archivado. */
 export async function updateAgentProfile(id: string, input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile | null> {
   const item = validate(input.name, input.modelId, input.config);
   const result = await db().query('UPDATE runtime.agent_profile_configs SET name=$2,model_id=$3,config=$4,updated_at=now() WHERE id=$1 AND archived_at IS NULL RETURNING *', [id, item.name, item.modelId, JSON.stringify(item.config)]);
   return result.rows[0] ? dto(result.rows[0]) : null;
 }
+/** Archiva un perfil y reubica el predeterminado si corresponde; conserva al menos uno activo. */
 export async function archiveAgentProfile(id: string): Promise<boolean> {
   const client = await db().connect();
   try {
@@ -104,7 +115,7 @@ export async function archiveAgentProfile(id: string): Promise<boolean> {
   finally { client.release(); }
 }
 
-/** Migra el comportamiento preexistente al primer perfil, una sola vez. */
+/** Migra el comportamiento anterior al primer perfil activo, una sola vez y de forma segura entre réplicas. */
 export async function seedDefaultAgentProfile(): Promise<void> {
   const client = await db().connect();
   try {

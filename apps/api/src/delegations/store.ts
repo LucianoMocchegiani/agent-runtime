@@ -4,13 +4,16 @@ import type { Prisma } from '@prisma/client';
 import { sealDelegationPayload } from './payload.js';
 import type { Principal } from '../auth/principal.js';
 
+/** Estados persistidos del ciclo de vida de una delegación. */
 export type DelegationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
+/** Datos de ejecución cifrados en reposo mientras el trabajo espera al worker. */
 export type DelegationPayload = {
   principal: Principal;
   accessToken: string;
   mcpTokens: Record<string, string> | null;
   instruction: string;
 };
+/** Trabajo reclamado por un worker, incluidos los bytes cifrados del payload. */
 export type DelegationJob = {
   id: string;
   user_id: string;
@@ -22,6 +25,7 @@ export type DelegationJob = {
   payload_tag: Buffer;
   claimed_by: string | null;
 };
+/** Evento persistido y transmitido a los clientes de una delegación. */
 export type DelegationEvent = {
   id: string;
   jobId: string;
@@ -30,6 +34,7 @@ export type DelegationEvent = {
   createdAt: Date;
 };
 
+/** Encola atómicamente un trabajo y su evento inicial, cifrando los datos de ejecución. */
 export async function enqueueDelegation(input: {
   principal: Principal;
   sourceConversationId: string;
@@ -79,6 +84,7 @@ async function interruptExpiredJobs(tx: Prisma.TransactionClient): Promise<void>
   }
 }
 
+/** Reclama el siguiente trabajo disponible y marca como interrumpidos los leases vencidos. */
 export async function claimDelegation(workerId: string, leaseMs = 120_000): Promise<DelegationJob | null> {
   return prisma.$transaction(async (tx) => {
     await interruptExpiredJobs(tx);
@@ -103,6 +109,7 @@ export async function claimDelegation(workerId: string, leaseMs = 120_000): Prom
   });
 }
 
+/** Registra el inicio si el worker aún conserva el lease del trabajo. */
 export async function recordDelegationStarted(jobId: string, workerId: string, targetConversationId: string): Promise<void> {
   await prisma.$transaction(async (tx) => {
     const rows = await tx.$queryRaw<Array<{ id: string }>>`
@@ -120,6 +127,7 @@ export async function recordDelegationStarted(jobId: string, workerId: string, t
   });
 }
 
+/** Renueva el lease del worker; devuelve `false` si ya no es su propietario. */
 export async function renewDelegation(jobId: string, workerId: string, leaseMs = 120_000): Promise<boolean> {
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     UPDATE runtime.delegation_jobs
@@ -131,6 +139,7 @@ export async function renewDelegation(jobId: string, workerId: string, leaseMs =
   return rows.length === 1;
 }
 
+/** Devuelve a la cola un trabajo reclamado que debe esperar antes de reintentarse. */
 export async function deferDelegation(jobId: string, workerId: string): Promise<void> {
   await prisma.$executeRaw`
     UPDATE runtime.delegation_jobs
@@ -141,6 +150,7 @@ export async function deferDelegation(jobId: string, workerId: string): Promise<
   `;
 }
 
+/** Finaliza el trabajo, elimina su payload cifrado y registra el evento terminal. */
 export async function finishDelegation(
   jobId: string,
   workerId: string,
@@ -170,6 +180,7 @@ export async function finishDelegation(
   });
 }
 
+/** Lista las delegaciones recientes de un usuario, sin exponer payloads cifrados. */
 export async function listDelegationsForUser(userId: string, limit = 100): Promise<Array<{
   id: string; status: DelegationStatus; sourceConversationId: string; targetConversationId: string;
   createdAt: Date; startedAt: Date | null; finishedAt: Date | null; errorCode: string | null;
@@ -192,6 +203,7 @@ export async function listDelegationsForUser(userId: string, limit = 100): Promi
   }));
 }
 
+/** Obtiene una delegación solo si pertenece al usuario indicado. */
 export async function getDelegationForUser(jobId: string, userId: string): Promise<{
   id: string; status: DelegationStatus; sourceConversationId: string; targetConversationId: string;
   createdAt: Date; startedAt: Date | null; finishedAt: Date | null; errorCode: string | null;
@@ -212,6 +224,7 @@ export async function getDelegationForUser(jobId: string, userId: string): Promi
   } : null;
 }
 
+/** Recupera eventos posteriores al identificador monotónico indicado. */
 export async function listDelegationEvents(jobId: string, afterId: string): Promise<DelegationEvent[]> {
   return prisma.$queryRaw<DelegationEvent[]>`
     SELECT id::text, job_id::text AS "jobId", event_type AS type, data, created_at AS "createdAt"

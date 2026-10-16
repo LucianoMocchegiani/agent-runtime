@@ -12,6 +12,7 @@ function readCursor(raw: string | undefined): string {
   return raw;
 }
 
+/** Rutas para consultar delegaciones propias y seguir sus eventos por SSE. */
 export const delegationRoutes = new Hono<AppEnv>();
 
 delegationRoutes.get('/', async (c) => {

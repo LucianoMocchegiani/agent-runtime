@@ -4,19 +4,26 @@ import { config, type McpConfig, type McpServerConfig } from '../config.js';
 /** OpenAI exige `^[a-zA-Z0-9_-]{1,64}$` en nombres de tools: sin puntos. */
 const TOOL_NAMESPACE_SEPARATOR = '__';
 
+/** Cliente conectado junto al nombre lógico de su servidor MCP. */
 export type McpClientEntry = {
   name: string;
   client: MCPClient;
 };
 
+/**
+ * Administra las conexiones MCP de un turno y agrega sus herramientas con namespace.
+ * Los servidores opcionales que fallen se omiten; los requeridos hacen fallar la conexión.
+ */
 export class McpRegistry {
   private mcps: Map<string, McpServerConfig> = new Map();
   private clients: Map<string, MCPClient> = new Map();
 
+  /** Crea el registro a partir de la configuración runtime actual. */
   static fromConfig(): McpRegistry {
     return new McpRegistry(config.mcpConfig);
   }
 
+  /** Inicializa el registro con el mapa de servidores que se conectarán. */
   constructor(mcps: McpConfig) {
     for (const [name, cfg] of Object.entries(mcps)) {
       this.mcps.set(name, cfg);
@@ -50,6 +57,7 @@ export class McpRegistry {
     }
   }
 
+  /** Lista y combina las herramientas disponibles, prefijándolas con el nombre del servidor. */
   async getAllTools(): Promise<Record<string, unknown>> {
     const allTools: Record<string, unknown> = {};
     for (const [name, client] of this.clients) {
@@ -71,6 +79,7 @@ export class McpRegistry {
     return allTools;
   }
 
+  /** Cierra todas las conexiones abiertas y vacía el registro de clientes. */
   async close(): Promise<void> {
     await Promise.all(
       [...this.clients.values()].map((client) =>

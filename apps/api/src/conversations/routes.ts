@@ -3,7 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/principal.js';
 import { getAgentProfile, getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { requireConversationId } from './ids.js';
-import { decodeOptionalConversationCursor, encodeConversationCursor } from '../agent/conversation-cursor.js';
+import { decodeOptionalConversationCursor, encodeConversationCursor } from './cursor.js';
 import { readJsonBody } from '../http/request-body.js';
 import {
   archiveConversation,
@@ -22,7 +22,8 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 /**
- * CRUD de hilos. Aislado por tenant+user del Bearer.
+ * Rutas HTTP de conversaciones: listado paginado, creación, consulta, edición y archivo.
+ * Todas las operaciones quedan aisladas por el principal autenticado.
  */
 export const conversationRoutes = new Hono<AppEnv>();
 

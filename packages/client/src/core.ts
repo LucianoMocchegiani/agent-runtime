@@ -5,20 +5,24 @@
  * No depende de framework UI.
  */
 
+/** Configuración del cliente HTTP, incluidos proveedores dinámicos de credenciales. */
 export type ClientConfig = {
   baseUrl: string;
   getBearer: () => string | null;
   getMcpAuth?: () => Record<string, string> | null;
 };
 
+/** Página de resultados con metadatos para continuar la paginación. */
 export type CursorPage<T, Cursor = string> = {
   items: T[];
   hasMore: boolean;
   nextCursor: Cursor | null;
 };
 
+/** Opciones comunes para solicitar una página con cursor. */
 export type CursorPageOptions = { limit?: number; cursor?: string };
 
+/** DTO de conversación que devuelve la API. */
 export type Conversation = {
   id: string;
   userId: string;
@@ -29,8 +33,10 @@ export type Conversation = {
   agentProfileId: string | null;
 };
 
+/** Campos públicos del perfil de agente disponibles para la aplicación cliente. */
 export type AgentProfileInfo = { id: string; name: string; modelId: string };
 
+/** Preferencia persistente devuelta por Memory. */
 export type UserPreference = {
   id: string;
   preference: string;
@@ -39,9 +45,12 @@ export type UserPreference = {
   createdAt: string;
 };
 
+/** Campos requeridos para guardar una preferencia. */
 export type SavePreferenceOptions = Omit<UserPreference, 'id' | 'createdAt'>;
 
+/** Estados posibles de una tarea delegada. */
 export type DelegationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
+/** Estado y metadatos públicos de una delegación. */
 export type Delegation = {
   id: string;
   status: DelegationStatus;
@@ -52,8 +61,10 @@ export type Delegation = {
   finishedAt: string | null;
   errorCode: string | null;
 };
+/** Evento recibido del stream de una delegación. */
 export type DelegationEvent = { id: string; type: string; data: unknown; createdAt: string };
 
+/** Mensaje serializado de usuario, asistente o herramienta. */
 export type Message = {
   id: string;
   conversationId: string;
@@ -65,10 +76,14 @@ export type Message = {
   createdAt: string;
 };
 
+/** Cursor de paginación de mensajes, con fecha e identificador. */
 export type MessageCursor = { createdAt: string; id: string };
+/** Página de mensajes con cursor de continuación. */
 export type MessagePage = CursorPage<Message, MessageCursor>;
+/** Opciones de paginación para listar mensajes de un hilo. */
 export type MessageListOptions = { limit?: number; before?: MessageCursor };
 
+/** Datos de presentación y selección de un modelo habilitado. */
 export type ModelInfo = {
   /** `proveedor/modelo`; se manda como `model` en `messages.send`. */
   id: string;
@@ -77,11 +92,13 @@ export type ModelInfo = {
   model: string;
 };
 
+/** Catálogo de modelos junto al modelo predeterminado para chats nuevos. */
 export type ModelList = {
   default: string;
   items: ModelInfo[];
 };
 
+/** Adjuntos opcionales enviados con el mensaje actual. */
 export type SendOptions = {
   /** Data URLs temporales de imágenes; el servidor no las persiste. */
   images?: string[];
@@ -89,6 +106,7 @@ export type SendOptions = {
   image?: string | null;
 };
 
+/** Callbacks invocados al consumir eventos de texto, herramientas, error y fin. */
 export type StreamHandlers = {
   onTextDelta?: (delta: string) => void;
   onToolStart?: (toolCallId: string, toolName: string) => void;
@@ -127,6 +145,7 @@ async function json<T>(res: Response): Promise<T> {
   }
 }
 
+/** Error HTTP del cliente; `status` conserva el código de respuesta recibido. */
 export class ClientError extends Error {
   readonly status: number;
   constructor(status: number, message: string) {
@@ -136,6 +155,10 @@ export class ClientError extends Error {
   }
 }
 
+/**
+ * Crea el cliente tipado para conversaciones, mensajes, modelos, voz, preferencias y delegaciones.
+ * @param config URL base y callbacks de credenciales consultados en cada solicitud.
+ */
 export function createClient(config: ClientConfig) {
   function cursorQuery(options: CursorPageOptions & { archived?: boolean } = {}): string {
     const query = new URLSearchParams();
@@ -206,7 +229,9 @@ export function createClient(config: ClientConfig) {
   }
 
   return {
+    /** Operaciones paginadas y CRUD de conversaciones. */
     conversations: {
+      /** Recorre páginas hasta 100 conversaciones y devuelve el listado agregado. */
       list: async (options: { archived?: boolean } = {}): Promise<Conversation[]> => {
         const items: Conversation[] = [];
         let cursor: string | undefined;
@@ -219,9 +244,11 @@ export function createClient(config: ClientConfig) {
         return items.slice(0, 100);
       },
 
+      /** Solicita una página de conversaciones sin recorrer el resto. */
       listPage: async (options: { archived?: boolean } & CursorPageOptions = {}): Promise<CursorPage<Conversation>> =>
         fetchConversationPage(options),
 
+      /** Crea una conversación, opcionalmente asignándole un perfil inicial. */
       create: async (options: { agentProfileId?: string } = {}): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations`, {
           method: 'POST',
@@ -235,6 +262,7 @@ export function createClient(config: ClientConfig) {
         return json<Conversation>(res);
       },
 
+      /** Consulta una conversación por su identificador. */
       get: async (id: string): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations/${id}`, {
           headers: headers(config, { Accept: 'application/json' }),
@@ -243,6 +271,7 @@ export function createClient(config: ClientConfig) {
         return json<Conversation>(res);
       },
 
+      /** Archiva una conversación. */
       archive: async (id: string): Promise<Conversation> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations/${id}`, {
           method: 'DELETE',
@@ -252,6 +281,7 @@ export function createClient(config: ClientConfig) {
         return json<Conversation>(res);
       },
 
+      /** Actualiza título, archivo o perfil sin modificar los campos omitidos. */
       patch: async (
         id: string,
         patch: { title?: string | null; archived?: boolean; agentProfileId?: string | null },
@@ -269,7 +299,9 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    /** Operaciones para listar, guardar y eliminar preferencias persistentes. */
     preferences: {
+      /** Recorre páginas hasta 100 preferencias y devuelve el listado agregado. */
       list: async (): Promise<UserPreference[]> => {
         const items: UserPreference[] = [];
         let cursor: string | undefined;
@@ -282,9 +314,11 @@ export function createClient(config: ClientConfig) {
         return items.slice(0, 100);
       },
 
+      /** Solicita una página de preferencias sin recorrer el resto. */
       listPage: async (options: CursorPageOptions = {}): Promise<CursorPage<UserPreference>> =>
         fetchPreferencePage(options),
 
+      /** Guarda una preferencia persistente. */
       save: async (preference: SavePreferenceOptions): Promise<UserPreference> => {
         const res = await fetch(`${baseUrl(config)}/v1/preferences`, {
           method: 'POST',
@@ -295,6 +329,7 @@ export function createClient(config: ClientConfig) {
         return json<UserPreference>(res);
       },
 
+      /** Elimina una preferencia por su identificador. */
       delete: async (id: string): Promise<void> => {
         const res = await fetch(`${baseUrl(config)}/v1/preferences/${encodeURIComponent(id)}`, {
           method: 'DELETE',
@@ -304,7 +339,9 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    /** Catálogo de modelos habilitados y selección predeterminada. */
     models: {
+      /** Obtiene el catálogo de modelos habilitados y el predeterminado. */
       list: async (): Promise<ModelList> => {
         const res = await fetch(`${baseUrl(config)}/v1/models`, {
           headers: headers(config, { Accept: 'application/json' }),
@@ -315,7 +352,9 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    /** Metadatos de perfiles disponibles en la aplicación autenticada. */
     agentProfiles: {
+      /** Lista los metadatos de perfiles disponibles para la aplicación. */
       list: async (): Promise<AgentProfileInfo[]> => {
         const res = await fetch(`${baseUrl(config)}/v1/agent-profiles`, { headers: headers(config, { Accept: 'application/json' }) });
         if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
@@ -324,7 +363,9 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    /** Consulta delegaciones y consume sus eventos persistidos por SSE. */
     delegations: {
+      /** Lista delegaciones del usuario autenticado. */
       list: async (): Promise<Delegation[]> => {
         const res = await fetch(`${baseUrl(config)}/v1/delegations`, {
           headers: headers(config, { Accept: 'application/json' }),
@@ -334,6 +375,7 @@ export function createClient(config: ClientConfig) {
         return data?.items ?? [];
       },
 
+      /** Consulta el estado de una delegación propia. */
       get: async (id: string): Promise<Delegation> => {
         const res = await fetch(`${baseUrl(config)}/v1/delegations/${encodeURIComponent(id)}`, {
           headers: headers(config, { Accept: 'application/json' }),
@@ -342,6 +384,7 @@ export function createClient(config: ClientConfig) {
         return json<Delegation>(res);
       },
 
+      /** Sigue los eventos SSE desde el cursor opcional hasta cancelar la señal. */
       events: async (
         id: string,
         options: { after?: string; signal?: AbortSignal; onEvent: (event: DelegationEvent) => void },
@@ -392,7 +435,9 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    /** Consulta disponibilidad de voz y accede a transcripción/síntesis. */
     voice: {
+      /** Indica si la síntesis de voz está disponible para el hilo. */
       status: async (conversationId: string): Promise<{ available: boolean }> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/status`, {
           headers: headers(config, { Accept: 'application/json' }),
@@ -401,6 +446,7 @@ export function createClient(config: ClientConfig) {
         return json<{ available: boolean }>(res);
       },
 
+      /** Solicita una credencial Realtime temporal para transcripción. */
       createRealtimeToken: async (conversationId: string): Promise<{ value: string; expiresAt: number | null }> => {
         const res = await fetch(`${baseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/token`, {
           method: 'POST',
@@ -413,6 +459,7 @@ export function createClient(config: ClientConfig) {
         return json<{ value: string; expiresAt: number | null }>(res);
       },
 
+      /** Convierte texto en audio y devuelve el resultado como `Blob`. */
       synthesize: async (conversationId: string, text: string, traceId?: string): Promise<Blob> => {
         const requestHeaders = headers(config, { 'Content-Type': 'application/json', Accept: 'audio/mpeg' });
         if (traceId) requestHeaders['X-Voice-Trace-Id'] = traceId;
@@ -429,7 +476,9 @@ export function createClient(config: ClientConfig) {
       },
     },
 
+    /** Lista mensajes y envía/edita turnos mediante UI Message Stream. */
     messages: {
+      /** Obtiene una página de mensajes, opcionalmente antes de un cursor. */
       list: async (conversationId: string, options: MessageListOptions = {}): Promise<MessagePage> => {
         const query = new URLSearchParams();
         if (options.limit !== undefined) query.set('limit', String(options.limit));
@@ -447,6 +496,7 @@ export function createClient(config: ClientConfig) {
         return data ?? { items: [], hasMore: false, nextCursor: null };
       },
 
+      /** Envía un turno y despacha deltas y eventos a los handlers. */
       send: async (
         conversationId: string,
         text: string,
@@ -464,6 +514,7 @@ export function createClient(config: ClientConfig) {
         signal,
       ),
 
+      /** Edita un mensaje del usuario y regenera desde ese punto. */
       edit: async (
         conversationId: string,
         messageId: string,
@@ -481,6 +532,7 @@ export function createClient(config: ClientConfig) {
   };
 }
 
+/** Indica si el error corresponde a una solicitud cancelada mediante `AbortSignal`. */
 export function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === 'AbortError') ||
@@ -488,6 +540,11 @@ export function isAbortError(error: unknown): boolean {
   );
 }
 
+/**
+ * Consume el stream UI Message de AI SDK y despacha los eventos normalizados.
+ * @param body Cuerpo SSE recibido de la API.
+ * @param handlers Callbacks para deltas de texto, herramientas y errores.
+ */
 export async function consumeUiMessageStream(
   body: ReadableStream<Uint8Array>,
   handlers: StreamHandlers = {},

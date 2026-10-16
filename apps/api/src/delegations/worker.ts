@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { HTTPException } from 'hono/http-exception';
-import { acquireConversationTurn } from '../messages/turn-lock.js';
+import { acquireConversationTurn } from '../agent/turn/lock.js';
 import { getConversation } from '../conversations/service.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
 import { resolveModel } from '../llm/provider.js';
-import { streamAgentTurn } from '../agent/run.js';
+import { streamAgentTurn } from '../agent/turn/run.js';
 import { delegationEncryptionEnabled, openDelegationPayload } from './payload.js';
 import {
   claimDelegation,
@@ -58,6 +58,7 @@ async function consume(response: Response): Promise<void> {
   }
 }
 
+/** Ejecuta una delegación reclamada, renovando ambos leases y guardando el estado terminal. */
 async function processJob(job: DelegationJob, workerId: string): Promise<void> {
   let payload: DelegationPayload;
   try {
@@ -136,6 +137,7 @@ async function processJob(job: DelegationJob, workerId: string): Promise<void> {
   }
 }
 
+/** Inicia el worker de delegaciones y procesa trabajos hasta recibir SIGTERM/SIGINT. */
 export function startDelegationWorker(): void {
   if (!delegationEncryptionEnabled()) {
     console.info('Delegaciones deshabilitadas: configurá DELEGATION_PAYLOAD_ENCRYPTION_KEY en todas las réplicas para habilitarlas.');

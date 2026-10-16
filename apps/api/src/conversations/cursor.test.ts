@@ -5,7 +5,7 @@ import {
   decodeOptionalConversationCursor,
   encodeConversationCursor,
   type ConversationListScope,
-} from './conversation-cursor.js';
+} from './cursor.js';
 
 const cursorData = {
   updatedAt: '2025-01-02T03:04:05.000Z',

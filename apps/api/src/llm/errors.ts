@@ -1,6 +1,4 @@
-/**
- * Errores del proveedor de IA / AI SDK → texto para el identificado. Sin secretos ni bodies crudos.
- */
+/** Clasifica errores del proveedor/AI SDK en mensajes seguros para el usuario, sin filtrar secretos ni cuerpos crudos. */
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -42,6 +40,7 @@ function collectBlob(error: unknown, depth = 0): string {
   return parts.join(' ').toLowerCase();
 }
 
+/** Indica si el valor representa la cancelación de una solicitud o stream. */
 export function isAbortError(error: unknown): boolean {
   if (error instanceof Error && (error.name === 'AbortError' || /aborted/i.test(error.message))) {
     return true;
@@ -56,9 +55,7 @@ function errorPayload(event: unknown): unknown {
   return rec?.error ?? event;
 }
 
-/**
- * Mensaje corto para el drawer / SSE `error`. Cadena vacía = abort (no mostrar).
- */
+/** Devuelve un mensaje breve para UI/SSE; una cadena vacía indica cancelación no visible. */
 export function identifiedFacingLlmError(event: unknown, provider: string): string {
   const error = errorPayload(event);
   if (isAbortError(error) || isAbortError(event)) {

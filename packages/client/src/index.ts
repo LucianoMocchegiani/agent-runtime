@@ -1,3 +1,4 @@
+/** Punto de entrada público del SDK de agent-runtime. */
 export {
   createClient,
   consumeUiMessageStream,

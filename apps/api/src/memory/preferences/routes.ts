@@ -1,10 +1,11 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { deletePreference, listPreferences, savePreference } from 'agent-runtime-memory';
-import type { AppEnv } from '../auth/principal.js';
-import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './preference-cursor.js';
-import { readJsonBody } from '../http/request-body.js';
+import type { AppEnv } from '../../auth/principal.js';
+import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './cursor.js';
+import { readJsonBody } from '../../http/request-body.js';
 
+/** Rutas de lectura paginada, alta y eliminación de preferencias del usuario. */
 export const preferenceRoutes = new Hono<AppEnv>();
 
 function asRecord(value: unknown): Record<string, unknown> {

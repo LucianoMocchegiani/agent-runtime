@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { streamAgentTurn } from '../agent/run.js';
+import { streamAgentTurn } from '../agent/turn/run.js';
 import type { AppEnv } from '../auth/principal.js';
 import { createMemoryClient } from '../memory/client.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
 import { resolveModel } from '../llm/provider.js';
-import { acquireConversationTurn } from './turn-lock.js';
+import { acquireConversationTurn } from '../agent/turn/lock.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
 import { readJsonBody } from '../http/request-body.js';
 import {
@@ -122,7 +122,8 @@ async function releaseTurnWhenResponseEnds(response: Response, release: () => Pr
 }
 
 /**
- * Mensajes de un hilo. GET lista; POST stremea un turno o edita un mensaje y regenera desde ahí.
+ * Rutas de mensajes: listado paginado, envío con stream y edición con regeneración.
+ * Los turnos se coordinan con un lease compartido y los adjuntos no se persisten.
  */
 export const messageRoutes = new Hono<AppEnv>();
 

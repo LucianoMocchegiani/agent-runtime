@@ -25,7 +25,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { titleFromFirstMessage } from './title.js';
 
-/** Error de dominio cuando un hilo no existe o no pertenece al usuario. */
+/** Error de dominio cuando un hilo no existe o no pertenece al usuario indicado. */
 export class ConversationNotFoundError extends Error {
   constructor() {
     super('Conversation not found');
@@ -103,6 +103,11 @@ const CONTEXT_MESSAGES_TAKE = 500;
 const DEFAULT_MESSAGES_TAKE = 50;
 const MAX_MESSAGES_TAKE = 100;
 
+/**
+ * Carga el historial reciente y el estado del resumen tras verificar la propiedad del hilo.
+ * @param params Identidad y conversación cuyo contexto se necesita.
+ * @returns Mensajes en orden cronológico, resumen y cursor de resumen.
+ */
 export async function getContext(
   params: GetContextParams,
 ): Promise<GetContextResult> {
@@ -138,6 +143,7 @@ export async function getContext(
   };
 }
 
+/** Guarda un resumen solo si coincide la revisión esperada, evitando sobrescribir otro turno. */
 export async function saveSummary(params: SaveSummaryParams): Promise<boolean> {
   const throughCreatedAt = new Date(params.throughCreatedAt);
   if (!Number.isFinite(throughCreatedAt.getTime()) || !params.summary.trim()) return false;
@@ -157,6 +163,7 @@ export async function saveSummary(params: SaveSummaryParams): Promise<boolean> {
   return result.count === 1;
 }
 
+/** Persiste un mensaje de usuario, asistente o herramienta en una conversación propia. */
 export async function saveMessage(
   params: SaveMessageParams,
 ): Promise<void> {
@@ -174,6 +181,12 @@ export async function saveMessage(
   });
 }
 
+/**
+ * Edita un mensaje propio y elimina transaccionalmente los mensajes posteriores, invalidando el resumen.
+ * @throws {MessageEditConflictError} Si cambió el historial posterior desde la confirmación.
+ * @throws {MessageNotEditableError} Si el objetivo no es un mensaje propio editable.
+ * @throws {MessageContainsUnstoredAttachmentError} Si el mensaje contiene adjuntos que no se guardaron.
+ */
 export async function editMessageAndTruncate(
   params: EditMessageParams,
 ): Promise<EditMessageResult> {
@@ -234,6 +247,7 @@ export async function editMessageAndTruncate(
   });
 }
 
+/** Lista una página de mensajes de una conversación propia, en orden cronológico. */
 export async function listMessages(
   params: ListMessagesParams,
 ): Promise<ListMessagesResult> {
@@ -272,6 +286,7 @@ export async function listMessages(
   };
 }
 
+/** Lista conversaciones del usuario con filtro opcional de archivo y cursor estable. */
 export async function listConversations(
   params: ListConversationsParams,
 ): Promise<ConversationDto[]> {
@@ -300,6 +315,7 @@ export async function listConversations(
   return rows.map(toConversationDto);
 }
 
+/** Crea una conversación para el usuario y fija el perfil que usará el hilo. */
 export async function createConversation(
   params: CreateConversationParams,
 ): Promise<ConversationDto> {
@@ -314,6 +330,7 @@ export async function createConversation(
   return toConversationDto(row);
 }
 
+/** Obtiene una conversación después de validar que pertenece al usuario indicado. */
 export async function getConversation(
   params: GetConversationParams,
 ): Promise<ConversationDto> {
@@ -326,6 +343,7 @@ export async function getConversation(
   return toConversationDto(row);
 }
 
+/** Actualiza título, estado de archivo y/o perfil de una conversación propia. */
 export async function updateConversation(
   params: UpdateConversationParams,
 ): Promise<ConversationDto> {
@@ -344,6 +362,7 @@ export async function updateConversation(
   return toConversationDto(row);
 }
 
+/** Archiva una conversación propia sin eliminar sus mensajes. */
 export async function archiveConversation(
   params: ArchiveConversationParams,
 ): Promise<ConversationDto> {
@@ -356,6 +375,7 @@ export async function archiveConversation(
   return toConversationDto(row);
 }
 
+/** Asigna el título derivado del primer mensaje solo si todavía no hay título. */
 export async function applyAutomaticTitle(
   params: ApplyTitleParams,
 ): Promise<string | null> {

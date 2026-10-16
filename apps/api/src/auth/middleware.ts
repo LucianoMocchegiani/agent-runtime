@@ -13,9 +13,8 @@ function readBearer(header: string | undefined): string | null {
 }
 
 /**
- * Exige Bearer (identificado) o crea session anónima (público).
- *
- * @remarks Sin estado: la session anónima es el uuid de `anon:<uuid>` que guarda el cliente.
+ * Middleware que asocia a la petición un principal identificado o una sesión anónima.
+ * @remarks No mantiene estado: el cliente conserva el UUID como `anon:<uuid>`; sin Bearer se crea una sesión nueva.
  */
 const ANON_PREFIX = 'anon:';
 
@@ -42,6 +41,7 @@ function parseMcpAuth(header: string | undefined): Record<string, string> | null
   }
 }
 
+/** Valida la identidad y carga principal, token y credenciales MCP en el contexto Hono. */
 export const requirePrincipal = createMiddleware<AppEnv>(async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     await next();

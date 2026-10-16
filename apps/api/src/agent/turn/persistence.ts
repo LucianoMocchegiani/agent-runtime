@@ -1,6 +1,7 @@
 import { toJsonValue, type MemoryService } from 'agent-runtime-memory-contract';
-import { shrinkToolContent } from './window.js';
+import { shrinkToolContent } from '../window/index.js';
 
+/** Forma normalizada de una llamada o resultado de herramienta del AI SDK. */
 export type AgentTurnTool = {
   toolName?: string;
   args?: unknown;
@@ -9,6 +10,7 @@ export type AgentTurnTool = {
   output?: unknown;
 };
 
+/** Texto y herramientas producidos durante un paso del turno. */
 export type AgentTurnStep = {
   text?: string;
   toolCalls?: AgentTurnTool[];
@@ -40,7 +42,14 @@ function assistantTextOf(text: string | undefined, steps: AgentTurnStep[]): stri
     .trim();
 }
 
-/** Persists assistant text and tool results yielded during a completed or interrupted turn. */
+/**
+ * Persiste el texto y resultados producidos durante un turno finalizado o interrumpido.
+ * @param memory Servicio de persistencia de conversaciones.
+ * @param conversationId Hilo donde se guardará la salida.
+ * @param userId Propietario del hilo.
+ * @param text Texto final generado por el modelo, si existe.
+ * @param steps Pasos y llamadas a herramientas reportados por el SDK.
+ */
 export async function persistAgentTurn(
   memory: MemoryService,
   conversationId: string,

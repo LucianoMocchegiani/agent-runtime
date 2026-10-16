@@ -1,14 +1,14 @@
 import { streamText, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
 import type { MemoryService } from 'agent-runtime-memory-contract';
-import type { ResolvedModel } from '../llm/provider.js';
-import { isAbortError, identifiedFacingLlmError } from '../llm/errors.js';
-import type { McpRegistry } from '../mcp/registry.js';
-import type { RuntimeSettings } from '../runtime-config/store.js';
+import type { ResolvedModel } from '../../llm/provider.js';
+import { isAbortError, identifiedFacingLlmError } from '../../llm/errors.js';
+import type { McpRegistry } from '../../mcp/registry.js';
+import type { RuntimeSettings } from '../../runtime-config/store.js';
 import { formatLlmRequestTrace } from './llm-trace.js';
-import { persistAgentTurn, type AgentTurnStep } from './turn-persistence.js';
+import { persistAgentTurn, type AgentTurnStep } from './persistence.js';
 
-/** Runs the LLM stream and owns persistence and cleanup for the prepared turn. */
+/** Ejecuta el stream del modelo y coordina persistencia y cierre de recursos del turno. */
 export async function streamPreparedAgentTurn(params: {
   conversationId: string;
   userId: string;

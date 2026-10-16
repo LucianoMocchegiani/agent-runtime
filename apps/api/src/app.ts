@@ -9,19 +9,19 @@ import { conversationRoutes } from './conversations/routes.js';
 import { modelRoutes } from './llm/routes.js';
 import { prisma } from 'agent-runtime-memory';
 import { messageRoutes } from './messages/routes.js';
-import { runtimeConfigRoutes } from './runtime-config/routes.js';
+import { runtimeConfigRoutes } from './runtime-config/runtime-config-routes.js';
 import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';
 import { agentProfileListRoutes } from './runtime-config/agent-profile-list-routes.js';
 import { mountUi } from './ui.js';
 import { delegationRoutes } from './delegations/routes.js';
 import { voiceRoutes } from './voice/routes.js';
-import { preferenceRoutes } from './memory/preferences-routes.js';
+import { preferenceRoutes } from './memory/preferences/routes.js';
 
 type DependencyStatus = 'up' | 'down';
 
 const HEALTH_TIMEOUT_MS = 3000;
 
-/** Verifica PostgreSQL, compartido por Runtime y el módulo interno de Memory. */
+/** Comprueba la disponibilidad de PostgreSQL, compartido por Runtime y el módulo Memory. */
 async function pingMemory(): Promise<DependencyStatus> {
   try {
     await Promise.race([
@@ -35,7 +35,8 @@ async function pingMemory(): Promise<DependencyStatus> {
 }
 
 /**
- * App HTTP del agent-runtime: CORS, health, `/v1` autenticado y UI nativa en `/`.
+ * Construye la aplicación HTTP con CORS, health, rutas autenticadas `/v1`, administración y UI.
+ * @returns Aplicación Hono lista para servir.
  */
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();

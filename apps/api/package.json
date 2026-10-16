@@ -11,7 +11,7 @@
     "start": "node dist/index.js",
     "start:dev": "tsx watch --env-file=../../.env src/index.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/agent/window.test.ts src/agent/turn-persistence.test.ts src/agent/turn-context.test.ts src/agent/conversation-cursor.test.ts src/agent/tools.test.ts src/memory/preference-cursor.test.ts src/http/request-body.test.ts src/messages/turn-lock.test.ts src/delegations/payload.test.ts"
+    "test": "node --import tsx --test src/agent/window/index.test.ts src/agent/turn/persistence.test.ts src/agent/turn/context.test.ts src/agent/turn/lock.test.ts src/conversations/cursor.test.ts src/agent/tools/tools.test.ts src/memory/preferences/cursor.test.ts src/http/request-body.test.ts src/delegations/payload.test.ts"
   },
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.78",

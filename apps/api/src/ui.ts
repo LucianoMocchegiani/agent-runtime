@@ -12,9 +12,9 @@ function isApiPath(path: string): boolean {
 }
 
 /**
- * UI nativa (`apps/ui`) en `/`, mismo origen que la API. Montar después de las rutas de la API.
- *
- * @remarks `UI_ENABLED=false` la apaga (runtime solo como backend de otra app, vía SDK).
+ * Monta la UI nativa en el mismo origen, después de registrar las rutas de la API.
+ * @param app Aplicación Hono a la que se agregan los handlers estáticos y fallback SPA.
+ * @remarks `UI_ENABLED=false` la desactiva para usar Runtime solo como backend/SDK.
  */
 export function mountUi(app: Hono<AppEnv>): void {
   if (!config.ui.enabled) {

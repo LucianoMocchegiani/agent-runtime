@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createConversationTurnLocker } from './turn-lock.js';
+import { createConversationTurnLocker } from './lock.js';
 
 type Entry = { token: string; expiresAt: number };
 

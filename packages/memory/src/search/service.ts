@@ -16,6 +16,7 @@ function toEmbeddingInput(role: string, content: string): string {
   return `${input.slice(0, MAX_EMBEDDING_INPUT_CHARS - 20)} [truncated]`;
 }
 
+/** Parámetros de búsqueda expuestos por el módulo Memory. */
 export type SearchMemoryInput = {
   userId: string;
   query: string;
@@ -23,6 +24,7 @@ export type SearchMemoryInput = {
   limit?: number;
 };
 
+/** Resultados de búsqueda y modo de recuperación utilizado. */
 export type SearchMemoryOutput = {
   mode: 'text' | 'hybrid';
   items: SearchHit[];
@@ -33,6 +35,10 @@ export const searchIndex: SearchIndex = new PostgresSearchIndex();
 export let embeddingProvider: EmbeddingProvider | null = null;
 let activeEmbeddingIdentity = '';
 
+/**
+ * Configura el proveedor de embeddings e invalida/reencola índices al cambiar modelo o endpoint.
+ * @param value Credenciales y modelo o `null` para deshabilitar embeddings.
+ */
 export async function setEmbeddingConfig(value: { apiKey: string; baseUrl: string; model: string } | null): Promise<void> {
   let next: EmbeddingProvider | null = null;
   let nextIdentity = '';
@@ -48,6 +54,7 @@ export async function setEmbeddingConfig(value: { apiKey: string; baseUrl: strin
   activeEmbeddingIdentity = nextIdentity;
 }
 
+/** Encola o actualiza el documento de un mensaje para su indexación asíncrona. */
 export async function indexMessage(document: Parameters<SearchIndex['upsertDocument']>[0]): Promise<void> {
   await searchIndex.upsertDocument(document);
 }
@@ -68,6 +75,7 @@ function fuseResults(textHits: SearchHit[], semanticHits: SearchHit[], limit: nu
     .map(({ hit, score }) => ({ ...hit, score }));
 }
 
+/** Busca mensajes por texto y combina resultados semánticos cuando los embeddings están activos. */
 export async function searchMemory(input: SearchMemoryInput): Promise<SearchMemoryOutput> {
   const query = input.query.trim();
   if (!query) return { mode: 'text', items: [] };
@@ -109,7 +117,7 @@ async function processPendingBatch(): Promise<boolean> {
   return true;
 }
 
-/** Background, persisted queue: restarts and provider outages do not lose indexing work. */
+/** Inicia el worker de indexación persistente; reinicios y caídas del proveedor no pierden la cola. */
 export function startEmbeddingWorker(): void {
   let lastWarningAt = 0;
   const run = async () => {

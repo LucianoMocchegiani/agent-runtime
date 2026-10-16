@@ -1,5 +1,6 @@
 import { decodeOptionalCursor, encodeCursor } from '../pagination/cursor.js';
 
+/** Filtro incluido en el cursor para impedir reutilizarlo con otro alcance. */
 export type ConversationListScope = 'all' | 'active' | 'archived';
 
 type CursorPayload = {
@@ -8,10 +9,12 @@ type CursorPayload = {
   scope: ConversationListScope;
 };
 
+/** Codifica la posición de una página de conversaciones junto con su filtro. */
 export function encodeConversationCursor(payload: CursorPayload): string {
   return encodeCursor('updatedAt', payload.updatedAt, payload.id, payload.scope);
 }
 
+/** Decodifica el cursor opcional y comprueba que corresponda al filtro solicitado. */
 export function decodeOptionalConversationCursor(
   cursor: string | undefined,
   expectedScope: ConversationListScope,
@@ -24,6 +27,7 @@ export function decodeOptionalConversationCursor(
   }
 }
 
+/** Decodifica un cursor obligatorio de conversaciones. */
 export function decodeConversationCursor(
   cursor: string,
   expectedScope: ConversationListScope,

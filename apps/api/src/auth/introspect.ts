@@ -60,9 +60,10 @@ function readString(record: Record<string, unknown>, key: string): string | null
 }
 
 /**
- * Mapea el JSON de `AUTH_INTROSPECT_URL` al contrato portable.
- *
- * @throws {HTTPException} 502 si el cuerpo no trae `userId`.
+ * Mapea la respuesta JSON del servicio de introspección al contrato portable de identidad.
+ * @param body Cuerpo sin validar devuelto por el servicio.
+ * @returns Identificador de usuario y atributos opcionales configurados.
+ * @throws {HTTPException} 502 si la respuesta no es válida o no contiene `userId`.
  */
 function parseIntrospectBody(body: unknown): {
   userId: string;
@@ -88,10 +89,11 @@ function parseIntrospectBody(body: unknown): {
 }
 
 /**
- * Resuelve el principal reenviando el Bearer a `AUTH_INTROSPECT_URL`.
- *
- * @remarks Cache ~30s por hash del token. No verifica firma JWT.
- * @throws {HTTPException} 401 token inválido; 403 perfil/tenant; 502 introspect caído.
+ * Resuelve la identidad reenviando el Bearer al servicio configurado de introspección.
+ * @param token Token Bearer recibido del cliente.
+ * @returns Principal identificado por el servicio de autenticación.
+ * @remarks Usa una caché breve indexada por hash; no valida localmente firmas JWT.
+ * @throws {HTTPException} 401 si el token es inválido; 502 si falla la introspección o su respuesta.
  */
 export async function resolvePrincipal(token: string): Promise<Principal> {
   const key = tokenCacheKey(token);

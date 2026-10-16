@@ -1,13 +1,11 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID } from 'node:crypto';
 import { Pool } from 'pg';
-import { config, type ChatConfig } from '../config.js';
+import { config } from '../config.js';
 import { setEmbeddingConfig } from 'agent-runtime-memory';
 import { initializeNewChatDefaultProfile, seedDefaultAgentProfile, setAgentProfilePool } from './agent-profiles.js';
+import type { AgentProfile, EmbeddingConfig, RuntimeSettings } from './types.js';
 
-export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
-export type AgentProfileConfig = Pick<ChatConfig, 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'>;
-export type AgentProfile = { id: string; name: string; modelId: string; config: AgentProfileConfig; createdAt: string; updatedAt: string };
-export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
+export type { AgentProfile, AgentProfileConfig, EmbeddingConfig, RuntimeSettings } from './types.js';
 type Settings = RuntimeSettings;
 
 // Embeddings are opt-in and can only be configured in runtime.config.
@@ -50,7 +48,10 @@ async function reload(): Promise<void> {
   }
 }
 
-/** Runtime configuration is stored separately from Memory's conversation schema. */
+/**
+ * Inicializa el almacén cifrado de infraestructura, los perfiles y la sincronización entre réplicas.
+ * @throws {Error} Si faltan la URL de base de datos, la clave o la configuración persistida no es válida.
+ */
 export async function startRuntimeConfigStore(): Promise<void> {
   const url = process.env.DATABASE_URL?.trim();
   const rawKey = process.env.RUNTIME_CONFIG_ENCRYPTION_KEY?.trim();
@@ -155,7 +156,10 @@ function validateSettings(value: unknown): Settings {
   return v as Settings;
 }
 
-/** Devuelve una instantánea aislada y, cuando se indica, aplica el perfil asignado a la conversación. */
+/**
+ * Devuelve una instantánea aislada de la configuración efectiva y aplica el perfil opcional.
+ * @param profile Perfil opcional cuyos ajustes sustituyen los valores de conversación heredados.
+ */
 export function getRuntimeSettings(profile?: Pick<AgentProfile, 'modelId' | 'config'>): RuntimeSettings {
   const current = structuredClone(settings());
   if (profile) {
@@ -164,9 +168,12 @@ export function getRuntimeSettings(profile?: Pick<AgentProfile, 'modelId' | 'con
   }
   return current;
 }
+/** Devuelve la versión persistida que se usa para detectar actualizaciones concurrentes. */
 export function getRuntimeConfigVersion(): number { return version; }
+/** Indica si el almacén persistente y su clave de cifrado fueron inicializados. */
 export function isRuntimeConfigStoreEnabled(): boolean { return pool !== undefined && key !== undefined; }
 
+/** Conflicto optimista: la configuración cambió desde que el cliente la leyó. */
 export class RuntimeConfigConflictError extends Error {
   constructor() {
     super('Runtime config version conflict; reload the latest settings before saving');
@@ -174,6 +181,13 @@ export class RuntimeConfigConflictError extends Error {
   }
 }
 
+/**
+ * Valida, cifra y persiste nuevos ajustes usando control optimista de versión.
+ * @param value Configuración candidata recibida del administrador.
+ * @param expectedVersion Versión que el cliente espera reemplazar, si se envía.
+ * @returns Nueva versión persistida.
+ * @throws {RuntimeConfigConflictError} Si la versión esperada ya quedó obsoleta.
+ */
 export async function saveRuntimeSettings(value: unknown, expectedVersion?: number): Promise<number> {
   if (!pool) throw new Error('Database-backed config is disabled');
   const validated = validateSettings(value);

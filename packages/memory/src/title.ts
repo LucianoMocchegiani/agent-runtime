@@ -6,6 +6,11 @@
  */
 export const AUTO_TITLE_MAX = 60;
 
+/**
+ * Deriva un título breve de una sola línea del primer mensaje del usuario.
+ * @param text Texto original del mensaje.
+ * @returns Título de hasta `AUTO_TITLE_MAX` caracteres.
+ */
 export function titleFromFirstMessage(text: string): string {
   const oneLine = text.replace(/\s+/g, ' ').trim();
   if (oneLine.length === 0) {

@@ -15,8 +15,10 @@ function required(name: string): string {
   return value;
 }
 
+/** Proveedores de modelos cuyo soporte está integrado en esta aplicación. */
 export const AI_PROVIDERS = ['openrouter', 'openai'] as const;
 
+/** Identificador de un proveedor de modelos soportado. */
 export type AiProvider = (typeof AI_PROVIDERS)[number];
 
 /**
@@ -95,12 +97,14 @@ function parseBool(raw: string | undefined, fallback: boolean): boolean {
 const DEFAULT_SYSTEM_PROMPT =
   'Sos un asistente de IA. Usá las tools disponibles para responder. Si no sabés, decilo.';
 
+/** Mapeo de campos del servicio de introspección a la identidad interna. */
 export type AuthMapping = {
   userId: string;
   email: string | null;
   name: string | null;
 };
 
+/** Configuración de conexión, autenticación y obligatoriedad de un servidor MCP. */
 export type McpServerConfig = {
   url: string;
   auth: string | null;
@@ -109,8 +113,10 @@ export type McpServerConfig = {
   optional: boolean;
 };
 
+/** Servidores MCP configurados, indexados por nombre lógico. */
 export type McpConfig = Record<string, McpServerConfig>;
 
+/** Clave y catálogo de modelos/contextos de un proveedor de IA. */
 export type AiProviderConfig = {
   apiKey: string;
   /** Modelos ofrecidos en el selector (ids del proveedor, sin prefijo). */
@@ -119,6 +125,7 @@ export type AiProviderConfig = {
   contextWindows: Record<string, number>;
 };
 
+/** Proveedores habilitados y modelo seleccionado como valor de compatibilidad. */
 export type AiConfig = {
   /** Id completo `proveedor/modelo`; vacío hasta configurar el primer proveedor. */
   defaultModel: string;
@@ -126,6 +133,7 @@ export type AiConfig = {
   providers: Partial<Record<AiProvider, AiProviderConfig>>;
 };
 
+/** Configuración inicial del servicio, completada después desde el almacén runtime. */
 export type ChatConfig = {
   port: number;
   mcpConfig: McpConfig;
@@ -152,7 +160,8 @@ export type ChatConfig = {
   };
 };
 
-/** Seed mínimo usado solo cuando todavía no existe runtime.config. */
+/** Semilla mínima usada solo cuando todavía no existe `runtime.config`. */
+/** Configuración inicial leída del entorno; se completa con valores persistidos al arrancar. */
 export const config: ChatConfig = {
   port: parsePort(process.env.PORT),
   mcpConfig: {},

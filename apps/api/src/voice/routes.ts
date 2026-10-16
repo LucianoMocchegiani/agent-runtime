@@ -23,6 +23,7 @@ async function openAiError(response: Response): Promise<string> {
   }
 }
 
+/** Rutas de disponibilidad, credenciales de transcripción y síntesis de voz por conversación. */
 export const voiceRoutes = new Hono<AppEnv>();
 
 async function requireActiveConversation(c: Context<AppEnv>) {

@@ -7,6 +7,7 @@ type LeaseStore = {
   release(userId: string, conversationId: string, token: string): Promise<void>;
 };
 
+/** Reserva exclusiva de un turno; su señal se aborta si el lease se pierde. */
 export type ConversationTurnLease = {
   /** Se aborta si la instancia pierde o no puede renovar la reserva compartida. */
   signal: AbortSignal;
@@ -14,14 +15,19 @@ export type ConversationTurnLease = {
   release(): Promise<void>;
 };
 
+/** Duraciones configurables para la reserva y su renovación periódica. */
 export type ConversationTurnLockerOptions = {
   leaseMs?: number;
   renewEveryMs?: number;
 };
 
 /**
- * Fabrica un locker basado en leases. La implementación real usa PostgreSQL;
- * el store inyectable permite probar la lógica sin un servidor de base de datos.
+ * Crea una función de adquisición de leases; PostgreSQL es el almacén de producción y
+ * el store inyectable permite probarla sin base de datos.
+ * @param store Operaciones atómicas para reclamar, renovar y liberar la reserva.
+ * @param options Duración del lease y frecuencia de renovación.
+ * @returns Función que devuelve `null` si otro proceso ya posee el turno.
+ * @throws {Error} Si el intervalo no es positivo o no es menor que la duración del lease.
  */
 export function createConversationTurnLocker(
   store: LeaseStore,
@@ -124,4 +130,5 @@ const postgresStore: LeaseStore = {
   },
 };
 
+/** Adquiere en PostgreSQL el lease exclusivo de una conversación. */
 export const acquireConversationTurn = createConversationTurnLocker(postgresStore);
