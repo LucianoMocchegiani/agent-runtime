@@ -10,14 +10,16 @@ const chatVoiceSource = await readFile(new URL('./useChatVoice.js', import.meta.
 const chatHistorySource = await readFile(new URL('./useChatHistory.js', import.meta.url), 'utf8');
 const chatTurnSource = await readFile(new URL('./useChatTurn.js', import.meta.url), 'utf8');
 const chatComposerSource = await readFile(new URL('./useChatComposer.js', import.meta.url), 'utf8');
+const chatComposerViewSource = await readFile(new URL('./ChatComposer.jsx', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
 });
 
 test('la selección, lectura y retención de adjuntos de imagen quedan en su hook', () => {
-  assert.match(chatSource, /import useChatAttachments, \{ MAX_IMAGES \} from '\.\/useChatAttachments\.js'/);
+  assert.match(chatSource, /import useChatAttachments from '\.\/useChatAttachments\.js'/);
   assert.match(chatSource, /useChatAttachments\(\{ setError \}\)/);
+  assert.match(chatComposerViewSource, /import \{ MAX_IMAGES \} from '\.\/useChatAttachments\.js'/);
   assert.doesNotMatch(chatSource, /FileReader|imageReadQueueRef|imagePreviewsRef|SUPPORTED_IMAGE_TYPES/);
   assert.match(chatAttachmentsSource, /function fileAsDataUrl/);
   assert.match(chatAttachmentsSource, /handlePaste/);
@@ -55,7 +57,7 @@ test('el envío, el streaming y la cancelación del turno quedan en su hook', ()
 });
 
 test('el borrador, la edición y la interacción del textarea quedan en su hook', () => {
-  assert.match(chatSource, /import useChatComposer, \{ MAX_MESSAGE_CHARS \} from '\.\/useChatComposer\.js'/);
+  assert.match(chatSource, /import useChatComposer from '\.\/useChatComposer\.js'/);
   assert.match(chatSource, /useChatComposer\(\{[\s\S]*canStartEditingMessage,[\s\S]*onClearError:/);
   assert.doesNotMatch(chatSource, /const \[input, setInput\]|function handleInputKeyDown|inputBeforeEditRef = useRef|textarea\.style\.height/);
   assert.match(chatComposerSource, /function startEditingMessage/);
@@ -63,6 +65,12 @@ test('el borrador, la edición y la interacción del textarea quedan en su hook'
   assert.match(chatComposerSource, /function handleInputKeyDown/);
   assert.match(chatComposerSource, /textarea\.style\.height = 'auto'/);
   assert.match(chatComposerSource, /MAX_MESSAGE_CHARS = 100_000/);
+  assert.match(chatSource, /import ChatComposer from '\.\/ChatComposer\.jsx'/);
+  assert.match(chatSource, /<ChatComposer[\s\S]*handleAbort=\{handleAbort\}/);
+  assert.doesNotMatch(chatSource, /<form onSubmit=\{handleSubmit\} className="composer"/);
+  assert.match(chatComposerViewSource, /<form onSubmit=\{onSubmit\} className="composer"/);
+  assert.match(chatComposerViewSource, /className="message-input"/);
+  assert.match(chatComposerViewSource, /className="attach-button"/);
 });
 
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {
