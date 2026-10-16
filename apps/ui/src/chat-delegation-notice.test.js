@@ -11,6 +11,7 @@ const chatHistorySource = await readFile(new URL('./useChatHistory.js', import.m
 const chatTurnSource = await readFile(new URL('./useChatTurn.js', import.meta.url), 'utf8');
 const chatComposerSource = await readFile(new URL('./useChatComposer.js', import.meta.url), 'utf8');
 const chatComposerViewSource = await readFile(new URL('./ChatComposer.jsx', import.meta.url), 'utf8');
+const chatHeaderSource = await readFile(new URL('./ChatHeader.jsx', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
@@ -71,6 +72,17 @@ test('el borrador, la edición y la interacción del textarea quedan en su hook'
   assert.match(chatComposerViewSource, /<form onSubmit=\{onSubmit\} className="composer"/);
   assert.match(chatComposerViewSource, /className="message-input"/);
   assert.match(chatComposerViewSource, /className="attach-button"/);
+});
+
+test('la cabecera, el título, el perfil y los controles de recarga y voz quedan en ChatHeader', () => {
+  assert.match(chatSource, /import ChatHeader from '\.\/ChatHeader\.jsx'/);
+  assert.match(chatSource, /<ChatHeader[\s\S]*loadMessages=\{loadMessages\}/);
+  assert.doesNotMatch(chatSource, /<header className="chat-header">|className="conversation-title-form"|className="chat-profile-picker"/);
+  assert.match(chatHeaderSource, /className="chat-header"/);
+  assert.match(chatHeaderSource, /conversation-title-form/);
+  assert.match(chatHeaderSource, /chat-profile-picker/);
+  assert.match(chatHeaderSource, /Preparando audio/);
+  assert.match(chatHeaderSource, /loadMessages\(\{ preserveHistory: true \}\)/);
 });
 
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {
