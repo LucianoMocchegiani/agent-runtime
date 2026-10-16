@@ -1,10 +1,6 @@
 import { generateText, type ModelMessage, type Tool } from 'ai';
-import type {
-  GetContextResult,
-  MemoryService,
-  MessageDto,
-  UserPreferenceDto,
-} from 'agent-runtime-memory/contracts';
+import type { GetContextResult, MessageDto } from '../../messages/contracts.js';
+import type { UserPreferenceDto } from '../../preferences/contracts.js';
 import type { RuntimeSettings } from '../../runtime-config/store.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import {
@@ -43,7 +39,7 @@ function messagesAfterSummaryCursor(
 }
 
 async function compactOmittedMessages(
-  memory: MemoryService,
+  saveSummary: typeof import('../../messages/persistence.js').saveSummary,
   model: ResolvedModel,
   conversationId: string,
   userId: string,
@@ -83,7 +79,7 @@ async function compactOmittedMessages(
     const summary = text.trim();
     const lastRow = transcriptRows.at(-1);
     if (!summary || !lastRow) return context.summary;
-    const saved = await memory.saveSummary({
+    const saved = await saveSummary({
       conversationId,
       userId,
       summary,
@@ -109,7 +105,8 @@ function preferencesPrompt(preferences: UserPreferenceDto[]): string {
  * @returns Mensajes listos para el proveedor y límites normalizados de salida.
  */
 export async function prepareTurnContext(params: {
-  memory: MemoryService;
+  saveSummary: typeof import('../../messages/persistence.js').saveSummary;
+  searchPreferences: typeof import('../../preferences/persistence.js').searchPreferences;
   model: ResolvedModel;
   conversationId: string;
   userId: string;
@@ -125,7 +122,8 @@ export async function prepareTurnContext(params: {
   messages: ModelMessage[];
 }> {
   const {
-    memory,
+    saveSummary,
+    searchPreferences,
     model,
     conversationId,
     userId,
@@ -144,7 +142,7 @@ export async function prepareTurnContext(params: {
       .slice(-3)
       .map((message) => message.content)
       .join('\n');
-    applicablePreferences = await memory.searchPreferences({
+    applicablePreferences = await searchPreferences({
       userId,
       query: `${recentUserContext}\n${userText}`.slice(-2_000),
       limit: 5,
@@ -173,7 +171,7 @@ export async function prepareTurnContext(params: {
   let summary = context.summary;
   if (runtimeSettings.summariesEnabled && selection.omittedRows.length > 0) {
     summary = await compactOmittedMessages(
-      memory,
+      saveSummary,
       model,
       conversationId,
       userId,

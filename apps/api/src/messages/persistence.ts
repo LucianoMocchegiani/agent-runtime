@@ -1,24 +1,24 @@
 import { Prisma } from '@prisma/client';
-import { prisma } from './prisma.js';
+import { prisma } from '../db/prisma.js';
+import type {
+  GetContextParams,
+  GetContextResult,
+  SaveSummaryParams,
+  SaveMessageParams,
+  EditMessageParams,
+  EditMessageResult,
+  ListMessagesParams,
+  ListMessagesResult,
+  JsonValue,
+  MessageDto,
+} from './contracts.js';
+import { ConversationNotFoundError } from '../conversations/errors.js';
 import {
-  type GetContextParams,
-  type GetContextResult,
-  type SaveSummaryParams,
-  type SaveMessageParams,
-  type EditMessageParams,
-  type EditMessageResult,
-  type ListMessagesParams,
-  type ListMessagesResult,
-  type JsonValue,
-  type MessageDto,
-} from './contracts/index.js';
-import {
-  ConversationNotFoundError,
   MessageContainsUnstoredAttachmentError,
   MessageEditConflictError,
   MessageNotEditableError,
 } from './errors.js';
-import { assertConversationOwner } from './conversation-access.js';
+import { assertConversationOwner } from '../conversations/access.js';
 
 function toJsonPrisma(value: unknown): unknown {
   if (value === null || value === undefined) return null;

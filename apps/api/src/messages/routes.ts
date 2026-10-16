@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { streamAgentTurn } from '../agent/turn/run.js';
 import type { AppEnv } from '../auth/principal.js';
-import { createMemoryClient } from '../memory/client.js';
+import { listMessages, editMessageAndTruncate } from './persistence.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';
 import { resolveModel } from '../llm/provider.js';
@@ -13,7 +13,7 @@ import {
   MessageContainsUnstoredAttachmentError,
   MessageEditConflictError,
   MessageNotEditableError,
-} from 'agent-runtime-memory';
+} from './errors.js';
 
 const TEXT_MAX = 100_000;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -151,8 +151,7 @@ messageRoutes.get('/', async (c) => {
     before = { createdAt: beforeCreatedAt, id: beforeId };
   }
 
-  const memory = createMemoryClient();
-  const page = await memory.listMessages({
+  const page = await listMessages({
     conversationId: id,
     userId: principal.userId,
     limit,
@@ -202,9 +201,8 @@ messageRoutes.post('/:messageId/edit', async (c) => {
   }
 
   try {
-    const memory = createMemoryClient();
     try {
-      await memory.editMessageAndTruncate({
+      await editMessageAndTruncate({
         conversationId: id,
         messageId,
         userId: principal.userId,

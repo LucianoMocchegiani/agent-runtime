@@ -1,4 +1,4 @@
-import { prisma } from './prisma.js';
+import { prisma } from '../db/prisma.js';
 import { ConversationNotFoundError } from './errors.js';
 
 /** Verifica que la conversación exista y pertenezca al usuario indicado. */

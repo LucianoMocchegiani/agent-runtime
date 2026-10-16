@@ -1,12 +1,12 @@
-import { prisma } from './prisma.js';
-import { embeddingProvider } from './search/service.js';
+import { prisma } from '../db/prisma.js';
+import { embeddingProvider } from '../memory/search/service.js';
 import type {
   DeletePreferenceParams,
   ListPreferencesParams,
   SavePreferenceParams,
   SearchPreferencesParams,
   UserPreferenceDto,
-} from './contracts/index.js';
+} from './contracts.js';
 
 const EMBEDDING_DIMENSIONS = 1536;
 const MIN_SEMANTIC_SCORE = 0.34;

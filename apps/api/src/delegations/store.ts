@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { prisma } from 'agent-runtime-memory';
+import { prisma } from '../db/prisma.js';
 import type { Prisma } from '@prisma/client';
 import { sealDelegationPayload } from './payload.js';
 import type { Principal } from '../auth/principal.js';

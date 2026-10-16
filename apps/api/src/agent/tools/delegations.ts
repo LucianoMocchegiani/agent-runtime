@@ -1,11 +1,11 @@
 import { jsonSchema, tool, type Tool } from 'ai';
 import { getConversation } from '../../conversations/service.js';
+import { listMessages } from '../../messages/persistence.js';
 import { enqueueDelegation, getDelegationForUser } from '../../delegations/store.js';
 import type { AgentToolContext } from './context.js';
 
 /** Construye herramientas para encolar delegaciones y consultar su estado. */
 export function buildDelegationTools({
-  memory,
   principal,
   conversationId,
   accessToken,
@@ -79,7 +79,7 @@ export function buildDelegationTools({
           const resultPages: string[][] = [];
           let before: { createdAt: string; id: string } | undefined;
           while (true) {
-            const page = await memory.listMessages({
+            const page = await listMessages({
               conversationId: job.targetConversationId,
               userId: principal.userId,
               limit: 100,

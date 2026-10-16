@@ -8,19 +8,19 @@ Las convenciones son criterios por defecto, no reglas rígidas. Una feature pued
 
 ```text
 apps/
-├── api/                    # API HTTP, coordinación de módulos y ensamblado de la aplicación
+├── api/                    # API HTTP, módulos de dominio y persistencia
+│   ├── prisma/              # Schema y migraciones
 │   └── src/
 ├── ui/                     # UI React/Vite servida por la API
 packages/
-├── client/                 # Cliente HTTP y de streaming
-└── memory/                 # Dominio, contratos, Prisma y migraciones de Memory
+└── client/                 # Cliente HTTP y de streaming
 
 docs/                       # Documentación del producto y de la implementación
 ```
 
-Es un monorepo npm workspaces. `apps/api` y `packages/memory` corren como partes de la misma aplicación; Memory no es un servicio separado. MCP se utiliza para herramientas externas.
+Es un monorepo npm workspaces. La API y la UI viven en `apps/`; el SDK compartido está en `packages/client`. Memory no es un workspace ni un servicio separado: su búsqueda y sus contratos internos forman parte de `apps/api`. MCP se utiliza para herramientas externas.
 
-Los contratos internos entre la API y Memory viven por dominio en `packages/memory/src/contracts/`; `contracts.ts` los reexporta para conservar el subpath público `agent-runtime-memory/contracts`. Así quedan junto al módulo que los implementa, pero separados de la entrada que carga Prisma. La API ya depende de `agent-runtime-memory`, por lo que no hace falta un workspace adicional solo para compartir estos tipos y DTOs.
+Cada módulo mantiene sus contratos junto a su dominio (`conversations/contracts.ts`, `messages/contracts.ts`, `preferences/contracts.ts` y `memory/search/contracts.ts`). El agente importa las operaciones de persistencia que necesita directamente; no hay una fachada `MemoryService` que vuelva a agrupar dominios. Prisma, schema y migraciones pertenecen al workspace `apps/api`.
 
 ### Módulos de la API
 
@@ -33,13 +33,14 @@ src/
 │   ├── turn/               # Ejecución, contexto, persistencia y streaming de turnos
 │   └── window/             # Ventanas de contexto
 ├── auth/                   # Identidad, introspección y middleware
-├── conversations/          # Rutas, servicios, IDs y cursores de conversaciones
+├── conversations/          # Rutas, servicios, persistencia, IDs y cursores
+├── db/                     # Cliente Prisma y preparación de PostgreSQL
 ├── delegations/            # Rutas, almacenamiento, payload y worker de delegaciones
 ├── http/                   # Utilidades HTTP reutilizables, como lectura de requests
 ├── llm/                    # Proveedores y rutas de modelos
-├── memory/                 # Adaptador hacia el módulo Memory
-├── messages/               # Entrada HTTP de mensajes
-├── preferences/            # Rutas y cursor HTTP de preferencias
+├── memory/                 # Búsqueda semántica y contratos internos
+├── messages/               # Entrada HTTP y persistencia de mensajes
+├── preferences/            # Rutas, cursor HTTP y persistencia de preferencias
 ├── pagination/             # Utilidades de paginación compartidas
 ├── runtime-config/         # Configuración y administración de perfiles
 ├── voice/                  # Rutas y flujo de voz
@@ -57,12 +58,12 @@ El árbol es orientativo: no hace falta que cada módulo tenga los mismos tipos 
 | Una ruta y el comportamiento HTTP de un dominio | El módulo de ese dominio, por ejemplo `conversations/`, `delegations/` o `runtime-config/` |
 | Reglas o coordinación propias del agente | `agent/`, en el submódulo responsable (`turn/`, `tools/` o `window/`) |
 | Un endpoint que recibe mensajes | `messages/`; mantené allí la entrada HTTP y delegá el trabajo del turno al módulo `agent/` cuando corresponda |
-| La integración con conversaciones, preferencias o búsqueda de Memory | `memory/` o el módulo de dominio que la utiliza; la implementación y persistencia de Memory pertenecen a `packages/memory/` |
+| La integración con conversaciones, mensajes o preferencias | El módulo de dominio correspondiente; la búsqueda transversal vive en `memory/` |
 | Un tipo usado solo por un módulo | Cerca de ese módulo |
-| Un contrato compartido entre paquetes | En el paquete de contratos correspondiente; no lo muevas a un espacio común solo por anticipación |
+| Contrato de un dominio de la API | Junto al dominio que lo posee: `conversations/contracts.ts`, `messages/contracts.ts`, `preferences/contracts.ts` o `memory/search/contracts.ts` |
 | Un comportamiento transversal de HTTP, autenticación o paginación | El módulo transversal existente (`http/`, `auth/`, `pagination/`); incorporá una abstracción solo si más de un consumidor la necesita |
 | Una pantalla o interacción de la UI | `apps/ui/src/`; el acceso a la API debe usar `packages/client` cuando aplique |
-| Cambios de schema o migraciones de Memory | `packages/memory/prisma/` |
+| Cambios de schema o migraciones de persistencia | `apps/api/prisma/` |
 | Documentación de una feature o una decisión | El documento de dominio existente o uno nuevo en `docs/`, enlazado desde `docs/00-indice.md` si corresponde |
 
 ## Convenciones para distribuir archivos

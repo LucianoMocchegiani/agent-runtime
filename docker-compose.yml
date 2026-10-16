@@ -1,4 +1,4 @@
-# agent-runtime completo: PostgreSQL + aplicación Runtime (API, Memory interno y UI).
+# agent-runtime completo: PostgreSQL + aplicación Runtime (API y UI).
 #   docker compose up -d --build   →   http://localhost:3010
 name: agent-runtime
 

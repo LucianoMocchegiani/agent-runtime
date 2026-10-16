@@ -1,5 +1,5 @@
 import type { ModelMessage, Tool } from 'ai';
-import type { MessageDto } from 'agent-runtime-memory/contracts';
+import type { MessageDto } from '../../messages/contracts.js';
 
 const IMAGE_TOKEN_ESTIMATE = 1_024;
 const MESSAGE_OVERHEAD_TOKENS = 4;

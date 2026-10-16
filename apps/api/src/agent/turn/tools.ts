@@ -1,6 +1,5 @@
 import { type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import type { MemoryService } from 'agent-runtime-memory/contracts';
 import type { Principal } from '../../auth/principal.js';
 import type { McpConfig } from '../../config.js';
 import { McpRegistry } from '../../mcp/registry.js';
@@ -13,12 +12,11 @@ export async function prepareAgentTurnTools(params: {
   mcpConfig: McpConfig;
   accessToken: string;
   mcpTokens?: Record<string, string>;
-  memory: MemoryService;
   principal: Principal;
   conversationId: string;
   delegationEnabled: boolean;
 }): Promise<{ registry: McpRegistry; tools: Record<string, Tool> }> {
-  const { mcpConfig, accessToken, mcpTokens, memory, principal, conversationId, delegationEnabled } = params;
+  const { mcpConfig, accessToken, mcpTokens, principal, conversationId, delegationEnabled } = params;
 
   let registry: McpRegistry;
   try {
@@ -32,7 +30,6 @@ export async function prepareAgentTurnTools(params: {
   try {
     const mcpTools = await registry.getAllTools() as Record<string, Tool>;
     const tools = buildAgentTools(mcpTools, {
-      memory,
       principal,
       conversationId,
       accessToken,

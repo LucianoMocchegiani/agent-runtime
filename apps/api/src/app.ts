@@ -7,7 +7,7 @@ import { config } from './config.js';
 import { allowCorsOrigin } from './cors.js';
 import { conversationRoutes } from './conversations/routes.js';
 import { modelRoutes } from './llm/routes.js';
-import { prisma } from 'agent-runtime-memory';
+import { prisma } from './db/prisma.js';
 import { messageRoutes } from './messages/routes.js';
 import { runtimeConfigRoutes } from './runtime-config/runtime-config-routes.js';
 import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';

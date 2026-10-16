@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { MemoryService, GetContextResult } from 'agent-runtime-memory/contracts';
+import type { GetContextResult } from '../../messages/contracts.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { prepareTurnContext } from './context.js';
 
@@ -24,25 +24,25 @@ const context: GetContextResult = {
 
 test('prepares prompt, token limits and multimodal messages with applicable preferences', async () => {
   let preferenceQuery = '';
-  const memory = {
-    searchPreferences: async (params: { query: string }) => {
-      preferenceQuery = params.query;
-      return [{
-        id: 'preference-1',
-        preference: 'Usar respuestas concisas',
-        activationCondition: 'Al responder consultas',
-        category: 'estilo',
-        createdAt: '2025-01-01T00:00:00.000Z',
-      }];
-    },
-  } as unknown as MemoryService;
+  const searchPreferences = async (params: { query: string }) => {
+    preferenceQuery = params.query;
+    return [{
+      id: 'preference-1',
+      preference: 'Usar respuestas concisas',
+      activationCondition: 'Al responder consultas',
+      category: 'estilo',
+      createdAt: '2025-01-01T00:00:00.000Z',
+    }];
+  };
+  const saveSummary = async () => true;
   const model = {
     contextWindowTokens: 8_000,
   } as ResolvedModel;
   const imageData = new Uint8Array([1, 2, 3]);
 
   const prepared = await prepareTurnContext({
-    memory,
+    saveSummary,
+    searchPreferences,
     model,
     conversationId: 'conversation-1',
     userId: 'user-1',

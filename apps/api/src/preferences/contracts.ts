@@ -1,4 +1,4 @@
-/** DTOs y parámetros de preferencias persistentes. */
+/** DTOs y parámetros propios del dominio de preferencias persistentes. */
 
 /** Preferencia persistente serializada para el cliente o el agente. */
 export type UserPreferenceDto = {

@@ -28,22 +28,21 @@ Memory conserva su propio dominio, contrato de tipos, Prisma y migraciones. Comp
 
 # 2. Memory como módulo interno
 
-La implementación del módulo, su schema Prisma y las migraciones viven en `packages/memory`. Runtime lo consume directamente dentro del proceso de la API; PostgreSQL es el servicio independiente que persiste los datos.
+La implementación de Memory forma parte de `apps/api`: búsqueda y contratos internos viven en `apps/api/src/memory/`, la persistencia está organizada por dominio y su schema Prisma y migraciones están en `apps/api/prisma/`. PostgreSQL es el servicio independiente que persiste los datos.
 
 ---
 
 # 3. Implementación incluida
 
-El proyecto proporciona y mantiene Memory como un paquete interno de dominio. El usuario puede iniciar Agent Runtime sin construir ni configurar un sistema de memoria aparte.
+El proyecto proporciona y mantiene Memory como un módulo interno de la API. El usuario puede iniciar Agent Runtime sin construir ni configurar un sistema de memoria aparte.
 
 ```text
 Agent Runtime
-   ├── API / Agent Loop
-   └── paquete packages/memory
+   └── API / Agent Loop
            └── PostgreSQL
 ```
 
-La base de datos y las migraciones de conversaciones y mensajes son responsabilidad del paquete `packages/memory` incluido en el repositorio.
+La base de datos y las migraciones de conversaciones, mensajes y memoria son responsabilidad de `apps/api` y están incluidas en el repositorio.
 
 # 4. Session vs Memory
 

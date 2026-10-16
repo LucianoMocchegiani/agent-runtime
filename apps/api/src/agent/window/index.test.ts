@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Tool } from 'ai';
-import type { MessageDto } from 'agent-runtime-memory/contracts';
+import type { MessageDto } from '../../messages/contracts.js';
 import { buildModelMessages, resolveOutputTokenLimits, selectModelContext } from './index.js';
 
 function message(

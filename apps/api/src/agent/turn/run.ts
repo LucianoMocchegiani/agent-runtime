@@ -1,8 +1,9 @@
 import { HTTPException } from 'hono/http-exception';
 import { getRuntimeSettings, type AgentProfile } from '../../runtime-config/store.js';
 import type { ResolvedModel } from '../../llm/provider.js';
-import { createMemoryClient } from '../../memory/client.js';
-import type { MemoryService } from 'agent-runtime-memory/contracts';
+import { applyAutomaticTitle } from '../../conversations/persistence.js';
+import { getContext, saveMessage, saveSummary } from '../../messages/persistence.js';
+import { searchPreferences } from '../../preferences/persistence.js';
 import { prepareTurnContext, type IncomingImage } from './context.js';
 import type { Principal } from '../../auth/principal.js';
 import { delegationEncryptionEnabled } from '../../delegations/payload.js';
@@ -33,27 +34,24 @@ export async function streamAgentTurn(
     ? `${runtimeSettings.chatSystemPrompt}\n\nDelegaciones: solo usá delegate_to_conversation cuando el usuario haya pedido explícitamente delegar trabajo a otro hilo. Nunca elijas ni delegues tareas por iniciativa propia. No interpretes la mera disponibilidad de la herramienta como autorización.`
     : runtimeSettings.chatSystemPrompt;
 
-  const memory: MemoryService = createMemoryClient();
-
   const { registry, tools } = await prepareAgentTurnTools({
     mcpConfig: runtimeSettings.mcpConfig,
     accessToken,
     mcpTokens,
-    memory,
     principal,
     conversationId,
     delegationEnabled: delegationEncryptionEnabled(),
   });
 
   if (!options.userMessageAlreadySaved) {
-    await memory.saveMessage({
+    await saveMessage({
       conversationId,
       userId: principal.userId,
       role: 'user',
       content: userText,
     });
   }
-  await memory.applyAutomaticTitle({
+  await applyAutomaticTitle({
     conversationId,
     userId: principal.userId,
     userText,
@@ -61,7 +59,7 @@ export async function streamAgentTurn(
 
   let context;
   try {
-    context = await memory.getContext({
+    context = await getContext({
       conversationId,
       userId: principal.userId,
     });
@@ -72,7 +70,8 @@ export async function streamAgentTurn(
   }
 
   const preparedContext = await prepareTurnContext({
-    memory,
+    saveSummary,
+    searchPreferences,
     model,
     conversationId,
     userId: principal.userId,
@@ -88,7 +87,6 @@ export async function streamAgentTurn(
     conversationId,
     userId: principal.userId,
     model,
-    memory,
     registry,
     runtimeSettings,
     tools,

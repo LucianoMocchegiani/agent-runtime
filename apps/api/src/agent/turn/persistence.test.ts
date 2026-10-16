@@ -1,18 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { MemoryService } from 'agent-runtime-memory/contracts';
 import { persistAgentTurn } from './persistence.js';
 
-function memorySpy(saved: unknown[]) {
-  return {
-    saveMessage: async (message: unknown) => { saved.push(message); },
-  } as unknown as MemoryService;
+function saveMessageSpy(saved: unknown[]) {
+  return async (message: unknown) => { saved.push(message); };
 }
 
 test('persists assistant step text and tool results in stream order', async () => {
   const saved: unknown[] = [];
   await persistAgentTurn(
-    memorySpy(saved),
+    saveMessageSpy(saved),
     'conversation-1',
     'user-1',
     'final response',
@@ -44,7 +41,7 @@ test('persists assistant step text and tool results in stream order', async () =
 
 test('persists final text when no step contains assistant text', async () => {
   const saved: unknown[] = [];
-  await persistAgentTurn(memorySpy(saved), 'conversation-1', 'user-1', '  Answer.  ', []);
+  await persistAgentTurn(saveMessageSpy(saved), 'conversation-1', 'user-1', '  Answer.  ', []);
 
   assert.deepEqual(saved, [{
     conversationId: 'conversation-1',
@@ -57,7 +54,7 @@ test('persists final text when no step contains assistant text', async () => {
 test('persists step text when final text is absent', async () => {
   const saved: unknown[] = [];
   await persistAgentTurn(
-    memorySpy(saved),
+    saveMessageSpy(saved),
     'conversation-1',
     'user-1',
     undefined,

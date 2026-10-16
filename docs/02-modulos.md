@@ -1,36 +1,37 @@
 # Módulos
 
-Agent Runtime se despliega como una sola aplicación. Las responsabilidades siguen separadas en módulos de código; Memory no es otro servidor y Runtime la invoca directamente.
+Agent Runtime se despliega como una sola aplicación. Las responsabilidades siguen separadas en módulos de código; Memory no es otro servidor y se ejecuta dentro de la API.
 
 ```text
-apps/api/                 proceso HTTP único
-├── conversations/         rutas y servicios HTTP de conversaciones
-├── messages/              entrada de mensajes
-├── agent/                 ejecución temporal de turnos
-├── runtime-config/        configuración, perfiles y settings
-└── memory/                adaptador interno hacia el módulo Memory
-
-packages/memory/           módulo de dominio Memory consumido por la API
-├── src/module.ts           punto de entrada del paquete interno
-└── Prisma                   configuración del schema/migraciones del módulo
-
-La implementación, Prisma y las migraciones de Memory viven dentro de `packages/memory`.
+apps/api/
+├── prisma/                 schema y migraciones de PostgreSQL
+└── src/
+    ├── conversations/      rutas, servicios y persistencia de conversaciones
+    ├── messages/           entrada HTTP y persistencia de mensajes
+    ├── preferences/        rutas, cursores y persistencia de preferencias
+    ├── memory/             contratos internos y búsqueda semántica
+    ├── db/                 cliente Prisma y preparación de la base
+    ├── agent/              ejecución temporal de turnos
+    ├── runtime-config/     configuración, perfiles y settings
+    └── ...                 otros módulos de la API
 ```
+
+La persistencia se ubica con el dominio correspondiente. La búsqueda semántica y los contratos internos compartidos viven en `apps/api/src/memory/`; el schema y las migraciones están en `apps/api/prisma/`.
 
 ## API y ejecución
 
-`apps/api/src/app.ts` monta CORS, health, rutas administrativas, API autenticada y UI. `GET /health` verifica acceso a la base de datos usada por Memory.
+`apps/api/src/app.ts` monta CORS, health, rutas administrativas, API autenticada y UI. `GET /health` verifica acceso a PostgreSQL.
 
-`conversations/` valida requests y delega en Memory. `messages/` valida el mensaje, obtiene la conversación y resuelve el perfil asignado en Runtime. `agent/run.ts` ejecuta el turno, usa Memory para contexto y persistencia, e integra herramientas MCP externas.
+`conversations/` valida requests y delega en la persistencia de conversaciones. `messages/` valida el mensaje, obtiene la conversación y resuelve el perfil asignado en Runtime. `agent/run.ts` ejecuta el turno, usa las operaciones de persistencia y búsqueda para contexto y memoria, e integra herramientas MCP externas.
 
-Los perfiles son propiedad de Runtime (`runtime.agent_profile_configs`). La conversación mantiene solo `agent_profile_id` en sus datos de Memory; Runtime comprueba la referencia y aplica la configuración al ejecutar cada turno.
+Los perfiles son propiedad de Runtime (`runtime.agent_profile_configs`). La conversación mantiene solo `agent_profile_id`; Runtime comprueba la referencia y aplica la configuración al ejecutar cada turno.
 
-## Memory interno
+## Memory dentro de la API
 
-El adaptador `apps/api/src/memory/client.ts` ya no crea un cliente MCP ni realiza llamadas HTTP: devuelve operaciones directas del módulo `agent-runtime-memory`. Prisma y sus migraciones permanecen como responsabilidad del dominio Memory. PostgreSQL puede tener esquemas distintos (`public` para las tablas Memory y `runtime` para la configuración), pero comparte servidor/base y una única conexión lógica del producto.
+`conversations/persistence.ts`, `messages/persistence.ts` y `preferences/persistence.ts` agrupan las operaciones de datos con sus dominios. `memory/client.ts` reúne las operaciones que consume el agente mediante un contrato interno; no crea un cliente MCP ni realiza llamadas HTTP. `memory/search/` implementa la búsqueda semántica y el worker de indexación.
 
-Las embeddings se configuran en `runtime.config`; Runtime inyecta el valor directamente al módulo Memory y arranca el worker de indexación dentro del proceso de la API. No existe `/internal/runtime-config/embedding` ni se requiere `MEMORY_MCP_URL` o `RUNTIME_CONFIG_INTERNAL_TOKEN`.
+Las embeddings se configuran en `runtime.config`; Runtime inyecta el valor directamente al módulo de búsqueda y arranca el worker dentro del proceso de la API. PostgreSQL puede tener esquemas distintos (`public` para los datos de la aplicación y `runtime` para configuración), en la misma base de datos.
 
 ## Despliegue
 
-Compose contiene PostgreSQL, un contenedor efímero de migración y el servicio único `agent-runtime`. La tarea de migración termina antes de iniciar la API. La migración conserva las tablas existentes y agrega la asociación perfil-conversación; no se recrea el volumen de datos.
+Compose contiene PostgreSQL, un contenedor efímero de migración y el servicio único `agent-runtime`. La tarea de migración ejecuta Prisma desde el workspace `apps/api` y termina antes de iniciar la API. Las migraciones existentes se conservan; no se recrea el volumen de datos.

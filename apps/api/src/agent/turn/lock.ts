@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { prisma } from 'agent-runtime-memory';
+import { prisma } from '../../db/prisma.js';
 
 type LeaseStore = {
   claim(userId: string, conversationId: string, token: string, leaseMs: number): Promise<boolean>;

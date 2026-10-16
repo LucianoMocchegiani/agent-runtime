@@ -1,6 +1,6 @@
-/** DTOs y parámetros de las operaciones de conversaciones. */
+/** DTOs y parámetros propios del dominio de conversaciones. */
 
-/** Conversación serializada para consumidores del módulo Memory. */
+/** Conversación serializada para consumidores de la API. */
 export type ConversationDto = {
   id: string;
   userId: string;

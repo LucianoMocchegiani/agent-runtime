@@ -1,15 +1,15 @@
-import { prisma } from './prisma.js';
-import {
-  type ConversationDto,
-  type ListConversationsParams,
-  type GetConversationParams,
-  type CreateConversationParams,
-  type UpdateConversationParams,
-  type ArchiveConversationParams,
-  type ApplyTitleParams,
-} from './contracts/index.js';
+import { prisma } from '../db/prisma.js';
+import type {
+  ConversationDto,
+  ListConversationsParams,
+  GetConversationParams,
+  CreateConversationParams,
+  UpdateConversationParams,
+  ArchiveConversationParams,
+  ApplyTitleParams,
+} from './contracts.js';
 import { ConversationNotFoundError } from './errors.js';
-import { assertConversationOwner } from './conversation-access.js';
+import { assertConversationOwner } from './access.js';
 import { titleFromFirstMessage } from './title.js';
 
 function toConversationDto(row: {

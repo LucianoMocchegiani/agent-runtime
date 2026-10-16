@@ -1,10 +1,13 @@
 import { HTTPException } from 'hono/http-exception';
-import { createMemoryClient } from '../memory/client.js';
+import {
+  listConversations as persistListConversations,
+  createConversation as persistCreateConversation,
+  getConversation as persistGetConversation,
+  updateConversation as persistUpdateConversation,
+  applyAutomaticTitle as persistAutomaticTitle,
+} from './persistence.js';
 import type { Principal } from '../auth/principal.js';
-import type {
-  ConversationDto,
-  UpdateConversationPatch,
-} from 'agent-runtime-memory/contracts';
+import type { ConversationDto, UpdateConversationPatch } from './contracts.js';
 
 const TITLE_MAX = 200;
 
@@ -19,8 +22,7 @@ export async function listConversations(
   archived: boolean,
   options: { limit: number; before?: { updatedAt: string; id: string } },
 ): Promise<ConversationDto[]> {
-  const memory = createMemoryClient();
-  return memory.listConversations({
+  return persistListConversations({
     userId: principal.userId,
     archived,
     limit: options.limit,
@@ -39,8 +41,7 @@ export async function createConversation(
   title: string | null,
   agentProfileId: string,
 ): Promise<ConversationDto> {
-  const memory = createMemoryClient();
-  return memory.createConversation({
+  return persistCreateConversation({
     userId: principal.userId,
     title,
     agentProfileId,
@@ -52,8 +53,7 @@ export async function getConversation(
   principal: Principal,
   id: string,
 ): Promise<ConversationDto> {
-  const memory = createMemoryClient();
-  return memory.getConversation({
+  return persistGetConversation({
     id,
     userId: principal.userId,
   });
@@ -65,8 +65,7 @@ export async function updateConversation(
   id: string,
   patch: UpdateConversationPatch,
 ): Promise<ConversationDto> {
-  const memory = createMemoryClient();
-  return memory.updateConversation({
+  return persistUpdateConversation({
     id,
     userId: principal.userId,
     patch,
@@ -82,8 +81,7 @@ export async function applyAutomaticTitle(
   conversationId: string,
   userText: string,
 ): Promise<string | null> {
-  const memory = createMemoryClient();
-  return memory.applyAutomaticTitle({
+  return persistAutomaticTitle({
     conversationId,
     userId: principal.userId,
     userText,

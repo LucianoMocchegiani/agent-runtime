@@ -1,4 +1,4 @@
-import type { JsonValue } from 'agent-runtime-memory/contracts';
+import type { JsonValue } from '../../messages/contracts.js';
 
 /**
  * Convierte un valor a JSON, omitiendo `undefined` y serializando los valores no compatibles.

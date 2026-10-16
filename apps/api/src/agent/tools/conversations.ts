@@ -1,11 +1,12 @@
 import { jsonSchema, tool, type Tool } from 'ai';
 import { createConversation } from '../../conversations/service.js';
+import { listConversations as listConversationRecords } from '../../conversations/persistence.js';
 import { getNewChatDefaultAgentProfile } from '../../runtime-config/agent-profiles.js';
 import { decodeOptionalConversationCursor, encodeConversationCursor, type ConversationListScope } from '../../conversations/cursor.js';
 import type { AgentToolContext } from './context.js';
 
 /** Construye herramientas para listar y crear conversaciones del principal actual. */
-export function buildConversationTools({ memory, principal }: AgentToolContext): Record<string, Tool> {
+export function buildConversationTools({ principal }: AgentToolContext): Record<string, Tool> {
   return {
     list_conversations: tool({
       description: 'Lista las conversaciones del usuario autenticado en páginas de hasta 20, ordenadas por actividad reciente. Por defecto incluye activas y archivadas. Usa el cursor devuelto para avanzar; no vuelvas a empezar desde la primera página. Devuelve solo metadatos, no mensajes.',
@@ -36,7 +37,7 @@ export function buildConversationTools({ memory, principal }: AgentToolContext):
         } catch (error) {
           return { error: error instanceof Error ? error.message : 'El cursor no es válido.' };
         }
-        const page = await memory.listConversations({
+        const page = await listConversationRecords({
           userId: principal.userId,
           ...(scope === 'all' ? {} : { archived: scope === 'archived' }),
           limit: 21,

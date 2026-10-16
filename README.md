@@ -84,16 +84,13 @@ Monorepo npm workspaces con un lockfile:
 
 ```text
 apps/
-├── api/                 # único proceso de aplicación; coordina los módulos
+├── api/                 # API HTTP y módulos de dominio, incluida la persistencia
 └── ui/                  # React/Vite, servida por API
 packages/
-├── client/              # SDK HTTP/stream para la UI y huéspedes
-└── memory/              # implementación, Prisma y contratos internos de Memory
+└── client/              # SDK HTTP/stream para la UI y huéspedes
 ```
 
-`packages/memory` es un workspace de código, no un servidor. Runtime llama al módulo directamente en el mismo proceso; no hay un servicio, puerto ni transporte MCP interno para Memory. MCP se reserva para herramientas externas.
-
-La implementación, el schema y las migraciones de Memory viven en `packages/memory`; `apps/memory-mcp` ya no es un workspace ni un servicio desplegable.
+Memory no es un servidor independiente ni un paquete: su búsqueda y contratos internos están en `apps/api/src/memory/`, y las operaciones de persistencia viven junto a conversaciones, mensajes y preferencias. Prisma y sus migraciones están en `apps/api/prisma/`. No hay un puerto ni un transporte MCP interno para Memory; MCP se reserva para herramientas externas.
 
 ## Desarrollo
 

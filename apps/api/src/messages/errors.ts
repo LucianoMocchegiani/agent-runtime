@@ -1,11 +1,3 @@
-/** Error de dominio cuando un hilo no existe o no pertenece al usuario indicado. */
-export class ConversationNotFoundError extends Error {
-  constructor() {
-    super('Conversation not found');
-    this.name = 'ConversationNotFoundError';
-  }
-}
-
 /** Error cuando el mensaje objetivo no existe, no es propio o no es editable. */
 export class MessageNotEditableError extends Error {
   constructor(message = 'Message cannot be edited') {

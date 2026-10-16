@@ -1,4 +1,3 @@
-import type { MemoryService } from 'agent-runtime-memory/contracts';
 import { toJsonValue } from './json.js';
 import { shrinkToolContent } from '../window/index.js';
 
@@ -45,14 +44,14 @@ function assistantTextOf(text: string | undefined, steps: AgentTurnStep[]): stri
 
 /**
  * Persiste el texto y resultados producidos durante un turno finalizado o interrumpido.
- * @param memory Servicio de persistencia de conversaciones.
+ * @param saveMessage Operación de persistencia del dominio de mensajes.
  * @param conversationId Hilo donde se guardará la salida.
  * @param userId Propietario del hilo.
  * @param text Texto final generado por el modelo, si existe.
  * @param steps Pasos y llamadas a herramientas reportados por el SDK.
  */
 export async function persistAgentTurn(
-  memory: MemoryService,
+  saveMessage: typeof import('../../messages/persistence.js').saveMessage,
   conversationId: string,
   userId: string,
   text: string | undefined,
@@ -62,7 +61,7 @@ export async function persistAgentTurn(
   for (const step of steps) {
     const stepText = step.text?.trim();
     if (stepText) {
-      await memory.saveMessage({
+      await saveMessage({
         conversationId,
         userId,
         role: 'assistant',
@@ -80,7 +79,7 @@ export async function persistAgentTurn(
       const name = toolNameOf(result, toolNameOf(call));
       const args = toolArgsOf(call) ?? toolArgsOf(result);
       const output = toolOutputOf(result);
-      await memory.saveMessage({
+      await saveMessage({
         conversationId,
         userId,
         role: 'tool',
@@ -93,7 +92,7 @@ export async function persistAgentTurn(
   }
   const trimmed = assistantTextOf(text, steps);
   if (!savedStepText && trimmed) {
-    await memory.saveMessage({
+    await saveMessage({
       conversationId,
       userId,
       role: 'assistant',

@@ -1,6 +1,6 @@
 import { streamText, type ModelMessage, type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import type { MemoryService } from 'agent-runtime-memory/contracts';
+import { saveMessage } from '../../messages/persistence.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { isAbortError, identifiedFacingLlmError } from '../../llm/errors.js';
 import type { McpRegistry } from '../../mcp/registry.js';
@@ -13,7 +13,6 @@ export async function streamPreparedAgentTurn(params: {
   conversationId: string;
   userId: string;
   model: ResolvedModel;
-  memory: MemoryService;
   registry: Pick<McpRegistry, 'close'>;
   runtimeSettings: Pick<RuntimeSettings, 'maxToolSteps' | 'llmTraceRequests'>;
   tools: Record<string, Tool>;
@@ -26,7 +25,6 @@ export async function streamPreparedAgentTurn(params: {
     conversationId,
     userId,
     model,
-    memory,
     registry,
     runtimeSettings,
     tools,
@@ -71,7 +69,7 @@ export async function streamPreparedAgentTurn(params: {
     saved = true;
     const loose = Array.isArray(steps) ? (steps as AgentTurnStep[]) : acc;
     try {
-      await persistAgentTurn(memory, conversationId, userId, text, loose);
+      await persistAgentTurn(saveMessage, conversationId, userId, text, loose);
     } catch (error) {
       console.error(error);
     }

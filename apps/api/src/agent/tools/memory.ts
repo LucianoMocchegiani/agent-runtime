@@ -1,8 +1,14 @@
 import { jsonSchema, tool, type Tool } from 'ai';
+import { searchMemory } from '../../memory/search/service.js';
+import {
+  savePreference,
+  listPreferences,
+  deletePreference,
+} from '../../preferences/persistence.js';
 import type { AgentToolContext } from './context.js';
 
 /** Construye herramientas de búsqueda y administración de recuerdos/preferencias del usuario. */
-export function buildMemoryTools({ memory, principal }: AgentToolContext): Record<string, Tool> {
+export function buildMemoryTools({ principal }: AgentToolContext): Record<string, Tool> {
   return {
     memory__searchMemory: tool({
       description:
@@ -36,7 +42,7 @@ export function buildMemoryTools({ memory, principal }: AgentToolContext): Recor
       execute: async ({ query, conversationId: searchConversationId, limit }) => {
         console.info('tool memory__searchMemory invoked');
         const normalizedConversationId = searchConversationId?.trim() || undefined;
-        return memory.searchMemory({
+        return searchMemory({
           userId: principal.userId,
           query,
           ...(normalizedConversationId
@@ -64,7 +70,7 @@ export function buildMemoryTools({ memory, principal }: AgentToolContext): Recor
       }),
       execute: async ({ preference, activationCondition, category }) => {
         console.info('tool memory__savePreference invoked');
-        return memory.savePreference({
+        return savePreference({
           userId: principal.userId,
           preference,
           activationCondition,
@@ -79,7 +85,7 @@ export function buildMemoryTools({ memory, principal }: AgentToolContext): Recor
         properties: {},
         additionalProperties: false,
       }),
-      execute: async () => memory.listPreferences({ userId: principal.userId }),
+      execute: async () => listPreferences({ userId: principal.userId }),
     }),
     memory__deletePreference: tool({
       description: 'Elimina permanentemente una preferencia guardada cuando el usuario pide olvidarla, eliminarla o reemplazarla. Para reemplazarla, lista si hace falta, elimina la anterior y guarda la nueva con memory__savePreference.',
@@ -89,7 +95,7 @@ export function buildMemoryTools({ memory, principal }: AgentToolContext): Recor
         required: ['id'],
         additionalProperties: false,
       }),
-      execute: async ({ id }) => memory.deletePreference({ userId: principal.userId, id }),
+      execute: async ({ id }) => deletePreference({ userId: principal.userId, id }),
     }),
   };
 }

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import { deletePreference, listPreferences, savePreference } from 'agent-runtime-memory';
+import { deletePreference, listPreferences, savePreference } from './persistence.js';
 import type { AppEnv } from '../auth/principal.js';
 import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './cursor.js';
 import { readJsonBody } from '../http/request-body.js';

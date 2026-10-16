@@ -1,6 +1,13 @@
-/** DTOs, parámetros y errores de las operaciones de mensajes. */
+/** DTOs y parámetros propios del dominio de mensajes. */
 
-import type { JsonValue } from './common.js';
+/** Valor compatible con JSON, usado en argumentos y resultados de herramientas. */
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
 
 /** Mensaje serializable de una conversación, incluidos los metadatos opcionales de tools. */
 export type MessageDto = {
