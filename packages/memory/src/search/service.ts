@@ -1,4 +1,4 @@
-import type { MemorySearchParams, MemorySearchResult } from '../contracts.js';
+import type { MemorySearchParams, MemorySearchResult } from '../contracts/index.js';
 import type { EmbeddingProvider, SearchHit, SearchIndex } from './ports.js';
 import { OpenAiCompatibleEmbeddingProvider } from './embedding-provider.js';
 import { PostgresSearchIndex } from './postgres-index.js';

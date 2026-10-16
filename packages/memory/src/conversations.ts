@@ -7,7 +7,7 @@ import {
   type UpdateConversationParams,
   type ArchiveConversationParams,
   type ApplyTitleParams,
-} from './contracts.js';
+} from './contracts/index.js';
 import { ConversationNotFoundError } from './errors.js';
 import { assertConversationOwner } from './conversation-access.js';
 import { titleFromFirstMessage } from './title.js';

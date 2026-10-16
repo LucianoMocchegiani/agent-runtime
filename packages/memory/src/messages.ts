@@ -11,7 +11,7 @@ import {
   type ListMessagesResult,
   type JsonValue,
   type MessageDto,
-} from './contracts.js';
+} from './contracts/index.js';
 import {
   ConversationNotFoundError,
   MessageContainsUnstoredAttachmentError,

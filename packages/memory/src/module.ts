@@ -1,4 +1,4 @@
-export * from './contracts.js';
+export * from './contracts/index.js';
 /** Punto de entrada del módulo Memory ejecutado en proceso y consumido por la API Runtime. */
 export {
   listConversations,

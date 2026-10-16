@@ -6,7 +6,7 @@ import type {
   SavePreferenceParams,
   SearchPreferencesParams,
   UserPreferenceDto,
-} from './contracts.js';
+} from './contracts/index.js';
 
 const EMBEDDING_DIMENSIONS = 1536;
 const MIN_SEMANTIC_SCORE = 0.34;
