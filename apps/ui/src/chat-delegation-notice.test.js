@@ -83,18 +83,18 @@ test('el borrador, la edición y la interacción del textarea quedan en su hook'
   assert.match(chatSource, /import ChatComposer from '\.\/ChatComposer\.jsx'/);
   assert.match(chatSource, /<ChatComposer[\s\S]*handleAbort=\{handleAbort\}/);
   assert.doesNotMatch(chatSource, /<form onSubmit=\{handleSubmit\} className="composer"/);
-  assert.match(chatComposerViewSource, /<form onSubmit=\{onSubmit\} className="composer"/);
-  assert.match(chatComposerViewSource, /className="message-input"/);
-  assert.match(chatComposerViewSource, /className="attach-button"/);
+  assert.match(chatComposerViewSource, /<form onSubmit=\{onSubmit\} className=\{ChatStyles\.composer\}/);
+  assert.match(chatComposerViewSource, /className=\{ChatStyles\.messageInput\}/);
+  assert.match(chatComposerViewSource, /className=\{ChatStyles\.attachButton\}/);
 });
 
 test('la cabecera, el título, el perfil y los controles de recarga y voz quedan en ChatHeader', () => {
   assert.match(chatSource, /import ChatHeader from '\.\/ChatHeader\.jsx'/);
   assert.match(chatSource, /<ChatHeader[\s\S]*loadMessages=\{loadMessages\}/);
   assert.doesNotMatch(chatSource, /<header className="chat-header">|className="conversation-title-form"|className="chat-profile-picker"/);
-  assert.match(chatHeaderSource, /className="chat-header"/);
-  assert.match(chatHeaderSource, /conversation-title-form/);
-  assert.match(chatHeaderSource, /chat-profile-picker/);
+  assert.match(chatHeaderSource, /className=\{ChatStyles\.chatHeader\}/);
+  assert.match(chatHeaderSource, /ChatStyles\.conversationTitleForm/);
+  assert.match(chatHeaderSource, /ChatStyles\.chatProfilePicker/);
   assert.match(chatHeaderSource, /Preparando audio/);
   assert.match(chatHeaderSource, /loadMessages\(\{ preserveHistory: true \}\)/);
 });
@@ -111,7 +111,7 @@ test('la lista de mensajes y la presentación de herramientas quedan separadas',
   assert.match(toolMessagesSource, /function formatToolOutput/);
   assert.match(toolMessagesSource, /function ToolStack/);
   assert.match(toolMessagesSource, /function collectToolMessages/);
-  assert.match(toolMessagesSource, /delegation-events/);
+  assert.match(toolMessagesSource, /ChatStyles\.delegationEvents/);
   assert.match(toolMessagesSource, /El resultado quedó guardado en la conversación de destino/);
   assert.match(conversationListSource, /delegationLabels\[delegation\?\.status\]/);
 });

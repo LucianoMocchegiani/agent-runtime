@@ -1,7 +1,8 @@
+import ChatStyles from './MarkdownContent.module.css';
 import { useState, useEffect, useId } from 'react';
 
 export default function MarkdownContent({ content, preserveWhitespace = false }) {
-  return <div className="markdown-content">{renderMarkdownBlocks(content || '', preserveWhitespace)}</div>;
+  return <div className={ChatStyles.markdownContent}>{renderMarkdownBlocks(content || '', preserveWhitespace)}</div>;
 }
 
 function MermaidDiagram({ chart }) {
@@ -29,14 +30,14 @@ function MermaidDiagram({ chart }) {
 
   if (result.error) {
     return (
-      <div className="mermaid-fallback" role="status">
+      <div className={ChatStyles.mermaidFallback} role="status">
         <p>No se pudo dibujar este diagrama. Se muestra el código para que puedas revisarlo.</p>
-        <pre className="markdown-code"><code>{chart}</code></pre>
+        <pre className={ChatStyles.markdownCode}><code>{chart}</code></pre>
       </div>
     );
   }
-  if (!result.svg) return <div className="mermaid-loading" role="status">Dibujando diagrama…</div>;
-  return <div className="mermaid-diagram" role="img" aria-label="Diagrama Mermaid" dangerouslySetInnerHTML={{ __html: result.svg }} />;
+  if (!result.svg) return <div className={ChatStyles.mermaidLoading} role="status">Dibujando diagrama…</div>;
+  return <div className={ChatStyles.mermaidDiagram} role="img" aria-label="Diagrama Mermaid" dangerouslySetInnerHTML={{ __html: result.svg }} />;
 }
 
 function renderMarkdownBlocks(content, preserveWhitespace = false) {
@@ -58,7 +59,7 @@ function renderMarkdownBlocks(content, preserveWhitespace = false) {
       if (fence[1].trim().toLowerCase() === 'mermaid') {
         blocks.push(<MermaidDiagram key={`mermaid-${index}`} chart={source} />);
       } else {
-        blocks.push(<pre className="markdown-code" key={`code-${index}`}><code>{source}</code></pre>);
+        blocks.push(<pre className={ChatStyles.markdownCode} key={`code-${index}`}><code>{source}</code></pre>);
       }
       continue;
     }
@@ -72,8 +73,8 @@ function renderMarkdownBlocks(content, preserveWhitespace = false) {
         rows.push(splitMarkdownTableRow(lines[index++]));
       }
       blocks.push(
-        <div className="markdown-table-wrapper" key={`table-${index}`}>
-          <table className="markdown-table">
+        <div className={ChatStyles.markdownTableWrapper} key={`table-${index}`}>
+          <table className={ChatStyles.markdownTable}>
             <thead><tr>{headers.map((cell, cellIndex) => (
               <th key={cellIndex} scope="col" style={{ textAlign: alignments[cellIndex] || 'left' }}><MarkdownInline text={cell} /></th>
             ))}</tr></thead>

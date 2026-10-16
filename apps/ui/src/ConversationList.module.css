@@ -1,0 +1,84 @@
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+}
+.sidebar h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+}
+.sidebar h2 span { flex: 1; }
+.convList { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.conversationListTabs { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.conversationListTabs button { min-height: 36px; color: var(--text-muted); background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; }
+.conversationListTabs button:hover { background: rgba(255,255,255,.05); }
+.conversationListTabs button.active { color: var(--text); background: rgba(79,195,247,.1); border-color: rgba(79,195,247,.35); }
+.conversationListState { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; overflow-wrap: anywhere; }
+.conversationListMessage { margin: 8px 10px 0; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.conversationListError { color: var(--error-text); background: var(--bg-error); }
+.conversationListNotice { color: #a5e6ac; background: rgba(67,160,71,.12); }
+.convItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 8px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.convItem:hover { background: rgba(255,255,255,0.04); }
+.convItem.active { background: rgba(79,195,247,0.1); border-left: 3px solid var(--accent); }
+.convSelect {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.convSelect:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.convTitle { flex: 1; min-width: 0; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.convDate { color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+.convActivity { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 4px; color: var(--accent); font-size: 10px; white-space: nowrap; }
+.convActivityDot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 8px rgba(79,195,247,.7); animation: activity-pulse 1.4s ease-in-out infinite; }
+@keyframes activity-pulse { 50% { opacity: .45; } }
+
+.sidebar { flex: 0 0 280px; min-width: 0; }
+.sidebar h2 { min-height: 56px; }
+.convItem { min-height: 54px; }
+.convItem.active { padding-left: 13px; }
+
+.sidebarAction, .archiveButton {
+  display: inline-grid; place-items: center; width: 40px; min-height: 40px; padding: 0;
+  color: var(--text-muted); background: transparent; border: 1px solid transparent;
+  border-radius: var(--radius); font: inherit; cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.sidebarAction { color: var(--accent); font-size: 22px; }
+.archiveButton { min-height: 36px; width: 36px; font-size: 20px; }
+.restoreButton { min-height: 34px; padding: 4px 8px; color: var(--accent); background: transparent; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 11px; white-space: nowrap; }
+.restoreButton:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.sidebarAction:hover, .archiveButton:hover:not(:disabled) { color: var(--text); background: rgba(255,255,255,0.07); border-color: var(--border); }
+.sidebarAction:disabled, .archiveButton:disabled, .restoreButton:disabled { opacity: .5; cursor: not-allowed; }
+.sidebarAction :global(svg), .archiveButton :global(svg) { width: 19px; height: 19px; }
+.paginationSentinel { width: 100%; height: 1px; pointer-events: none; }
+.conversationListRetry { flex: 0 0 auto; min-height: 34px; padding: 5px 10px; color: var(--text); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; }
+.conversationListRetry:hover { border-color: var(--accent); }
+@media (max-width: 700px) {
+  .sidebar { position: fixed; z-index: 30; inset: 0 auto 0 0; width: min(84vw, 320px); height: 100%; min-width: 0; box-shadow: 18px 0 48px rgba(0,0,0,0.32); transform: translateX(-105%); transition: transform 0.22s ease; padding-bottom: env(safe-area-inset-bottom); }
+  .sidebar.sidebarOpen, .sidebar.sidebarNoChat { transform: translateX(0); }
+}
+

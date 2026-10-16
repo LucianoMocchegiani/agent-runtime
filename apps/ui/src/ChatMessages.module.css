@@ -1,0 +1,57 @@
+/* Styles for ChatMessages. */
+
+.bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  color: #fff;
+  background: var(--user-bubble);
+  border-bottom-right-radius: 2px;
+}
+
+.messageActions { display: flex; justify-content: flex-end; margin-top: 6px; }
+
+.messageEditButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 3px 7px;
+  color: rgba(255,255,255,0.72);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.messageEditButton:hover { color: #fff; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+
+.messageEditButton:focus-visible { color: #fff; background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.16); }
+
+.messageEditButton:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.messageEditButton svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+.bubble.assistant {
+  align-self: flex-start;
+  color: var(--text);
+  background: var(--assistant-bubble);
+  border-bottom-left-radius: 2px;
+}
+
+.thinkingIndicator { width: fit-content; color: var(--text-muted) !important; }
+
+.messageImage { display: block; max-width: min(100%, 420px); max-height: 360px; margin-top: 8px; object-fit: contain; border-radius: var(--radius-sm); }
+
+@media (max-width: 700px) {
+.bubble { max-width: 94%; padding: 10px 12px; }
+}

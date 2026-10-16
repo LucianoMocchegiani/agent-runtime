@@ -1,3 +1,4 @@
+import ChatStyles from './Icon.module.css';
 const ICON_PATHS = {
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
   refresh: <><path d="M20 7v5h-5" /><path d="M19 12a7 7 0 1 1-2-5l3 5" /></>,
@@ -17,7 +18,7 @@ const ICON_PATHS = {
 
 export default function Icon({ name, className = '' }) {
   return (
-    <svg className={`ui-icon ${className}`.trim()} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+    <svg className={[ChatStyles.uiIcon, className].filter(Boolean).join(' ')} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       {ICON_PATHS[name]}
     </svg>
   );

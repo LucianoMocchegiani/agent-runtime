@@ -1,0 +1,109 @@
+.page {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: clamp(18px, 4vw, 44px);
+  color: var(--text);
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 auto 26px;
+}
+
+.pageEyebrow {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .12em;
+}
+
+.surface {
+  margin: 0 auto;
+  padding: clamp(16px, 3vw, 26px);
+  background: rgba(22, 33, 62, .6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 18px 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.field input,
+.field textarea,
+.field select {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 12px;
+  color: var(--text);
+  background: var(--bg-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  font: inherit;
+}
+
+.field select { cursor: pointer; }
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: 2px solid rgba(79, 195, 247, .45);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.field select:disabled { opacity: .65; cursor: not-allowed; }
+
+.secondaryButton,
+.primaryButton {
+  min-height: 40px;
+  padding: 8px 14px;
+  color: var(--text);
+  background: #20263b;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.primaryButton {
+  color: #07131a;
+  background: var(--accent);
+  border-color: var(--accent);
+  font-weight: 650;
+}
+
+.secondaryButton:hover { border-color: var(--accent); }
+.primaryButton:disabled,
+.secondaryButton:disabled { opacity: .5; cursor: not-allowed; }
+
+.notice,
+.error {
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.notice { margin: 14px auto 0; color: #a5e6ac; background: rgba(67, 160, 71, .12); }
+.error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--error-text);
+  background: var(--bg-error);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .page { padding: 16px 12px; }
+  .pageHeader { gap: 8px; }
+}

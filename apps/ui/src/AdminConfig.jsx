@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import AdminConfigHelp from './AdminConfigHelp.jsx';
+import sharedStyles from './admin-memory.module.css';
+import styles from './AdminConfig.module.css';
 
 const TABS = [
   { id: 'Profiles', label: 'Profiles' },
@@ -214,74 +216,74 @@ export default function AdminConfig({ onBack }) {
     setError('');
   }
 
-  return <main className="admin-page">
-    <header className="admin-header">
-      <div><p className="admin-eyebrow">ADMINISTRACIÓN</p><h1>Configuración del runtime</h1><p className="admin-subtitle">Cambios versionados, aplicados sin reiniciar.</p></div>
-      <button className="admin-secondary" onClick={onBack}>Volver al chat</button>
+  return <main className={`${sharedStyles.page} ${styles.adminPage}`}>
+    <header className={`${sharedStyles.pageHeader} ${styles.adminHeader}`}>
+      <div><p className={sharedStyles.pageEyebrow}>ADMINISTRACIÓN</p><h1>Configuración del runtime</h1><p className={styles.subtitle}>Cambios versionados, aplicados sin reiniciar.</p></div>
+      <button className={sharedStyles.secondaryButton} onClick={onBack}>Volver al chat</button>
     </header>
-    {!config ? <section className="admin-card admin-auth-card">
+    {!config ? <section className={`${sharedStyles.surface} ${styles.card} ${styles.authCard}`}>
       <h2>Acceso administrativo</h2>
-      <div className="admin-tabs">
-        <button className={loginMode === 'bootstrap' ? 'active' : ''} onClick={() => setLoginMode('bootstrap')}>Admin inicial</button>
-        <button className={loginMode === 'user' ? 'active' : ''} onClick={() => setLoginMode('user')}>Usuario autenticado</button>
+      <div className={styles.tabs}>
+        <button className={loginMode === 'bootstrap' ? styles.active : ''} onClick={() => setLoginMode('bootstrap')}>Admin inicial</button>
+        <button className={loginMode === 'user' ? styles.active : ''} onClick={() => setLoginMode('user')}>Usuario autenticado</button>
       </div>
       {loginMode === 'bootstrap' ? <>
         <p>Acceso inicial clásico. Usuario y contraseña predeterminados: <code>admin</code> / <code>admin</code>. Se desactiva al configurar el primer usuario administrador.</p>
-        <label className="admin-field">Usuario<input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
-        <label className="admin-field">Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <label className={sharedStyles.field}>Usuario<input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
+        <label className={sharedStyles.field}>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       </> : <>
         <p>Ingresá el access token de una cuenta autenticada incluida en <code>RUNTIME_CONFIG_ADMIN_USERS</code>. No uses el token administrativo del runtime.</p>
-        <label className="admin-field">Access token del usuario<input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></label>
+        <label className={sharedStyles.field}>Access token del usuario<input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></label>
       </>}
-      <button className="admin-primary" disabled={busy || (loginMode === 'bootstrap' ? !username.trim() || !password : !token.trim())} onClick={signIn}>{busy ? 'Verificando…' : 'Continuar'}</button>
+      <button className={sharedStyles.primaryButton} disabled={busy || (loginMode === 'bootstrap' ? !username.trim() || !password : !token.trim())} onClick={signIn}>{busy ? 'Verificando…' : 'Continuar'}</button>
     </section> : <>
-      {Object.keys(config.ai?.providers ?? {}).length === 0 && <p className="admin-notice" role="status">Instalación nueva: no hay proveedores de IA configurados. Agregá una clave y modelos habilitados en Provider. Después elegí el modelo en el perfil predeterminado.</p>}
-      <nav className="admin-tabs" role="tablist" aria-label="Configuración del runtime">
+      {Object.keys(config.ai?.providers ?? {}).length === 0 && <p className={`${sharedStyles.notice} ${styles.notice}`} role="status">Instalación nueva: no hay proveedores de IA configurados. Agregá una clave y modelos habilitados en Provider. Después elegí el modelo en el perfil predeterminado.</p>}
+      <nav className={styles.tabs} role="tablist" aria-label="Configuración del runtime">
         {TABS.map(({ id, label }) => <button
           key={id}
           type="button"
           role="tab"
           aria-selected={tab === id}
-          className={tab === id ? 'active' : ''}
+          className={tab === id ? styles.active : ''}
           onClick={() => changeTab(id)}
         >{label}</button>)}
       </nav>
-      {tab === 'Profiles' ? <section className="admin-card admin-form" role="tabpanel">
+      {tab === 'Profiles' ? <section className={`${sharedStyles.surface} ${styles.card}`} role="tabpanel">
         <h2>Perfiles de agente</h2>
         <AdminConfigHelp tab="Profiles" />
-        <p className="admin-notice">Cada conversación usa el perfil que tiene asignado. El predeterminado solo se aplica a los chats nuevos; cambiarlo no modifica las conversaciones existentes.</p>
-        <div className="admin-profile-controls">
-          <label className="admin-field admin-profile-field">Perfil para nuevos chats<select value={defaultForNewChatsId} onChange={(e) => setDefaultForNewChatsId(e.target.value)} disabled={!profiles.length}>
+        <p className={`${sharedStyles.notice} ${styles.notice}`}>Cada conversación usa el perfil que tiene asignado. El predeterminado solo se aplica a los chats nuevos; cambiarlo no modifica las conversaciones existentes.</p>
+        <div className={styles.profileControls}>
+          <label className={`${sharedStyles.field} ${styles.profileField}`}>Perfil para nuevos chats<select value={defaultForNewChatsId} onChange={(e) => setDefaultForNewChatsId(e.target.value)} disabled={!profiles.length}>
             {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
           </select></label>
-          <div className="admin-profile-buttons">
-            <button className="admin-primary" disabled={busy || !defaultForNewChatsId} onClick={saveDefaultForNewChats}>Guardar predeterminado</button>
+          <div className={styles.profileButtons}>
+            <button className={sharedStyles.primaryButton} disabled={busy || !defaultForNewChatsId} onClick={saveDefaultForNewChats}>Guardar predeterminado</button>
           </div>
         </div>
-        <div className="admin-profile-controls">
-          <label className="admin-field admin-profile-field">Perfil a editar<select value={selectedProfileId} onChange={(e) => selectProfile(e.target.value)} disabled={!profiles.length}>
+        <div className={styles.profileControls}>
+          <label className={`${sharedStyles.field} ${styles.profileField}`}>Perfil a editar<select value={selectedProfileId} onChange={(e) => selectProfile(e.target.value)} disabled={!profiles.length}>
             {profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}
           </select></label>
-          <div className="admin-profile-buttons">
-            <button className="admin-secondary" disabled={busy || !profiles.length} onClick={createProfile}>Crear perfil</button>
-            <button className="admin-secondary" disabled={busy || profiles.length < 2} onClick={archiveProfile}>Archivar</button>
+          <div className={styles.profileButtons}>
+            <button className={sharedStyles.secondaryButton} disabled={busy || !profiles.length} onClick={createProfile}>Crear perfil</button>
+            <button className={sharedStyles.secondaryButton} disabled={busy || profiles.length < 2} onClick={archiveProfile}>Archivar</button>
           </div>
         </div>
         {selectedProfileId && <>
-          <label className="admin-field">Perfil JSON · name, modelId y config<textarea className="admin-json" spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
-          <div className="admin-actions"><button className="admin-primary" disabled={busy} onClick={saveProfile}>{busy ? 'Guardando…' : 'Validar y guardar perfil'}</button></div>
+          <label className={sharedStyles.field}>Perfil JSON · name, modelId y config<textarea className={styles.json} spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
+          <div className={styles.actions}><button className={sharedStyles.primaryButton} disabled={busy} onClick={saveProfile}>{busy ? 'Guardando…' : 'Validar y guardar perfil'}</button></div>
         </>}
       </section> : <>
-        <p className="admin-subtitle">El modelo y los parámetros de comportamiento se administran en Profiles. Esta sección contiene proveedores y credenciales, embeddings y servidores MCP globales.</p>
-        <section className="admin-card admin-form" role="tabpanel">
+        <p className={styles.subtitle}>El modelo y los parámetros de comportamiento se administran en Profiles. Esta sección contiene proveedores y credenciales, embeddings y servidores MCP globales.</p>
+        <section className={`${sharedStyles.surface} ${styles.card}`} role="tabpanel">
           <h2>{TABS.find((item) => item.id === tab)?.label}</h2>
           <AdminConfigHelp tab={tab} />
-          <label className="admin-field">Configuración JSON<textarea className="admin-json" spellCheck="false" value={draft} onChange={(e) => setDraft(e.target.value)} /></label>
-          <div className="admin-actions"><button className="admin-secondary" disabled={busy} onClick={() => load()}>Recargar</button><button className="admin-primary" disabled={busy} onClick={save}>{busy ? 'Guardando…' : 'Validar y guardar'}</button></div>
+          <label className={sharedStyles.field}>Configuración JSON<textarea className={styles.json} spellCheck="false" value={draft} onChange={(e) => setDraft(e.target.value)} /></label>
+          <div className={styles.actions}><button className={sharedStyles.secondaryButton} disabled={busy} onClick={() => load()}>Recargar</button><button className={sharedStyles.primaryButton} disabled={busy} onClick={save}>{busy ? 'Guardando…' : 'Validar y guardar'}</button></div>
         </section>
       </>}
     </>}
-    {notice && <p className="admin-notice" role="status">{notice}</p>}
-    {error && <div className="admin-error" role="alert">{error}{error.includes('version conflict') && <button className="admin-secondary" onClick={load}>Cargar última versión</button>}</div>}
+    {notice && <p className={`${sharedStyles.notice} ${styles.notice}`} role="status">{notice}</p>}
+    {error && <div className={`${sharedStyles.error} ${styles.error}`} role="alert">{error}{error.includes('version conflict') && <button className={sharedStyles.secondaryButton} onClick={load}>Cargar última versión</button>}</div>}
   </main>;
 }

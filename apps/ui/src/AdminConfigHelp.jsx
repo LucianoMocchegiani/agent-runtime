@@ -1,3 +1,5 @@
+import styles from './AdminConfigHelp.module.css';
+
 const guides = {
   Profiles: {
     intro: 'Un perfil reúne el modelo y los parámetros de comportamiento del agente. Cada conversación usa el perfil que tiene asignado; el predeterminado se utiliza solo al crear chats nuevos. Las credenciales de proveedores, MCP y embeddings se configuran en sus pestañas globales.',
@@ -72,13 +74,13 @@ function linkedText(text) {
 
 export default function AdminConfigHelp({ tab }) {
   const guide = guides[tab];
-  return <aside className="admin-guide" aria-label={`Ayuda de configuración: ${tab}`}>
+  return <aside className={styles.guide} aria-label={`Ayuda de configuración: ${tab}`}>
     <h3>Guía de esta pestaña</h3>
     <p>{guide.intro}</p>
-    <dl>{guide.fields.map(([name, description]) => <div className="admin-guide-field" key={name}>
+    <dl>{guide.fields.map(([name, description]) => <div className={styles.guideField} key={name}>
       <dt><code>{name}</code></dt><dd>{linkedText(description)}</dd>
     </div>)}</dl>
-    {guide.example && <><h4>Ejemplo de estructura</h4><pre className="admin-example"><code>{guide.example}</code></pre></>}
-    {guide.note && <p className="admin-guide-note">{guide.note}</p>}
+    {guide.example && <><h4>Ejemplo de estructura</h4><pre className={styles.example}><code>{guide.example}</code></pre></>}
+    {guide.note && <p className={styles.guideNote}>{guide.note}</p>}
   </aside>;
 }

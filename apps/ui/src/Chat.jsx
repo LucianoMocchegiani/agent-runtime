@@ -1,3 +1,4 @@
+import ChatStyles from './Chat.module.css';
 import { useState, useEffect } from 'react';
 import { MessageList, ThinkingIndicator } from './ChatMessages.jsx';
 import ChatHeader from './ChatHeader.jsx';
@@ -115,7 +116,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   const isDelegatedActive = DELEGATION_ACTIVE_STATUSES.has(delegationStatus);
 
   return (
-    <main className="chat-area">
+    <main className={ChatStyles.chatArea}>
       <ChatHeader
         onOpenSidebar={onOpenSidebar}
         isEditingTitle={isEditingTitle}
@@ -142,21 +143,21 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
       />
       <div
         ref={scrollContainerRef}
-        className="messages"
+        className={ChatStyles.messages}
         onScroll={handleMessagesScroll}
       >
-        {isLoadingOlder && <div className="history-loading" role="status">Cargando mensajes anteriores…</div>}
+        {isLoadingOlder && <div className={ChatStyles.historyLoading} role="status">Cargando mensajes anteriores…</div>}
         <MessageList messages={messages} onOpenConversation={onOpenConversation} onEditMessage={!isLoading && !isDelegatedActive && !handsFreeMode && voiceState === 'idle' && images.length === 0 ? startEditingMessage : null} />
         {isLoading && (
-          <div className="thinking-slot">
+          <div className={ChatStyles.thinkingSlot}>
             {activity === 'thinking' && <ThinkingIndicator />}
           </div>
         )}
       </div>
       {error && (
-        <div className="error-bar" role="alert">
+        <div className={ChatStyles.errorBar} role="alert">
           <span>{error}</span>
-          {isHistoryStale && <button type="button" className="error-retry-button" onClick={retryHistoryLoad}>Actualizar historial</button>}
+          {isHistoryStale && <button type="button" className={ChatStyles.errorRetryButton} onClick={retryHistoryLoad}>Actualizar historial</button>}
         </div>
       )}
       <ChatComposer

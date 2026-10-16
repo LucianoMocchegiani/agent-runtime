@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import ConversationList from './ConversationList.jsx';
+import ChatStyles from './App.module.css';
 import Chat from './Chat.jsx';
 import client from './client.js';
 import Icon from './Icon.jsx';
@@ -66,8 +67,10 @@ export default function App() {
   }
 
   return (
-    <div className={`app-shell${activeConv || showAdmin || showMemory ? ' has-active-chat' : ''}${isSidebarOpen ? ' sidebar-open' : ''}`}>
+    <div className={ChatStyles.appShell}>
       <ConversationList
+        isSidebarOpen={isSidebarOpen}
+        hasActiveChat={Boolean(activeConv || showAdmin || showMemory)}
         activeId={activeConv}
         activityByConversation={conversationActivity}
         delegationByConversation={delegationByConversation}
@@ -80,14 +83,14 @@ export default function App() {
       {isSidebarOpen && (
         <button
           type="button"
-          className="sidebar-backdrop"
+          className={ChatStyles.sidebarBackdrop}
           aria-label="Cerrar conversaciones"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
-      <div className="chat-instances" hidden={showAdmin || showMemory || !activeConv}>
+      <div className={ChatStyles.chatInstances} hidden={showAdmin || showMemory || !activeConv}>
         {mountedConversations.map(id => (
-          <div key={id} className="chat-instance" hidden={showAdmin || showMemory || id !== activeConv}>
+          <div key={id} className={ChatStyles.chatInstance} hidden={showAdmin || showMemory || id !== activeConv}>
             <Chat
               conversationId={id}
               isVisible={!showAdmin && !showMemory && id === activeConv}
@@ -105,7 +108,7 @@ export default function App() {
       ) : showMemory ? (
         <MemoryManager onBack={() => setShowMemory(false)} />
       ) : !activeConv ? (
-        <div id="empty-state">
+        <div className={ChatStyles.emptyState}>
           <div>Seleccioná un chat o creá uno nuevo</div>
           <button onClick={async () => {
             const conv = await client.conversations.create();

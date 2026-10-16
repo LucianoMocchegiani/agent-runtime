@@ -1,0 +1,78 @@
+/* Styles for App. */
+
+.emptyState {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+
+.emptyState button {
+  min-height: 42px;
+  padding: 8px 18px;
+  color: #07131a;
+  background: var(--accent);
+  border: 0;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.emptyState button:hover { background: var(--accent-hover); }
+
+.appShell {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+.chatInstances {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chatInstances[hidden] { display: none; }
+
+.chatInstance {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+.chatInstance[hidden] { display: none; }
+
+.appShell button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sidebarBackdrop { display: none; }
+
+@media (max-width: 700px) {
+.appShell { position: relative; }
+}
+
+@media (max-width: 700px) {
+.sidebarBackdrop { display: block; position: fixed; z-index: 20; inset: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.56); border: 0; }
+}
+
+@media (max-width: 700px) {
+.emptyState { min-width: 0; padding: 24px; text-align: center; }
+}
+
+.emptyState button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+
+.emptyState button svg { width: 17px; height: 17px; }
