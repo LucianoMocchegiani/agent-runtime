@@ -4,6 +4,7 @@ import test from 'node:test';
 
 const chatSource = await readFile(new URL('./Chat.jsx', import.meta.url), 'utf8');
 const chatMessagesSource = await readFile(new URL('./ChatMessages.jsx', import.meta.url), 'utf8');
+const toolMessagesSource = await readFile(new URL('./ToolMessages.jsx', import.meta.url), 'utf8');
 const markdownContentSource = await readFile(new URL('./MarkdownContent.jsx', import.meta.url), 'utf8');
 const conversationListSource = await readFile(new URL('./ConversationList.jsx', import.meta.url), 'utf8');
 const chatAttachmentsSource = await readFile(new URL('./useChatAttachments.js', import.meta.url), 'utf8');
@@ -86,15 +87,20 @@ test('la cabecera, el título, el perfil y los controles de recarga y voz quedan
   assert.match(chatHeaderSource, /loadMessages\(\{ preserveHistory: true \}\)/);
 });
 
-test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {
+test('la lista de mensajes y la presentación de herramientas quedan separadas', () => {
   assert.match(chatSource, /import \{ MessageList, ThinkingIndicator \} from '\.\/ChatMessages\.jsx'/);
   assert.match(chatSource, /<MessageList messages=\{messages\}/);
   assert.doesNotMatch(chatSource, /formatToolOutput/);
   assert.match(chatTurnSource, /status: 'done', toolName: name, toolResult: output/);
   assert.match(chatMessagesSource, /export function MessageList/);
-  assert.match(chatMessagesSource, /function DelegationCard/);
-  assert.match(chatMessagesSource, /delegation-events/);
-  assert.match(chatMessagesSource, /El resultado quedó guardado en la conversación de destino/);
+  assert.match(chatMessagesSource, /import \{ collectToolMessages, ToolMessage, ToolStack \} from '\.\/ToolMessages\.jsx'/);
+  assert.doesNotMatch(chatMessagesSource, /function DelegationCard|function formatToolOutput/);
+  assert.match(toolMessagesSource, /function DelegationCard/);
+  assert.match(toolMessagesSource, /function formatToolOutput/);
+  assert.match(toolMessagesSource, /function ToolStack/);
+  assert.match(toolMessagesSource, /function collectToolMessages/);
+  assert.match(toolMessagesSource, /delegation-events/);
+  assert.match(toolMessagesSource, /El resultado quedó guardado en la conversación de destino/);
   assert.match(conversationListSource, /delegationLabels\[delegation\?\.status\]/);
 });
 
