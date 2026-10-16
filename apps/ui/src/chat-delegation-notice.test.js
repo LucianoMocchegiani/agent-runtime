@@ -9,6 +9,7 @@ const chatAttachmentsSource = await readFile(new URL('./useChatAttachments.js', 
 const chatVoiceSource = await readFile(new URL('./useChatVoice.js', import.meta.url), 'utf8');
 const chatHistorySource = await readFile(new URL('./useChatHistory.js', import.meta.url), 'utf8');
 const chatTurnSource = await readFile(new URL('./useChatTurn.js', import.meta.url), 'utf8');
+const chatComposerSource = await readFile(new URL('./useChatComposer.js', import.meta.url), 'utf8');
 
 test('el chat no muestra un aviso redundante por el estado persistente de delegación', () => {
   assert.doesNotMatch(chatSource, /visibleDelegationStatus|delegation-chat-status|DELEGATION_LABELS/);
@@ -51,6 +52,17 @@ test('el envío, el streaming y la cancelación del turno quedan en su hook', ()
   assert.match(chatTurnSource, /onToolStart/);
   assert.match(chatTurnSource, /function handleAbort/);
   assert.match(chatTurnSource, /finishVoiceReply\(\)/);
+});
+
+test('el borrador, la edición y la interacción del textarea quedan en su hook', () => {
+  assert.match(chatSource, /import useChatComposer, \{ MAX_MESSAGE_CHARS \} from '\.\/useChatComposer\.js'/);
+  assert.match(chatSource, /useChatComposer\(\{[\s\S]*canStartEditingMessage,[\s\S]*onClearError:/);
+  assert.doesNotMatch(chatSource, /const \[input, setInput\]|function handleInputKeyDown|inputBeforeEditRef = useRef|textarea\.style\.height/);
+  assert.match(chatComposerSource, /function startEditingMessage/);
+  assert.match(chatComposerSource, /function cancelEditingMessage/);
+  assert.match(chatComposerSource, /function handleInputKeyDown/);
+  assert.match(chatComposerSource, /textarea\.style\.height = 'auto'/);
+  assert.match(chatComposerSource, /MAX_MESSAGE_CHARS = 100_000/);
 });
 
 test('la presentación de mensajes y el seguimiento de delegaciones quedan en ChatMessages', () => {

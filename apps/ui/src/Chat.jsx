@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from './Icon.jsx';
 import { MessageList, ThinkingIndicator } from './ChatMessages.jsx';
 import useConversationSettings from './useConversationSettings.js';
@@ -6,8 +6,7 @@ import useChatAttachments, { MAX_IMAGES } from './useChatAttachments.js';
 import useChatVoice from './useChatVoice.js';
 import useChatHistory from './useChatHistory.js';
 import useChatTurn, { DELEGATION_ACTIVE_STATUSES } from './useChatTurn.js';
-
-const MAX_MESSAGE_CHARS = 100_000;
+import useChatComposer, { MAX_MESSAGE_CHARS } from './useChatComposer.js';
 export default function Chat({ conversationId, isVisible, delegationStatus, onOpenSidebar, onConversationUpdated, onActivityChange, onOpenConversation }) {
   const [error, setError] = useState(null);
   const {
@@ -61,10 +60,22 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     isPreparingVoice, isPlayingVoice, stopVoicePlayback,
     toggleHandsFree, handleVoiceButton, handleReplayVoice, handleCancelVoice,
   } = voice;
-  const [input, setInput] = useState('');
-  const [editingMessage, setEditingMessage] = useState(null);
-  const inputBeforeEditRef = useRef('');
-  const messageInputRef = useRef(null);
+  const {
+    input,
+    setInput,
+    editingMessage,
+    setEditingMessage,
+    inputBeforeEditRef,
+    messageInputRef,
+    handleInputChange,
+    handleInputKeyDown,
+    startEditingMessage,
+    cancelEditingMessage,
+  } = useChatComposer({
+    conversationId,
+    canStartEditingMessage,
+    onClearError: () => setError(null),
+  });
   const {
     isLoading,
     activity,
@@ -91,62 +102,10 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     voice,
   });
 
-  useEffect(() => {
-    const textarea = messageInputRef.current;
-    if (!textarea) return;
-    textarea.style.height = 'auto';
-    const maxHeight = Number.parseFloat(getComputedStyle(textarea).maxHeight);
-    textarea.style.height = `${Math.min(textarea.scrollHeight, Number.isFinite(maxHeight) ? maxHeight : textarea.scrollHeight)}px`;
-    textarea.style.overflowY = textarea.scrollHeight > textarea.clientHeight ? 'auto' : 'hidden';
-  }, [input]);
-
-  function handleInputChange(e) {
-    setInput(e.target.value);
+  function canStartEditingMessage(message) {
+    return !isLoading && voiceState === 'idle' && pendingImageReads === 0
+      && images.length === 0 && !message.pending && message.role === 'user';
   }
-
-  function startEditingMessage(message) {
-    if (isLoading || voiceState !== 'idle' || pendingImageReads > 0 || images.length > 0 || message.pending || message.role !== 'user') return;
-    inputBeforeEditRef.current = input;
-    setEditingMessage(message);
-    setInput(message.content);
-    setError(null);
-    requestAnimationFrame(() => messageInputRef.current?.focus());
-  }
-
-  function cancelEditingMessage() {
-    setEditingMessage(null);
-    setInput(inputBeforeEditRef.current);
-    inputBeforeEditRef.current = '';
-  }
-
-  function handleInputKeyDown(e) {
-    if (e.key === 'Escape' && editingMessage) {
-      e.preventDefault();
-      cancelEditingMessage();
-      return;
-    }
-    if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
-    e.preventDefault();
-
-    if (e.shiftKey) {
-      const textarea = e.currentTarget;
-      const { selectionStart, selectionEnd, value } = textarea;
-      const nextValue = `${value.slice(0, selectionStart)}\n${value.slice(selectionEnd)}`;
-      setInput(nextValue);
-      requestAnimationFrame(() => {
-        textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);
-      });
-      return;
-    }
-
-    e.currentTarget.form?.requestSubmit();
-  }
-  
-  useEffect(() => {
-    setEditingMessage(null);
-    setInput('');
-    inputBeforeEditRef.current = '';
-  }, [conversationId]);
 
   useEffect(() => {
     onActivityChange?.(conversationId, isLoading ? activity : null);
