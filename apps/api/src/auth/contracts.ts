@@ -1,5 +1,5 @@
 /**
- * Identidad resuelta por introspección (contrato portable, no GymBro).
+ * Identidad resuelta por introspección (contrato portable).
  *
  * @remarks `userId` aísla hilos. Nunca sale del body del cliente.
  */

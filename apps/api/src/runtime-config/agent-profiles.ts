@@ -1,145 +1,87 @@
-import { randomUUID } from 'node:crypto';
-import { Pool } from 'pg';
 import { config } from '../config.js';
-import type { AgentProfile, AgentProfileConfig } from './types.js';
+import type { AgentProfile, AgentProfileConfig } from './contracts.js';
+import {
+  archiveAgentProfileRecord,
+  insertAgentProfile,
+  insertInitialDefaultProfile,
+  readAgentProfile,
+  readAgentProfiles,
+  readFirstActiveAgentProfile,
+  readNewChatDefaultProfileId,
+  seedLegacyAgentProfile,
+  updateAgentProfileRecord,
+  writeNewChatDefaultProfileId,
+} from './agent-profile-persistence.js';
+import { validateAgentProfileInput } from './agent-profile-validation.js';
 
-let pool: Pool | undefined;
-const FIELDS = ['chatSystemPrompt', 'contextTokenBudget', 'maxContextMessages', 'maxOutputTokens', 'reserveOutputTokens', 'contextSafetyTokens', 'maxToolSteps', 'llmTraceRequests', 'summariesEnabled', 'summaryTokenBudget'] as const;
-
-/** Inyecta el pool PostgreSQL compartido para las operaciones de perfiles. */
-export function setAgentProfilePool(value: Pool): void { pool = value; }
-function db(): Pool { if (!pool) throw new Error('Agent profile store is not initialized'); return pool; }
-function dto(row: any): AgentProfile {
-  return { id: row.id, name: row.name, modelId: row.model_id, config: row.config, createdAt: new Date(row.created_at).toISOString(), updatedAt: new Date(row.updated_at).toISOString() };
-}
-function validate(name: unknown, modelId: unknown, rawConfig: unknown): { name: string; modelId: string; config: AgentProfileConfig } {
-  if (typeof name !== 'string' || !name.trim() || name.trim().length > 100) throw new Error('name debe tener entre 1 y 100 caracteres');
-  if (typeof modelId !== 'string') throw new Error('modelId debe ser un string');
-  if (modelId && !config.ai.providers[modelId.split('/')[0] as keyof typeof config.ai.providers]?.models.includes(modelId.slice(modelId.indexOf('/') + 1))) throw new Error('El modelo no está habilitado en la configuración del runtime');
-  if (!rawConfig || typeof rawConfig !== 'object' || Array.isArray(rawConfig)) throw new Error('config debe ser un objeto');
-  const c = rawConfig as Record<string, unknown>;
-  for (const field of FIELDS) if (!Object.hasOwn(c, field)) throw new Error(`Falta ${field} en config`);
-  for (const field of ['contextTokenBudget', 'maxContextMessages', 'maxOutputTokens', 'reserveOutputTokens', 'contextSafetyTokens', 'maxToolSteps', 'summaryTokenBudget'] as const) {
-    if (!Number.isSafeInteger(c[field]) || (c[field] as number) < 1 || (c[field] as number) > 10_000_000) throw new Error(`${field} debe ser un entero positivo`);
-  }
-  if ((c.reserveOutputTokens as number) < (c.maxOutputTokens as number)) throw new Error('reserveOutputTokens debe ser mayor o igual que maxOutputTokens');
-  if (typeof c.chatSystemPrompt !== 'string' || c.chatSystemPrompt.length > 100_000 || typeof c.llmTraceRequests !== 'boolean' || typeof c.summariesEnabled !== 'boolean') throw new Error('Configuración de agente inválida');
-  return { name: name.trim(), modelId: modelId.trim(), config: Object.fromEntries(FIELDS.map((field) => [field, c[field]])) as AgentProfileConfig };
-}
-
-/** Lista perfiles ordenados por creación; por defecto excluye los archivados. */
+/** Lista perfiles activos o incluye los archivados cuando se solicita explícitamente. */
 export async function listAgentProfiles(includeArchived = false): Promise<AgentProfile[]> {
-  const result = await db().query(`SELECT * FROM runtime.agent_profile_configs ${includeArchived ? '' : 'WHERE archived_at IS NULL'} ORDER BY created_at, id`);
-  return result.rows.map(dto);
+  return readAgentProfiles(includeArchived);
 }
-/** Busca un perfil por identificador; por defecto devuelve `null` si está archivado. */
+
+/** Busca un perfil por identificador; devuelve null para archivados salvo indicación contraria. */
 export async function getAgentProfile(id: string, includeArchived = false): Promise<AgentProfile | null> {
-  const result = await db().query(`SELECT * FROM runtime.agent_profile_configs WHERE id = $1 ${includeArchived ? '' : 'AND archived_at IS NULL'}`, [id]);
-  return result.rows[0] ? dto(result.rows[0]) : null;
+  return readAgentProfile(id, includeArchived);
 }
-/** Devuelve el primer perfil activo en orden de creación o falla si no hay ninguno. */
+
+/** Obtiene el perfil activo más antiguo y falla si no hay perfiles configurados. */
 export async function getFirstActiveAgentProfile(): Promise<AgentProfile> {
-  const profiles = await listAgentProfiles();
-  if (!profiles[0]) throw new Error('No hay perfiles de agente configurados');
-  return profiles[0];
+  return readFirstActiveAgentProfile();
 }
 
-/** Perfil configurado para los chats nuevos. */
-/** Devuelve el ID del perfil activo predeterminado o el primer perfil activo como fallback. */
+/** Resuelve el id del perfil predeterminado y usa el primer perfil activo como fallback. */
 export async function getNewChatDefaultProfileId(): Promise<string> {
-  const result = await db().query<{ default_profile_id: string }>(
-    "SELECT default_profile_id FROM runtime.agent_profile_preferences WHERE id = 'default'",
-  );
-  const selectedId = result.rows[0]?.default_profile_id;
-  if (selectedId && await getAgentProfile(selectedId)) return selectedId;
-  return (await getFirstActiveAgentProfile()).id;
+  const selectedId = await readNewChatDefaultProfileId();
+  if (selectedId && await readAgentProfile(selectedId)) return selectedId;
+  return (await readFirstActiveAgentProfile()).id;
 }
 
-/** Establece el perfil predeterminado de nuevos chats si existe y está activo. */
+/** Cambia el perfil predeterminado solo si el perfil elegido está activo. */
 export async function setNewChatDefaultProfileId(profileId: string): Promise<boolean> {
-  if (!await getAgentProfile(profileId)) return false;
-  await db().query(
-    "INSERT INTO runtime.agent_profile_preferences (id, default_profile_id) VALUES ('default', $1) ON CONFLICT (id) DO UPDATE SET default_profile_id = EXCLUDED.default_profile_id, updated_at = now()",
-    [profileId],
-  );
+  if (!await readAgentProfile(profileId)) return false;
+  await writeNewChatDefaultProfileId(profileId);
   return true;
 }
 
-/** Inicializa el perfil predeterminado solo si todavía no se guardó uno. */
+/** Inicializa la preferencia predeterminada solo cuando todavía no existe. */
 export async function initializeNewChatDefaultProfile(): Promise<void> {
-  const first = await getFirstActiveAgentProfile();
-  await db().query(
-    "INSERT INTO runtime.agent_profile_preferences (id, default_profile_id) VALUES ('default', $1) ON CONFLICT (id) DO NOTHING",
-    [first.id],
-  );
+  const first = await readFirstActiveAgentProfile();
+  await insertInitialDefaultProfile(first.id);
 }
 
-/** Resuelve el perfil configurado para los chats nuevos. */
 /** Resuelve el perfil completo que se asignará por defecto a conversaciones nuevas. */
 export async function getNewChatDefaultAgentProfile(): Promise<AgentProfile> {
-  return (await getAgentProfile(await getNewChatDefaultProfileId())) ?? getFirstActiveAgentProfile();
-}
-/** Valida y crea un perfil de agente activo. */
-export async function createAgentProfile(input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile> {
-  const item = validate(input.name, input.modelId, input.config);
-  // sort_order remains in the table for existing installations, but no longer carries behavior.
-  const result = await db().query('INSERT INTO runtime.agent_profile_configs (id,name,model_id,sort_order,config) VALUES ($1,$2,$3,0,$4) RETURNING *', [randomUUID(), item.name, item.modelId, JSON.stringify(item.config)]);
-  return dto(result.rows[0]);
-}
-/** Actualiza un perfil activo; devuelve `null` si no existe o ya fue archivado. */
-export async function updateAgentProfile(id: string, input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile | null> {
-  const item = validate(input.name, input.modelId, input.config);
-  const result = await db().query('UPDATE runtime.agent_profile_configs SET name=$2,model_id=$3,config=$4,updated_at=now() WHERE id=$1 AND archived_at IS NULL RETURNING *', [id, item.name, item.modelId, JSON.stringify(item.config)]);
-  return result.rows[0] ? dto(result.rows[0]) : null;
-}
-/** Archiva un perfil y reubica el predeterminado si corresponde; conserva al menos uno activo. */
-export async function archiveAgentProfile(id: string): Promise<boolean> {
-  const client = await db().connect();
-  try {
-    await client.query('BEGIN');
-    const profile = await client.query('SELECT id FROM runtime.agent_profile_configs WHERE id=$1 AND archived_at IS NULL FOR UPDATE', [id]);
-    if (!profile.rows[0]) { await client.query('ROLLBACK'); return false; }
-    const remaining = await client.query('SELECT count(*)::int AS count FROM runtime.agent_profile_configs WHERE archived_at IS NULL');
-    if (remaining.rows[0].count <= 1) throw new Error('Debe quedar al menos un perfil activo');
-    await client.query('UPDATE runtime.agent_profile_configs SET archived_at=now(),updated_at=now() WHERE id=$1', [id]);
-    await client.query(
-      `UPDATE runtime.agent_profile_preferences SET default_profile_id = (
-        SELECT id FROM runtime.agent_profile_configs WHERE archived_at IS NULL
-        ORDER BY created_at, id LIMIT 1
-      ), updated_at=now() WHERE id='default' AND default_profile_id=$1`,
-      [id],
-    );
-    await client.query('COMMIT');
-    return true;
-  } catch (error) { await client.query('ROLLBACK'); throw error; }
-  finally { client.release(); }
+  return (await readAgentProfile(await getNewChatDefaultProfileId())) ?? readFirstActiveAgentProfile();
 }
 
-/** Migra el comportamiento anterior al primer perfil activo, una sola vez y de forma segura entre réplicas. */
+/** Valida y crea un perfil de agente activo. */
+export async function createAgentProfile(input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile> {
+  return insertAgentProfile(validateAgentProfileInput(input.name, input.modelId, input.config));
+}
+
+/** Valida y actualiza un perfil activo; devuelve null si no existe o está archivado. */
+export async function updateAgentProfile(id: string, input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile | null> {
+  return updateAgentProfileRecord(id, validateAgentProfileInput(input.name, input.modelId, input.config));
+}
+
+/** Archiva un perfil preservando la existencia de un perfil activo. */
+export async function archiveAgentProfile(id: string): Promise<boolean> {
+  return archiveAgentProfileRecord(id);
+}
+
+/** Migra la configuración heredada al primer perfil activo de forma segura entre réplicas. */
 export async function seedDefaultAgentProfile(): Promise<void> {
-  const client = await db().connect();
-  try {
-    await client.query('BEGIN');
-    // Avoid creating multiple competing first profiles when API replicas start together.
-    await client.query("SELECT pg_advisory_xact_lock(hashtext('runtime.agent_profile_configs.seed'))");
-    const exists = await client.query('SELECT 1 FROM runtime.agent_profile_configs LIMIT 1');
-    if (exists.rowCount) {
-      await client.query('COMMIT');
-      return;
-    }
-    const legacyConfig: AgentProfileConfig = {
-      chatSystemPrompt: config.chatSystemPrompt, contextTokenBudget: config.contextTokenBudget,
-      maxContextMessages: config.maxContextMessages, maxOutputTokens: config.maxOutputTokens,
-      reserveOutputTokens: config.reserveOutputTokens, contextSafetyTokens: config.contextSafetyTokens,
-      maxToolSteps: config.maxToolSteps, llmTraceRequests: config.llmTraceRequests,
-      summariesEnabled: config.summariesEnabled, summaryTokenBudget: config.summaryTokenBudget,
-    };
-    await client.query('INSERT INTO runtime.agent_profile_configs (id,name,model_id,sort_order,config) VALUES ($1,$2,$3,0,$4)', [randomUUID(), 'Predeterminado', config.ai.defaultModel, JSON.stringify(legacyConfig)]);
-    await client.query('COMMIT');
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
+  const legacyConfig: AgentProfileConfig = {
+    chatSystemPrompt: config.chatSystemPrompt,
+    contextTokenBudget: config.contextTokenBudget,
+    maxContextMessages: config.maxContextMessages,
+    maxOutputTokens: config.maxOutputTokens,
+    reserveOutputTokens: config.reserveOutputTokens,
+    contextSafetyTokens: config.contextSafetyTokens,
+    maxToolSteps: config.maxToolSteps,
+    llmTraceRequests: config.llmTraceRequests,
+    summariesEnabled: config.summariesEnabled,
+    summaryTokenBudget: config.summaryTokenBudget,
+  };
+  await seedLegacyAgentProfile(config.ai.defaultModel, legacyConfig);
 }

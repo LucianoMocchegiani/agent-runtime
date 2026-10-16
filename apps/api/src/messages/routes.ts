@@ -14,7 +14,7 @@ import {
 } from './constants.js';
 import { HTTPException } from 'hono/http-exception';
 import { streamAgentTurn } from '../agent/turn/run.js';
-import type { AppEnv } from '../auth/principal.js';
+import type { AppEnv } from '../auth/contracts.js';
 import { listMessages, editMessageAndTruncate } from './persistence.js';
 import { requireConversationId } from '../conversations/ids.js';
 import { getConversation } from '../conversations/service.js';

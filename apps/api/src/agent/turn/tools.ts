@@ -1,6 +1,6 @@
 import { type Tool } from 'ai';
 import { HTTPException } from 'hono/http-exception';
-import type { Principal } from '../../auth/principal.js';
+import type { Principal } from '../../auth/contracts.js';
 import type { McpConfig } from '../../config.js';
 import { McpRegistry } from '../../mcp/registry.js';
 import { AgentToolNameConflictError, buildAgentTools } from '../tools/index.js';

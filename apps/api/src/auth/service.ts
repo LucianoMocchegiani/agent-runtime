@@ -1,11 +1,15 @@
 import { createHash } from 'node:crypto';
-import { HTTPException } from 'hono/http-exception';
 import { config } from '../config.js';
-import type { Principal } from './principal.js';
+import type { Principal } from './contracts.js';
+import { AUTH_CACHE_MAX_ENTRIES, AUTH_CACHE_TTL_MS, AUTH_INTROSPECT_TIMEOUT_MS } from './constants.js';
 
-const CACHE_TTL_MS = 30_000;
-const CACHE_MAX = 256;
-const INTROSPECT_TIMEOUT_MS = 8_000;
+/** Error de autenticación independiente de HTTP, traducible por los adaptadores de entrada. */
+export class AuthServiceError extends Error {
+  constructor(readonly status: 401 | 502, message: string) {
+    super(message);
+    this.name = 'AuthServiceError';
+  }
+}
 
 type CacheEntry = {
   principal: Principal;
@@ -31,7 +35,7 @@ function cacheGet(key: string): Principal | null {
 }
 
 function cacheSet(key: string, principal: Principal): void {
-  if (cache.size >= CACHE_MAX) {
+  if (cache.size >= AUTH_CACHE_MAX_ENTRIES) {
     const oldest = cache.keys().next().value;
     if (oldest) {
       cache.delete(oldest);
@@ -39,7 +43,7 @@ function cacheSet(key: string, principal: Principal): void {
   }
   cache.set(key, {
     principal,
-    expiresAt: Date.now() + CACHE_TTL_MS,
+    expiresAt: Date.now() + AUTH_CACHE_TTL_MS,
   });
 }
 
@@ -63,7 +67,7 @@ function readString(record: Record<string, unknown>, key: string): string | null
  * Mapea la respuesta JSON del servicio de introspección al contrato portable de identidad.
  * @param body Cuerpo sin validar devuelto por el servicio.
  * @returns Identificador de usuario y atributos opcionales configurados.
- * @throws {HTTPException} 502 si la respuesta no es válida o no contiene `userId`.
+ * @throws {AuthServiceError} 502 si la respuesta no es válida o no contiene `userId`.
  */
 function parseIntrospectBody(body: unknown): {
   userId: string;
@@ -72,14 +76,12 @@ function parseIntrospectBody(body: unknown): {
 } {
   const record = asRecord(body);
   if (!record) {
-    throw new HTTPException(502, { message: 'Introspect response is not JSON object' });
+    throw new AuthServiceError(502, 'Introspect response is not JSON object');
   }
   const m = config.authMapping;
   const userId = readString(record, m.userId);
   if (!userId) {
-    throw new HTTPException(502, {
-      message: 'Introspect response missing userId',
-    });
+    throw new AuthServiceError(502, 'Introspect response missing userId');
   }
   return {
     userId,
@@ -93,7 +95,7 @@ function parseIntrospectBody(body: unknown): {
  * @param token Token Bearer recibido del cliente.
  * @returns Principal identificado por el servicio de autenticación.
  * @remarks Usa una caché breve indexada por hash; no valida localmente firmas JWT.
- * @throws {HTTPException} 401 si el token es inválido; 502 si falla la introspección o su respuesta.
+ * @throws {AuthServiceError} 401 si el token es inválido; 502 si falla la introspección o su respuesta.
  */
 export async function resolvePrincipal(token: string): Promise<Principal> {
   const key = tokenCacheKey(token);
@@ -106,24 +108,24 @@ export async function resolvePrincipal(token: string): Promise<Principal> {
   try {
     response = await fetch(config.authIntrospectUrl, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(INTROSPECT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(AUTH_INTROSPECT_TIMEOUT_MS),
     });
   } catch {
-    throw new HTTPException(502, { message: 'Auth introspection unavailable' });
+    throw new AuthServiceError(502, 'Auth introspection unavailable');
   }
 
   if (response.status === 401 || response.status === 403) {
-    throw new HTTPException(401, { message: 'Unauthorized' });
+    throw new AuthServiceError(401, 'Unauthorized');
   }
   if (!response.ok) {
-    throw new HTTPException(502, { message: 'Auth introspection failed' });
+    throw new AuthServiceError(502, 'Auth introspection failed');
   }
 
   let body: unknown;
   try {
     body = await response.json();
   } catch {
-    throw new HTTPException(502, { message: 'Auth introspection returned non-JSON' });
+    throw new AuthServiceError(502, 'Auth introspection returned non-JSON');
   }
 
   const parsed = parseIntrospectBody(body);

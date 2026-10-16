@@ -1,7 +1,9 @@
 import { jsonSchema, tool, type Tool } from 'ai';
 import { getConversation } from '../../conversations/service.js';
 import { listMessages } from '../../messages/persistence.js';
-import { enqueueDelegation, getDelegationForUser } from '../../delegations/store.js';
+import { enqueueDelegation } from '../../delegations/service.js';
+import { getDelegationForUser } from '../../delegations/persistence.js';
+import { DELEGATION_ID_PATTERN, DELEGATION_INSTRUCTION_MAX_LENGTH } from '../../delegations/constants.js';
 import type { AgentToolContext } from './context.js';
 
 /** Construye herramientas para encolar delegaciones y consultar su estado. */
@@ -18,14 +20,14 @@ export function buildDelegationTools({
         type: 'object',
         properties: {
           conversationId: { type: 'string', format: 'uuid', description: 'Id del hilo destinatario, que debe pertenecer al usuario.' },
-          instruction: { type: 'string', minLength: 1, maxLength: 100_000 },
+          instruction: { type: 'string', minLength: 1, maxLength: DELEGATION_INSTRUCTION_MAX_LENGTH },
         },
         required: ['conversationId', 'instruction'],
         additionalProperties: false,
       }),
       execute: async ({ conversationId: targetId, instruction }) => {
         const targetIdTrimmed = targetId.trim();
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetIdTrimmed)) {
+        if (!DELEGATION_ID_PATTERN.test(targetIdTrimmed)) {
           return { error: 'El id del hilo destinatario no es válido.' };
         }
         const canonicalTargetId = targetIdTrimmed.toLowerCase();
@@ -34,7 +36,7 @@ export function buildDelegationTools({
         }
         // Los UUID son case-insensitive; conservar su forma canónica evita claves duplicadas en la UI.
         const trimmedInstruction = instruction.trim();
-        if (!trimmedInstruction || trimmedInstruction.length > 100_000) {
+        if (!trimmedInstruction || trimmedInstruction.length > DELEGATION_INSTRUCTION_MAX_LENGTH) {
           return { error: 'La instrucción debe tener entre 1 y 100000 caracteres.' };
         }
         const target = await getConversation(principal, canonicalTargetId);
@@ -67,7 +69,7 @@ export function buildDelegationTools({
         additionalProperties: false,
       }),
       execute: async ({ delegationId }) => {
-        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(delegationId)) {
+        if (!DELEGATION_ID_PATTERN.test(delegationId)) {
           return { error: 'El id de delegación no es válido.' };
         }
         const job = await getDelegationForUser(delegationId, principal.userId);

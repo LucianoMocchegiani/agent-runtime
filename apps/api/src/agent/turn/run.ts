@@ -1,11 +1,11 @@
 import { HTTPException } from 'hono/http-exception';
-import { getRuntimeSettings, type AgentProfile } from '../../runtime-config/store.js';
+import { getRuntimeSettings, type AgentProfile } from '../../runtime-config/service.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { applyAutomaticTitle } from '../../conversations/persistence.js';
 import { getContext, saveMessage, saveSummary } from '../../messages/persistence.js';
 import { searchPreferences } from '../../preferences/persistence.js';
 import { prepareTurnContext, type IncomingImage } from './context.js';
-import type { Principal } from '../../auth/principal.js';
+import type { Principal } from '../../auth/contracts.js';
 import { delegationEncryptionEnabled } from '../../delegations/payload.js';
 import { prepareAgentTurnTools } from './tools.js';
 import { streamPreparedAgentTurn } from './stream.js';

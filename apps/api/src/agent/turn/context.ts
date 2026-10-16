@@ -1,7 +1,7 @@
 import { generateText, type ModelMessage, type Tool } from 'ai';
 import type { GetContextResult, MessageDto } from '../../messages/contracts.js';
 import type { UserPreferenceDto } from '../../preferences/contracts.js';
-import type { RuntimeSettings } from '../../runtime-config/store.js';
+import type { RuntimeSettings } from '../../runtime-config/service.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import {
   resolveOutputTokenLimits,

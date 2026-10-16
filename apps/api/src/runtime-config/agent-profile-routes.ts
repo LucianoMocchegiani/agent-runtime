@@ -1,11 +1,18 @@
 import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { AuthServiceError } from '../auth/service.js';
 import { authorized } from './authorization.js';
 import { archiveAgentProfile, createAgentProfile, getNewChatDefaultProfileId, listAgentProfiles, setNewChatDefaultProfileId, updateAgentProfile } from './agent-profiles.js';
 
 /** Endpoints administrativos de perfiles y perfil predeterminado para chats nuevos. */
 export const agentProfileAdminRoutes = new Hono();
 agentProfileAdminRoutes.use('*', async (c, next) => {
-  if (!(await authorized(c.req.header('Authorization')))) return c.json({ error: 'Not authorized to manage agent profiles' }, 403);
+  try {
+    if (!(await authorized(c.req.header('Authorization')))) return c.json({ error: 'Not authorized to manage agent profiles' }, 403);
+  } catch (error) {
+    if (error instanceof AuthServiceError) throw new HTTPException(error.status, { message: error.message });
+    throw error;
+  }
   await next();
 });
 /** Lee y valida que el cuerpo de una solicitud administrativa sea un objeto JSON. */

@@ -1,5 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
-import { resolvePrincipal } from '../auth/introspect.js';
+import { resolvePrincipal } from '../auth/service.js';
+import { ANONYMOUS_TOKEN_PREFIX } from '../auth/constants.js';
+import { RUNTIME_CONFIG_BOOTSTRAP_ADMIN_USER } from './constants.js';
 
 function matchesSecret(actualValue: string, expectedValue: string | undefined): boolean {
   if (!expectedValue) return false;
@@ -31,7 +33,7 @@ export async function authorized(header: string | undefined): Promise<boolean> {
       if (separator < 0) return false;
       const username = decoded.slice(0, separator);
       const password = decoded.slice(separator + 1);
-      const expectedUsername = process.env.RUNTIME_CONFIG_BOOTSTRAP_USER?.trim() || 'admin';
+      const expectedUsername = process.env.RUNTIME_CONFIG_BOOTSTRAP_USER?.trim() || RUNTIME_CONFIG_BOOTSTRAP_ADMIN_USER;
       const expectedPassword = process.env.RUNTIME_CONFIG_BOOTSTRAP_PASSWORD ?? 'admin';
       return matchesSecret(username, expectedUsername) && matchesSecret(password, expectedPassword);
     }
@@ -46,7 +48,7 @@ export async function authorized(header: string | undefined): Promise<boolean> {
 
   // Browser access is granted only to authenticated identities explicitly allowlisted by an operator.
   // Anonymous session ids used by the chat UI are deliberately not accepted here.
-  if (token.startsWith('anon:') || configuredAdmins.length === 0) return false;
+  if (token.startsWith(ANONYMOUS_TOKEN_PREFIX) || configuredAdmins.length === 0) return false;
 
   const principal = await resolvePrincipal(token);
   return configuredAdmins.some((identity) =>

@@ -1,4 +1,4 @@
-import type { Principal } from '../../auth/principal.js';
+import type { Principal } from '../../auth/contracts.js';
 
 /** Dependencias e identidad compartidas por los constructores de herramientas del agente. */
 export type AgentToolContext = {

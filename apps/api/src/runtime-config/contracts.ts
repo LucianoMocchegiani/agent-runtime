@@ -8,3 +8,6 @@ export type AgentProfileConfig = Pick<ChatConfig, 'chatSystemPrompt' | 'contextT
 export type AgentProfile = { id: string; name: string; modelId: string; config: AgentProfileConfig; createdAt: string; updatedAt: string };
 /** Ajustes efectivos del runtime: infraestructura global y valores de chat heredados. */
 export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
+
+/** Entrada normalizada lista para crear o actualizar un perfil persistido. */
+export type AgentProfileWrite = { name: string; modelId: string; config: AgentProfileConfig };

@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { AppEnv } from '../auth/principal.js';
+import type { AppEnv } from '../auth/contracts.js';
 import { listModels } from './provider.js';
 import { getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 

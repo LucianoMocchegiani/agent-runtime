@@ -12,12 +12,10 @@ import {
   finishDelegation,
   renewDelegation,
   recordDelegationStarted,
-  type DelegationPayload,
-  type DelegationJob,
-} from './store.js';
+} from './persistence.js';
+import type { DelegationPayload, DelegationJob } from './contracts.js';
+import { DELEGATION_LEASE_MS, DELEGATION_RENEW_INTERVAL_MS, DELEGATION_WORKER_POLL_INTERVAL_MS } from './constants.js';
 
-const WORKER_LEASE_MS = 120_000;
-const WORKER_RENEW_MS = 30_000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function consume(response: Response): Promise<void> {
@@ -94,7 +92,7 @@ async function processJob(job: DelegationJob, workerId: string): Promise<void> {
     }
     await recordDelegationStarted(job.id, workerId, job.target_conversation_id);
     renewTimer = setInterval(() => {
-      void renewDelegation(job.id, workerId, WORKER_LEASE_MS).then((renewed) => {
+      void renewDelegation(job.id, workerId, DELEGATION_LEASE_MS).then((renewed) => {
         if (!renewed) {
           leaseLost = true;
           controller.abort(new Error('Se perdió la reserva del trabajo delegado.'));
@@ -104,7 +102,7 @@ async function processJob(job: DelegationJob, workerId: string): Promise<void> {
         controller.abort(error);
         console.error('No se pudo renovar la delegación.', error);
       });
-    }, WORKER_RENEW_MS);
+    }, DELEGATION_RENEW_INTERVAL_MS);
     renewTimer.unref?.();
 
     const response = await streamAgentTurn(
@@ -153,7 +151,7 @@ export function startDelegationWorker(): void {
     console.info(`Worker de delegaciones iniciado (${workerId}).`);
     while (!stopping) {
       try {
-        const job = await claimDelegation(workerId, WORKER_LEASE_MS);
+        const job = await claimDelegation(workerId, DELEGATION_LEASE_MS);
         if (job) {
           await processJob(job, workerId);
           continue;
@@ -161,7 +159,7 @@ export function startDelegationWorker(): void {
       } catch (error) {
         console.error('Error al reclamar delegaciones.', error);
       }
-      await sleep(1_000);
+      await sleep(DELEGATION_WORKER_POLL_INTERVAL_MS);
     }
   })();
 }

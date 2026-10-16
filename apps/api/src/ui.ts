@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { Hono } from 'hono';
-import type { AppEnv } from './auth/principal.js';
+import type { AppEnv } from './auth/contracts.js';
 import { config } from './config.js';
 
 const API_PATHS = ['/v1', '/health'];

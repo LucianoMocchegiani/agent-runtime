@@ -1,8 +1,9 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
 import { randomUUID } from 'node:crypto';
-import type { AppEnv } from './principal.js';
-import { resolvePrincipal } from './introspect.js';
+import type { AppEnv, Principal } from './contracts.js';
+import { AuthServiceError, resolvePrincipal } from './service.js';
+import { ANONYMOUS_TOKEN_PREFIX } from './constants.js';
 
 function readBearer(header: string | undefined): string | null {
   if (!header) {
@@ -16,14 +17,12 @@ function readBearer(header: string | undefined): string | null {
  * Middleware que asocia a la petición un principal identificado o una sesión anónima.
  * @remarks No mantiene estado: el cliente conserva el UUID como `anon:<uuid>`; sin Bearer se crea una sesión nueva.
  */
-const ANON_PREFIX = 'anon:';
-
 function isAnonToken(value: string): boolean {
-  return value.startsWith(ANON_PREFIX);
+  return value.startsWith(ANONYMOUS_TOKEN_PREFIX);
 }
 
 function stripAnonPrefix(value: string): string {
-  return value.slice(ANON_PREFIX.length);
+  return value.slice(ANONYMOUS_TOKEN_PREFIX.length);
 }
 
 function parseMcpAuth(header: string | undefined): Record<string, string> | null {
@@ -77,7 +76,13 @@ export const requirePrincipal = createMiddleware<AppEnv>(async (c, next) => {
     return;
   }
 
-  const principal = await resolvePrincipal(token);
+  let principal: Principal;
+  try {
+    principal = await resolvePrincipal(token);
+  } catch (error) {
+    if (error instanceof AuthServiceError) throw new HTTPException(error.status, { message: error.message });
+    throw error;
+  }
 
   c.set('principal', principal);
   c.set('accessToken', token);

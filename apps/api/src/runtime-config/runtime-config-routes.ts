@@ -1,41 +1,47 @@
 import { Hono } from 'hono';
-import type { AppEnv } from '../auth/principal.js';
+import { HTTPException } from 'hono/http-exception';
+import type { AppEnv } from '../auth/contracts.js';
 import { authorized } from './authorization.js';
-import { getRuntimeConfigVersion, getRuntimeSettings, isRuntimeConfigStoreEnabled, RuntimeConfigConflictError, saveRuntimeSettings } from './store.js';
-
-const MASK = '********';
+import { AuthServiceError } from '../auth/service.js';
+import { getRuntimeConfigVersion, getRuntimeSettings, isRuntimeConfigStoreEnabled, RuntimeConfigConflictError, saveRuntimeSettings } from './service.js';
+import { RUNTIME_CONFIG_SECRET_MASK } from './constants.js';
 /** Endpoints administrativos para leer y actualizar la configuración global del runtime. */
 export const runtimeConfigRoutes = new Hono<AppEnv>();
 
 function maskSecrets(settings: ReturnType<typeof getRuntimeSettings>) {
   const copy = structuredClone(settings);
-  for (const provider of Object.values(copy.ai.providers)) if (provider) provider.apiKey = MASK;
+  for (const provider of Object.values(copy.ai.providers)) if (provider) provider.apiKey = RUNTIME_CONFIG_SECRET_MASK;
   for (const mcp of Object.values(copy.mcpConfig)) {
-    if (mcp.auth) mcp.auth = MASK;
-    for (const name of Object.keys(mcp.headers)) mcp.headers[name] = MASK;
+    if (mcp.auth) mcp.auth = RUNTIME_CONFIG_SECRET_MASK;
+    for (const name of Object.keys(mcp.headers)) mcp.headers[name] = RUNTIME_CONFIG_SECRET_MASK;
   }
-  if (copy.embeddingConfig) copy.embeddingConfig.apiKey = MASK;
+  if (copy.embeddingConfig) copy.embeddingConfig.apiKey = RUNTIME_CONFIG_SECRET_MASK;
   return copy;
 }
 function restoreMaskedSecrets(next: any): void {
   const current = getRuntimeSettings();
-  if (next?.embeddingConfig?.apiKey === MASK) next.embeddingConfig.apiKey = current.embeddingConfig?.apiKey;
+  if (next?.embeddingConfig?.apiKey === RUNTIME_CONFIG_SECRET_MASK) next.embeddingConfig.apiKey = current.embeddingConfig?.apiKey;
   for (const [name, provider] of Object.entries(next?.ai?.providers ?? {}) as [string, any][]) {
-    if (provider?.apiKey === MASK) provider.apiKey = current.ai.providers[name as keyof typeof current.ai.providers]?.apiKey;
+    if (provider?.apiKey === RUNTIME_CONFIG_SECRET_MASK) provider.apiKey = current.ai.providers[name as keyof typeof current.ai.providers]?.apiKey;
   }
   for (const [name, mcp] of Object.entries(next?.mcpConfig ?? {}) as [string, any][]) {
     const previous = current.mcpConfig[name];
     if (!previous || !mcp || typeof mcp !== 'object') continue;
-    if (mcp.auth === MASK) mcp.auth = previous.auth;
+    if (mcp.auth === RUNTIME_CONFIG_SECRET_MASK) mcp.auth = previous.auth;
     if (mcp.headers && typeof mcp.headers === 'object') {
-      for (const header of Object.keys(mcp.headers)) if (mcp.headers[header] === MASK) mcp.headers[header] = previous.headers[header];
+      for (const header of Object.keys(mcp.headers)) if (mcp.headers[header] === RUNTIME_CONFIG_SECRET_MASK) mcp.headers[header] = previous.headers[header];
     }
   }
 }
 
 runtimeConfigRoutes.use('*', async (c, next) => {
   if (!isRuntimeConfigStoreEnabled()) return c.json({ error: 'Not Found' }, 404);
-  if (!(await authorized(c.req.header('Authorization')))) return c.json({ error: 'Not authorized to manage runtime configuration' }, 403);
+  try {
+    if (!(await authorized(c.req.header('Authorization')))) return c.json({ error: 'Not authorized to manage runtime configuration' }, 403);
+  } catch (error) {
+    if (error instanceof AuthServiceError) throw new HTTPException(error.status, { message: error.message });
+    throw error;
+  }
   await next();
 });
 

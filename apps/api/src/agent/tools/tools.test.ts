@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { Tool } from 'ai';
-import type { Principal } from '../../auth/principal.js';
+import type { Principal } from '../../auth/contracts.js';
 import { AgentToolNameConflictError, buildAgentTools } from './index.js';
 
 const context = {

@@ -4,7 +4,7 @@ import { saveMessage } from '../../messages/persistence.js';
 import type { ResolvedModel } from '../../llm/provider.js';
 import { isAbortError, identifiedFacingLlmError } from '../../llm/errors.js';
 import type { McpRegistry } from '../../mcp/registry.js';
-import type { RuntimeSettings } from '../../runtime-config/store.js';
+import type { RuntimeSettings } from '../../runtime-config/service.js';
 import { formatLlmRequestTrace } from './llm-trace.js';
 import { persistAgentTurn, type AgentTurnStep } from './persistence.js';
 

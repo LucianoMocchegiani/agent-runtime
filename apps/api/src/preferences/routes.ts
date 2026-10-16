@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { PREFERENCE_ROUTE_DEFAULT_LIMIT, PREFERENCE_ROUTE_MAX_LIMIT } from './constants.js';
 import { HTTPException } from 'hono/http-exception';
 import { deletePreference, listPreferences, savePreference } from './persistence.js';
-import type { AppEnv } from '../auth/principal.js';
+import type { AppEnv } from '../auth/contracts.js';
 import { decodeOptionalPreferenceCursor, encodePreferenceCursor } from './cursor.js';
 import { readJsonBody } from '../http/request-body.js';
 

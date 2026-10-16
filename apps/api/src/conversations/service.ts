@@ -6,7 +6,7 @@ import {
   updateConversation as persistUpdateConversation,
   applyAutomaticTitle as persistAutomaticTitle,
 } from './persistence.js';
-import type { Principal } from '../auth/principal.js';
+import type { Principal } from '../auth/contracts.js';
 import type { ConversationDto, UpdateConversationPatch } from './contracts.js';
 import { CONVERSATION_TITLE_MAX_LENGTH } from './constants.js';
 

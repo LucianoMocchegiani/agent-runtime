@@ -1,69 +1,31 @@
-import { randomUUID } from 'node:crypto';
 import { prisma } from '../db/prisma.js';
 import type { Prisma } from '@prisma/client';
-import { sealDelegationPayload } from './payload.js';
-import type { Principal } from '../auth/principal.js';
+import type { DelegationEvent, DelegationJob, DelegationStatus } from './contracts.js';
+import { DELEGATION_EVENT_BATCH_LIMIT, DELEGATION_LIST_LIMIT, DELEGATION_RETRY_DELAY_MS } from './constants.js';
 
-/** Estados persistidos del ciclo de vida de una delegación. */
-export type DelegationStatus = 'queued' | 'running' | 'completed' | 'failed' | 'interrupted';
-/** Datos de ejecución cifrados en reposo mientras el trabajo espera al worker. */
-export type DelegationPayload = {
-  principal: Principal;
-  accessToken: string;
-  mcpTokens: Record<string, string> | null;
-  instruction: string;
-};
-/** Trabajo reclamado por un worker, incluidos los bytes cifrados del payload. */
-export type DelegationJob = {
+/** Persiste atómicamente un trabajo ya cifrado y su evento inicial. */
+export async function insertQueuedDelegation(input: {
   id: string;
-  user_id: string;
-  source_conversation_id: string;
-  target_conversation_id: string;
-  status: DelegationStatus;
-  payload_ciphertext: Buffer;
-  payload_nonce: Buffer;
-  payload_tag: Buffer;
-  claimed_by: string | null;
-};
-/** Evento persistido y transmitido a los clientes de una delegación. */
-export type DelegationEvent = {
-  id: string;
-  jobId: string;
-  type: string;
-  data: unknown;
-  createdAt: Date;
-};
-
-/** Encola atómicamente un trabajo y su evento inicial, cifrando los datos de ejecución. */
-export async function enqueueDelegation(input: {
-  principal: Principal;
+  userId: string;
   sourceConversationId: string;
   targetConversationId: string;
-  instruction: string;
-  accessToken: string;
-  mcpTokens: Record<string, string> | null;
-}): Promise<{ id: string; status: 'queued' }> {
-  const id = randomUUID();
-  const sealed = sealDelegationPayload({
-    principal: input.principal,
-    accessToken: input.accessToken,
-    mcpTokens: input.mcpTokens,
-    instruction: input.instruction,
-  } satisfies DelegationPayload);
+  ciphertext: Buffer;
+  nonce: Buffer;
+  tag: Buffer;
+}): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await tx.$executeRaw`
       INSERT INTO runtime.delegation_jobs
         (id, user_id, source_conversation_id, target_conversation_id, status,
          payload_ciphertext, payload_nonce, payload_tag)
-      VALUES (${id}::uuid, ${input.principal.userId}, ${input.sourceConversationId}::uuid,
-        ${input.targetConversationId}::uuid, 'queued', ${sealed.ciphertext}, ${sealed.nonce}, ${sealed.tag})
+      VALUES (${input.id}::uuid, ${input.userId}, ${input.sourceConversationId}::uuid,
+        ${input.targetConversationId}::uuid, 'queued', ${input.ciphertext}, ${input.nonce}, ${input.tag})
     `;
     await tx.$executeRaw`
       INSERT INTO runtime.delegation_events (job_id, event_type, data)
-      VALUES (${id}::uuid, 'queued', jsonb_build_object('targetConversationId', ${input.targetConversationId}))
+      VALUES (${input.id}::uuid, 'queued', jsonb_build_object('targetConversationId', ${input.targetConversationId}))
     `;
   });
-  return { id, status: 'queued' };
 }
 
 /** Marca trabajos cuyo worker desapareció como interrupted; nunca los vuelve a ejecutar. */
@@ -85,7 +47,7 @@ async function interruptExpiredJobs(tx: Prisma.TransactionClient): Promise<void>
 }
 
 /** Reclama el siguiente trabajo disponible y marca como interrumpidos los leases vencidos. */
-export async function claimDelegation(workerId: string, leaseMs = 120_000): Promise<DelegationJob | null> {
+export async function claimDelegation(workerId: string, leaseMs: number): Promise<DelegationJob | null> {
   return prisma.$transaction(async (tx) => {
     await interruptExpiredJobs(tx);
     const rows = await tx.$queryRaw<DelegationJob[]>`
@@ -128,7 +90,7 @@ export async function recordDelegationStarted(jobId: string, workerId: string, t
 }
 
 /** Renueva el lease del worker; devuelve `false` si ya no es su propietario. */
-export async function renewDelegation(jobId: string, workerId: string, leaseMs = 120_000): Promise<boolean> {
+export async function renewDelegation(jobId: string, workerId: string, leaseMs: number): Promise<boolean> {
   const rows = await prisma.$queryRaw<Array<{ id: string }>>`
     UPDATE runtime.delegation_jobs
     SET lease_until = clock_timestamp() + (${leaseMs} * interval '1 millisecond')
@@ -144,7 +106,7 @@ export async function deferDelegation(jobId: string, workerId: string): Promise<
   await prisma.$executeRaw`
     UPDATE runtime.delegation_jobs
     SET status = 'queued', claimed_by = NULL, lease_until = NULL,
-        available_at = clock_timestamp() + interval '2 seconds'
+        available_at = clock_timestamp() + (${DELEGATION_RETRY_DELAY_MS} * interval '1 millisecond')
     WHERE id = ${jobId}::uuid AND status = 'running' AND claimed_by = ${workerId}
       AND lease_until > clock_timestamp()
   `;
@@ -181,7 +143,7 @@ export async function finishDelegation(
 }
 
 /** Lista las delegaciones recientes de un usuario, sin exponer payloads cifrados. */
-export async function listDelegationsForUser(userId: string, limit = 100): Promise<Array<{
+export async function listDelegationsForUser(userId: string, limit = DELEGATION_LIST_LIMIT): Promise<Array<{
   id: string; status: DelegationStatus; sourceConversationId: string; targetConversationId: string;
   createdAt: Date; startedAt: Date | null; finishedAt: Date | null; errorCode: string | null;
 }>> {
@@ -231,6 +193,6 @@ export async function listDelegationEvents(jobId: string, afterId: string): Prom
     FROM runtime.delegation_events
     WHERE job_id = ${jobId}::uuid AND id > ${afterId}::bigint
     ORDER BY id
-    LIMIT 100
+    LIMIT ${DELEGATION_EVENT_BATCH_LIMIT}
   `;
 }

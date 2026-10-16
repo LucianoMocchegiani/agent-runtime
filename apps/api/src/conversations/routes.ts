@@ -5,7 +5,7 @@ import {
   CONVERSATION_LIST_SCOPE,
 } from './constants.js';
 import { HTTPException } from 'hono/http-exception';
-import type { AppEnv } from '../auth/principal.js';
+import type { AppEnv } from '../auth/contracts.js';
 import { getAgentProfile, getNewChatDefaultAgentProfile } from '../runtime-config/agent-profiles.js';
 import { requireConversationId } from './ids.js';
 import { decodeOptionalConversationCursor, encodeConversationCursor } from './cursor.js';

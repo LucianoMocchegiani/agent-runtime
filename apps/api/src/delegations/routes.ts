@@ -1,14 +1,18 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
-import type { AppEnv } from '../auth/principal.js';
-import { getDelegationForUser, listDelegationEvents, listDelegationsForUser } from './store.js';
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const CURSOR = /^\d{1,18}$/;
+import type { AppEnv } from '../auth/contracts.js';
+import { getDelegationForUser, listDelegationEvents, listDelegationsForUser } from './persistence.js';
+import {
+  DELEGATION_CURSOR_PATTERN,
+  DELEGATION_ID_PATTERN,
+  DELEGATION_SSE_HEARTBEAT_MS,
+  DELEGATION_TERMINAL_STATUSES,
+  DELEGATION_WORKER_POLL_INTERVAL_MS,
+} from './constants.js';
 
 function readCursor(raw: string | undefined): string {
   if (raw === undefined || raw === '') return '0';
-  if (!CURSOR.test(raw)) throw new HTTPException(400, { message: 'Cursor de eventos inválido.' });
+  if (!DELEGATION_CURSOR_PATTERN.test(raw)) throw new HTTPException(400, { message: 'Cursor de eventos inválido.' });
   return raw;
 }
 
@@ -22,7 +26,7 @@ delegationRoutes.get('/', async (c) => {
 
 delegationRoutes.get('/:id', async (c) => {
   const id = c.req.param('id');
-  if (!UUID.test(id)) throw new HTTPException(404, { message: 'Delegación no encontrada.' });
+  if (!DELEGATION_ID_PATTERN.test(id)) throw new HTTPException(404, { message: 'Delegación no encontrada.' });
   const job = await getDelegationForUser(id, c.get('principal').userId);
   if (!job) throw new HTTPException(404, { message: 'Delegación no encontrada.' });
   return c.json(job);
@@ -30,7 +34,7 @@ delegationRoutes.get('/:id', async (c) => {
 
 delegationRoutes.get('/:id/events', async (c) => {
   const id = c.req.param('id');
-  if (!UUID.test(id)) throw new HTTPException(404, { message: 'Delegación no encontrada.' });
+  if (!DELEGATION_ID_PATTERN.test(id)) throw new HTTPException(404, { message: 'Delegación no encontrada.' });
   const userId = c.get('principal').userId;
   const job = await getDelegationForUser(id, userId);
   if (!job) throw new HTTPException(404, { message: 'Delegación no encontrada.' });
@@ -52,12 +56,12 @@ delegationRoutes.get('/:id/events', async (c) => {
             }
             const current = await getDelegationForUser(id, userId);
             if (!current) break;
-            if (Date.now() - lastHeartbeat >= 15_000) {
+            if (Date.now() - lastHeartbeat >= DELEGATION_SSE_HEARTBEAT_MS) {
               send(': keep-alive\n\n');
               lastHeartbeat = Date.now();
             }
-            if (['completed', 'failed', 'interrupted'].includes(current.status) && events.length === 0) break;
-            await new Promise((resolve) => setTimeout(resolve, 1_000));
+            if ((DELEGATION_TERMINAL_STATUSES as readonly string[]).includes(current.status) && events.length === 0) break;
+            await new Promise((resolve) => setTimeout(resolve, DELEGATION_WORKER_POLL_INTERVAL_MS));
           }
         } catch {
           // El cliente puede desconectarse entre polls; los eventos persisten y se recuperan al reconectar.

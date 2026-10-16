@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { requirePrincipal } from './auth/middleware.js';
-import type { AppEnv } from './auth/principal.js';
+import type { AppEnv } from './auth/contracts.js';
 import { config } from './config.js';
 import { allowCorsOrigin } from './cors.js';
 import { conversationRoutes } from './conversations/routes.js';
