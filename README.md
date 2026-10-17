@@ -2,6 +2,8 @@
 
 Runtime para ejecutar agentes de IA con perfiles reutilizables, conversaciones persistentes y herramientas MCP. La aplicación de Runtime integra Memory dentro del mismo proceso: hay un solo servicio de aplicación y una base PostgreSQL persistente.
 
+**Versión actual: 0.1.0.** Los cambios de esta versión están resumidos en [`CHANGELOG.md`](./CHANGELOG.md).
+
 Visión del producto: [`docs/vision/00-que-es.md`](./docs/vision/00-que-es.md). Diseño y módulos: [`docs/`](./docs/00-indice.md). Convenciones para contribuir: [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
 
 ## Componentes
@@ -76,7 +78,7 @@ Los trabajos se reclaman en PostgreSQL con `FOR UPDATE SKIP LOCKED`; un lease co
 - Estados: `queued`, `running`, `completed`, `failed`, `interrupted`
 - Si un worker cae, el lease vence y el trabajo queda `interrupted`; no se reintenta automáticamente. Tokens expirados o fallos al ejecutar producen `failed`.
 
-Los identificadores de eventos son cursores monotónicos persistidos en la base. `LISTEN/NOTIFY` no se usa como fuente de verdad; los workers consultan la cola cada segundo. Asegurá que la clave de delegación se mantenga fuera del repositorio y que las copias de seguridad de PostgreSQL tengan controles apropiados. Las imágenes se publican en `ghcr.io/lucianomocchegiani/agent-runtime`. Para instalación con las imágenes publicadas desde una copia del repositorio, prepará `deploy/.env` (por ejemplo, copiando `.env.example`, agregando la clave requerida y revisando `AUTH_INTROSPECT_URL`) y ejecutá `docker compose -f deploy/docker-compose.yml up -d`. Compose espera el archivo de variables junto al YAML. La instalación de imágenes publicadas todavía no tiene un Compose escalable equivalente.
+Los identificadores de eventos son cursores monotónicos persistidos en la base. `LISTEN/NOTIFY` no se usa como fuente de verdad; los workers consultan la cola cada segundo. Asegurá que la clave de delegación se mantenga fuera del repositorio y que las copias de seguridad de PostgreSQL tengan controles apropiados. Las imágenes se publican en `ghcr.io/lucianomocchegiani/agent-runtime`. Para instalación con las imágenes publicadas desde una copia del repositorio, prepará `deploy/.env` (por ejemplo, copiando `.env.example`, descomentando `AGENT_RUNTIME_VERSION=0.1.0` para fijar esta versión en lugar de `latest`, agregando la clave requerida y revisando `AUTH_INTROSPECT_URL`) y ejecutá `docker compose -f deploy/docker-compose.yml up -d`. Compose espera el archivo de variables junto al YAML. La instalación de imágenes publicadas todavía no tiene un Compose escalable equivalente.
 
 ## Estructura
 

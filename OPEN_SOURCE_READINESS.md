@@ -9,7 +9,7 @@ Este documento reúne los temas que todavía conviene resolver o verificar antes
   - Una vez decidida, agregar el texto oficial como `LICENSE` (o el nombre que corresponda) y comprobar que los avisos de copyright y las licencias de dependencias sean compatibles.
 
 - [ ] **Definir el alcance de la publicación y el soporte.** Aclarar qué componentes se consideran públicos y mantenidos (API, UI, SDK, módulo Memory, imágenes Docker), qué plataformas/versiones se soportan y bajo qué expectativas de estabilidad.
-  - **Requiere decisión de los responsables:** política de compatibilidad, versionado, deprecaciones, soporte y canales oficiales de comunicación.
+  - La versión inicial del proyecto se fijó en `0.1.0`. **Requiere decisión de los responsables:** política de compatibilidad, deprecaciones, soporte y canales oficiales de comunicación.
   - Reflejar las decisiones en el README y la documentación de contribución.
 
 ## 2. Contribuciones, seguridad y uso aceptable
