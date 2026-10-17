@@ -9,7 +9,7 @@ Setup y env: [`../README.md`](../README.md). Convenciones de desarrollo: [`DEVEL
 | [vision/00-que-es.md](./vision/00-que-es.md) | Qué es agent-runtime y hacia dónde va |
 | [vision/01-mcp-genericos.md](./vision/01-mcp-genericos.md) | Runtime genérico conectado a cualquier app por MCP |
 | [vision/02-providers-y-modelos.md](./vision/02-providers-y-modelos.md) | Abstracción de proveedores y modelos |
-| [vision/03-memory-mcp.md](./vision/03-memory-mcp.md) | Memory MCP como componente integrado de Agent Runtime |
+| [vision/03-conversaciones-y-contexto.md](./vision/03-conversaciones-y-contexto.md) | Conversaciones, contexto y límites de las capacidades de memoria |
 
 ## Implementación — cómo está hecho hoy
 

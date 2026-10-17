@@ -4,18 +4,18 @@
 
 ## 1. Idea general
 
-**Agent Runtime** es un runtime genérico para ejecutar agentes de IA sin acoplarlos a una aplicación o dominio de negocio específico. Incluye su propio componente Memory MCP para conversaciones, mensajes y recuerdos; este componente es parte de Runtime y no se configura como una memoria externa intercambiable.
+**Agent Runtime** es un runtime genérico para ejecutar agentes de IA sin acoplarlos a una aplicación o dominio de negocio específico. Runtime administra sus conversaciones y el historial de mensajes. No incluye un Memory MCP ni un sistema general de memoria a largo plazo; las capacidades externas se integran mediante MCP cuando se necesitan.
 
-El objetivo es que una aplicación que quiera incorporar capacidades de IA **no tenga que implementar su propio agente, integrar directamente un LLM, manejar el agent loop ni construir un sistema de memoria**.
+El objetivo es que una aplicación que quiera incorporar capacidades de IA **no tenga que implementar su propio agente, integrar directamente un LLM ni manejar el agent loop**.
 
-La aplicación expone sus capacidades de dominio mediante **MCP**. Agent Runtime ejecuta el agente, integra su Memory MCP interno y se conecta con los MCP externos que la aplicación configure.
+La aplicación expone sus capacidades de dominio mediante **MCP**. Agent Runtime ejecuta el agente, administra las conversaciones y se conecta con los MCP externos que la aplicación configure.
 
 ```text
                          AGENT RUNTIME
               +--------------------------------+
-              | Agent Loop       Memory MCP   |
-              |                      |         |
-              |                Memory DB/RAG   |
+              | Agent Loop                     |
+              | Conversaciones e historial    |
+              | Contexto del turno            |
               +----------------------+---------+
                                      |
                               MCP Client externo
@@ -68,6 +68,9 @@ El Agent Runtime es responsable de la **ejecución del agente**, no de la lógic
 
 Entre sus responsabilidades se encuentran:
 
+* administrar el ciclo de vida de las conversaciones;
+* persistir y recuperar el historial de mensajes;
+* asociar a cada conversación su perfil y usar el historial como contexto de los turnos;
 * ejecutar el agent loop;
 * comunicarse con el modelo de IA;
 * gestionar el contexto de ejecución;
@@ -87,7 +90,7 @@ Request
    v
 Agent Runtime
    |
-   +-- Load context
+   +-- Load conversation and history
    |
    +-- Call LLM
    |
@@ -103,7 +106,7 @@ Agent Runtime
 Response
 ```
 
-El runtime debe intentar mantenerse **lo más stateless y agnóstico posible**.
+Cada turno es una ejecución temporal y debe mantenerse lo más stateless posible; Runtime conserva de forma persistente la conversación y su historial. El runtime también debe mantenerse agnóstico respecto del dominio de la aplicación.
 
 ---
 
@@ -132,8 +135,7 @@ Application
     |
     +-- OpenAI integration
     +-- Agent logic
-    +-- Memory
-    +-- RAG
+    +-- Optional MCP capabilities
     +-- Tool orchestration
 ```
 
@@ -179,7 +181,7 @@ El agente podría:
 3. generar el reporte;
 4. utilizar el PC MCP;
 5. guardar el archivo;
-6. registrar la ejecución en un Memory MCP.
+6. conservar el intercambio en el historial de la conversación de Runtime.
 
 El Agent Runtime no necesita saber cómo funciona ninguno de esos dominios.
 
@@ -210,7 +212,7 @@ Gym MCP
 │
 ├── RAG
 │
-└── Gym Database / API
+└── Database / API
 ```
 
 De la misma forma, otros dominios pueden exponer sus propias herramientas:
@@ -297,21 +299,23 @@ El agente podría utilizar:
 2. PC MCP
    └── writeFile()
 
-3. Memory MCP
-   └── saveContext()
+3. Agent Runtime
+   └── persiste el resultado en la conversación
 ```
 
 El resultado sería:
+
+La conversación y su historial los conserva Agent Runtime; los MCPs aportan las capacidades de dominio necesarias.
 
 ```text
                          Agent Runtime
                               |
              +----------------+----------------+
-             |                |                |
-             v                v                v
-          Gym MCP         PC MCP          Memory MCP
-             |                |                |
-          Gym DB             OS             Memory DB
+             |                                 |
+             v                                 v
+          Gym MCP                            PC MCP
+             |                                 |
+          Gym DB                              OS
 ```
 
 El Runtime puede combinar estas capacidades sin conocer internamente cómo funciona ninguno de los dominios.
@@ -333,7 +337,7 @@ Agent Runtime
      +-- cualquier otro MCP externo
 ```
 
-Un MCP externo puede representar un dominio de negocio, una herramienta general o un dispositivo. Agent Runtime consume esas integraciones mediante la abstracción **MCP**. La memoria no forma parte de esta composición opcional: Memory MCP es el componente integrado de Runtime, aunque internamente también use el protocolo MCP.
+Un MCP externo puede representar un dominio de negocio, una herramienta general o un dispositivo. Agent Runtime consume esas integraciones mediante la abstracción **MCP**. La persistencia de conversaciones es responsabilidad de Runtime, no de un Memory MCP integrado. Una aplicación puede conectar opcionalmente un MCP externo de memoria si requiere capacidades avanzadas de ese tipo.
 
 ---
 
@@ -441,43 +445,28 @@ El runtime proporciona el contexto necesario para que el MCP pueda tomar esas de
 
 # 13. Desacoplamiento
 
-El objetivo final es separar completamente:
+El objetivo es mantener desacoplada la ejecución genérica del agente respecto de la implementación de cada dominio.
 
 ```text
 Agent Runtime
         |
-        +-- Agent execution
-        +-- LLM
-        +-- MCP client
-        +-- Orchestration
+        +-- Agent execution / LLM / MCP client
+        +-- Conversations and message history
+        +-- Turn context and profile assignment
 ```
 
-de:
+y la responsabilidad propia de cada dominio:
 
 ```text
-Domain
+Domain MCP
         |
         +-- Business logic
-        +-- Database
-        +-- APIs
+        +-- Database / APIs
         +-- Authorization
-        +-- RAG
-        +-- Harness
+        +-- RAG / Harness
 ```
 
-y de:
-
-```text
-Memory
-        |
-        +-- Sessions
-        +-- Conversations
-        +-- Context
-        +-- Long-term memory
-        +-- Retrieval
-```
-
-Todos estos componentes se comunican mediante MCP.
+Runtime administra sus conversaciones e historial. Cada MCP mantiene la lógica y los datos propios de su dominio; las integraciones entre ambos se realizan mediante las capacidades MCP externas.
 
 ---
 
@@ -496,16 +485,13 @@ La arquitectura objetivo puede representarse así:
              +---------------------+-----------------------+
              |                     |                       |
              v                     v                       v
-        Memory MCP             Domain MCP             Tools MCP
-             |                     |                       |
-             |                 +---+---+                   |
-             |                 |       |                   |
-             |              Harness   RAG                  |
-             |                 |       |                   |
-             |                 +---+---+                   |
-             |                     |                       |
-             v                     v                       v
-       Memory System          Domain System          External System
+        Conversation store     Domain MCPs          Tools MCPs
+             |                     |                    |
+             v                 +---+---+                v
+       PostgreSQL              Harness / RAG       External systems
+                                   |
+                                   v
+                             Domain systems
 ```
 
 ---
@@ -537,12 +523,11 @@ Gym MCP
 Y utilizar:
 
 ```text
-Memory MCP
+Agent Runtime
    |
-   +-- sessions
-   +-- conversations
-   +-- user context
-   +-- long-term memory
+   +-- conversation history
+   +-- profile assignment
+   +-- turn context
 ```
 
 El runtime simplemente conecta ambos:
@@ -553,8 +538,8 @@ El runtime simplemente conecta ambos:
                     +-------+-------+
                     |               |
                     v               v
-                Memory MCP       Gym MCP
-                                    |
+             Conversation       Gym MCP
+              and history           |
                                   Harness
                                     |
                               Gym API / DB
@@ -572,7 +557,7 @@ Por ejemplo:
 
 ```text
 Agent Runtime
-      ├── Memory MCP integrado
+      ├── Conversaciones e historial
       |
       +-- Local Computer MCP
       |
@@ -599,7 +584,7 @@ El objetivo de Agent Runtime es llegar a una arquitectura donde:
 >
 > **Los Harnesses adaptan cada dominio al uso por agentes.**
 >
-> **Los MCPs de memoria proporcionan estado y contexto.**
+> **Runtime conserva las conversaciones; los MCPs externos aportan capacidades y contexto especializado cuando se configuran.**
 >
 > **Los dominios pueden implementar su propio RAG.**
 >
@@ -617,16 +602,17 @@ Está diseñado para ser reutilizado.
        v                v                v
     App A             App B           Personal
        |                |                |
-      MCP              MCP              MCPs
+  Conversation     Conversation     Conversation
+   and history      and history      and history
+       |                |                |
+      MCPs             MCPs             MCPs
        |                |                |
      Domain           Domain           Tools
-     Memory           Memory           Memory
-     RAG              RAG              RAG
 ```
 
 ## Principio central
 
-> **One Agent Runtime. Any MCP. Any Domain. Any Memory.**
+> **One Agent Runtime. Any MCP. Any Domain.**
 
 El runtime proporciona la ejecución.
 
