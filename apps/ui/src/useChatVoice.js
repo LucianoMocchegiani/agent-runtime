@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import client from './client.js';
 
-export default function useChatVoice({ conversationId, isVisible, onError, onSubmitTranscript }) {
-  const [voiceState, setVoiceState] = useState('idle');
+export default function useChatVoice({ conversationId, isVisible, onError, onRecognizedSpeech }) {
   const [voiceAvailable, setVoiceAvailable] = useState(false);
   const [handsFreeMode, setHandsFreeMode] = useState(false);
   const [handsFreeStatus, setHandsFreeStatus] = useState('off');
@@ -19,7 +18,6 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
   const voiceStartIdRef = useRef(0);
   const voiceTranscriptRef = useRef([]);
   const voiceAudioRef = useRef(null);
-  const voiceAudioUrlRef = useRef(null);
   const voiceAudioUrlsRef = useRef([]);
   const voicePlaybackIndexRef = useRef(0);
   const voicePlaybackEnabledRef = useRef(false);
@@ -39,7 +37,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     handsFreeModeRef.current = false;
     setHandsFreeMode(false);
     setHandsFreeStatus('off');
-    stopVoiceCapture(false);
+    stopVoiceCapture();
     stopVoicePlayback({ discard: true });
   }, [isVisible]);
 
@@ -47,7 +45,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     handsFreeModeRef.current = false;
     setHandsFreeMode(false);
     setHandsFreeStatus('off');
-    stopVoiceCapture(false);
+    stopVoiceCapture();
     stopVoicePlayback({ discard: true });
   }, [conversationId]);
 
@@ -56,7 +54,6 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     const session = voiceSessionRef.current;
     if (session) {
       window.clearTimeout(session.finishTimer);
-      window.clearTimeout(session.transcriptionTimer);
       session.channel.close();
       session.pc.close();
       session.stream.getTracks().forEach(track => track.stop());
@@ -82,7 +79,6 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
       voicePlaybackIndexRef.current = 0;
       voiceAudioUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
       voiceAudioUrlsRef.current = [];
-      voiceAudioUrlRef.current = null;
       setVoiceAudioUrl(null);
       setIsPreparingVoice(false);
     }
@@ -158,7 +154,6 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
           urls.push(url);
           voiceAudioUrlsRef.current = urls;
           if (urls.length === 1) {
-            voiceAudioUrlRef.current = url;
             setVoiceAudioUrl(url);
             console.info('[voice-debug] first-audio-ready', JSON.stringify({
               traceId, msFromReplyReady: Date.now() - replyReadyAt,
@@ -263,81 +258,54 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
 
   function finishVoiceCapture(session, submitTranscript) {
     if (session?.finished) return;
-    const continueHandsFree = Boolean(session?.handsFree && handsFreeModeRef.current);
+    const continueHandsFree = Boolean(session && handsFreeModeRef.current);
     if (session) {
       session.finished = true;
       window.clearTimeout(session.finishTimer);
-      window.clearTimeout(session.transcriptionTimer);
       if (voiceSessionRef.current === session) voiceSessionRef.current = null;
       session.channel.close();
       session.pc.close();
       session.stream.getTracks().forEach(track => track.stop());
     }
-    setVoiceState('idle');
     if (continueHandsFree) setHandsFreeStatus('processing');
     const text = voiceTranscriptRef.current.join(' ').replace(/\s+/g, ' ').trim();
     voiceTranscriptRef.current = [];
-    if (submitTranscript && text) void onSubmitTranscript(text);
-    else if (submitTranscript && !continueHandsFree) onError(session?.errorMessage || 'No se reconoció voz. Probá de nuevo o escribí el mensaje.');
+    if (submitTranscript && text) void onRecognizedSpeech(text);
     else if (continueHandsFree) void restartHandsFreeCapture();
   }
 
-  function stopVoiceCapture(submitTranscript = true) {
+  function stopVoiceCapture() {
     voiceStartIdRef.current++;
     const session = voiceSessionRef.current;
-    if (!session) {
-      voiceTranscriptRef.current = [];
-      setVoiceState('idle');
-      if (submitTranscript) onError('No se reconoció voz. Probá de nuevo o escribí el mensaje.');
-      return;
-    }
-    if (!submitTranscript) {
-      voiceTranscriptRef.current = [];
-      finishVoiceCapture(session, false);
-      return;
-    }
-    if (session.stopRequested) return;
-    // Detener la pista avisa al servidor que terminó el audio. Mantenemos el
-    // canal de eventos abierto para que llegue la transcripción final.
-    session.stopRequested = true;
-    setVoiceState('transcribing');
-    session.stream.getTracks().forEach(track => track.stop());
-    session.finishTimer = window.setTimeout(() => finishVoiceCapture(session, true), 5000);
+    voiceTranscriptRef.current = [];
+    if (session) finishVoiceCapture(session, false);
   }
 
   function handleTranscriptionEvent(session, transcript) {
     if (typeof transcript === 'string' && transcript.trim()) {
       voiceTranscriptRef.current.push(transcript.trim());
     }
-    if (session.handsFree && handsFreeModeRef.current) {
-      session.stopRequested = true;
-      session.stream.getTracks().forEach(track => track.stop());
-      finishVoiceCapture(session, true);
-    } else if (session.stopRequested) {
-      // Puede haber más de un segmento de transcripción en camino; dejamos que
-      // termine de llegar el lote antes de cerrar el canal.
-      window.clearTimeout(session.transcriptionTimer);
-      session.transcriptionTimer = window.setTimeout(() => finishVoiceCapture(session, true), 500);
-    }
+    session.stopRequested = true;
+    session.stream.getTracks().forEach(track => track.stop());
+    finishVoiceCapture(session, true);
   }
 
   function handleVoiceError(session, message) {
-    session.errorMessage = message || 'Falló el reconocimiento de voz.';
+    const error = message || 'Falló el reconocimiento de voz.';
     if (session.stopRequested) finishVoiceCapture(session, true);
     else {
-      onError(session.errorMessage);
-      if (session.handsFree) disableHandsFree();
+      onError(error);
+      disableHandsFree();
     }
   }
 
-  async function startVoiceCapture(handsFree = false) {
+  async function startVoiceCapture() {
     const startId = ++voiceStartIdRef.current;
     let pendingStream = null;
     onError(null);
     stopVoicePlayback();
     voiceTranscriptRef.current = [];
-    setVoiceState('connecting');
-    if (handsFree) setHandsFreeStatus('connecting');
+    setHandsFreeStatus('connecting');
     try {
       if (!navigator.mediaDevices?.getUserMedia || !window.RTCPeerConnection) {
         throw new Error('Este navegador no admite captura de voz WebRTC.');
@@ -353,14 +321,14 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
       }
       const pc = new RTCPeerConnection();
       const channel = pc.createDataChannel('oai-events');
-      const session = { pc, channel, stream, handsFree, stopRequested: false, finished: false, finishTimer: null, transcriptionTimer: null };
+      const session = { pc, channel, stream, stopRequested: false, finished: false, finishTimer: null };
       pendingStream = null;
       voiceSessionRef.current = session;
       stream.getTracks().forEach(track => pc.addTrack(track, stream));
       channel.onmessage = event => {
         let message;
         try { message = JSON.parse(event.data); } catch { return; }
-        if (message.type === 'input_audio_buffer.speech_stopped' && session.handsFree && !session.stopRequested) {
+        if (message.type === 'input_audio_buffer.speech_stopped' && !session.stopRequested) {
           session.stopRequested = true;
           setHandsFreeStatus('processing');
           session.stream.getTracks().forEach(track => track.stop());
@@ -374,8 +342,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'failed' && voiceSessionRef.current === session) {
           onError('Se perdió la conexión de voz. Probá nuevamente.');
-          if (session.handsFree) disableHandsFree();
-          else stopVoiceCapture(false);
+          disableHandsFree();
         }
       };
       const offer = await pc.createOffer();
@@ -387,15 +354,11 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
       });
       if (!answer.ok) throw new Error(`OpenAI rechazó la conexión de voz (HTTP ${answer.status}).`);
       await pc.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
-      if (startId === voiceStartIdRef.current) {
-        setVoiceState('listening');
-        if (handsFree) setHandsFreeStatus('listening');
-      }
+      if (startId === voiceStartIdRef.current) setHandsFreeStatus('listening');
     } catch (e) {
       pendingStream?.getTracks().forEach(track => track.stop());
       if (startId !== voiceStartIdRef.current) return;
-      if (handsFree) disableHandsFree();
-      else stopVoiceCapture(false);
+      disableHandsFree();
       onError(e.message || 'No se pudo iniciar el reconocimiento de voz.');
     }
   }
@@ -404,7 +367,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     if (!handsFreeModeRef.current || handsFreeRestartRef.current) return;
     handsFreeRestartRef.current = true;
     try {
-      await startVoiceCapture(true);
+      await startVoiceCapture();
     } finally {
       handsFreeRestartRef.current = false;
     }
@@ -414,8 +377,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     handsFreeModeRef.current = false;
     setHandsFreeMode(false);
     setHandsFreeStatus('off');
-    if (voiceSessionRef.current) stopVoiceCapture(false);
-    else voiceStartIdRef.current++;
+    stopVoiceCapture();
     stopVoicePlayback({ discard: true });
   }
 
@@ -424,23 +386,11 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
       disableHandsFree();
       return;
     }
-    if (isLoading || isDelegatedActive || editingMessage || voiceState !== 'idle') return;
+    if (isLoading || isDelegatedActive || editingMessage || voiceSessionRef.current) return;
     handsFreeModeRef.current = true;
     setHandsFreeMode(true);
     setHandsFreeStatus('connecting');
-    void startVoiceCapture(true);
-  }
-
-  function handleVoiceButton() {
-    if (voiceState === 'transcribing') return;
-    if (voiceState === 'connecting') {
-      stopVoiceCapture(false);
-      onError(null);
-    } else if (voiceState === 'listening') {
-      stopVoiceCapture(true);
-    } else {
-      void startVoiceCapture();
-    }
+    void startVoiceCapture();
   }
 
   function handleReplayVoice() {
@@ -451,11 +401,6 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     playVoiceTrack(0);
   }
 
-  function handleCancelVoice() {
-    stopVoiceCapture(false);
-    onError(null);
-  }
-
   function finishVoiceReply() {
     speechSynthesisFinishedRef.current = true;
     const willSpeakVoiceReply = handsFreeModeRef.current;
@@ -464,7 +409,6 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
   }
 
   return {
-    voiceState,
     voiceAvailable,
     handsFreeMode,
     handsFreeStatus,
@@ -477,9 +421,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onSub
     finishVoiceReply,
     restartHandsFreeCapture,
     toggleHandsFree,
-    handleVoiceButton,
     handleReplayVoice,
-    handleCancelVoice,
   };
 }
 

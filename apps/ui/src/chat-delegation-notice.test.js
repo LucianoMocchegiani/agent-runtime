@@ -44,11 +44,15 @@ test('la selección, lectura y retención de adjuntos de imagen quedan en su hoo
 
 test('la captura, síntesis y reproducción de voz quedan en su hook', () => {
   assert.match(chatSource, /import useChatVoice from '\.\/useChatVoice\.js'/);
-  assert.match(chatSource, /useChatVoice\(\{[\s\S]*onSubmitTranscript:/);
+  assert.match(chatSource, /useChatVoice\(\{[\s\S]*onRecognizedSpeech:/);
   assert.doesNotMatch(chatSource, /RTCPeerConnection|createRealtimeToken|voiceSynthesisQueueRef|new Audio\(/);
   assert.match(chatVoiceSource, /navigator\.mediaDevices\?\.getUserMedia/);
   assert.match(chatVoiceSource, /client\.voice\.synthesize/);
-  assert.match(chatVoiceSource, /function handleCancelVoice/);
+  assert.match(chatVoiceSource, /input_audio_buffer\.speech_stopped/);
+  assert.match(chatVoiceSource, /conversation\.item\.input_audio_transcription\.completed/);
+  assert.match(chatVoiceSource, /onRecognizedSpeech/);
+  assert.doesNotMatch(chatVoiceSource, /handleVoiceButton|handleCancelVoice|transcribing|onSubmitTranscript/);
+  assert.doesNotMatch(chatSource, /voiceState|handleVoiceButton|handleCancelVoice/);
 });
 
 test('la carga, paginación y scroll del historial quedan en su hook', () => {
@@ -115,6 +119,12 @@ test('la lista de mensajes y la presentación de herramientas quedan separadas',
   assert.match(toolMessagesSource, /ChatStyles\.delegationEvents/);
   assert.match(toolMessagesSource, /El resultado quedó guardado en la conversación de destino/);
   assert.match(conversationListSource, /delegationLabels\[delegation\?\.status\]/);
+});
+
+test('el composer conserva conversación hablada y no expone dictado manual', () => {
+  assert.match(chatComposerViewSource, /🎙 Conversación hablada/);
+  assert.doesNotMatch(chatComposerViewSource, /Dictar o transcribir|Enviar voz|handleVoiceButton|handleCancelVoice|voiceState/);
+  assert.match(chatComposerViewSource, /handsFreeMode/);
 });
 
 test('el renderizado de Markdown queda separado de las burbujas y la lista de mensajes', () => {

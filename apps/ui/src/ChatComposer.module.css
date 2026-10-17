@@ -181,39 +181,6 @@
 
 .composerRow > .stopButton:hover:not(:disabled) { background: rgba(229,57,53,0.22); }
 
-.composerRow > .voiceButton {
-  flex: 0 0 auto;
-  min-height: 40px;
-  padding: 0 10px;
-  color: var(--text);
-  background: #20263b;
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.composerRow > .voiceButton:hover:not(:disabled) { border-color: var(--accent); background: #252f49; }
-
-.composerRow > .voiceButton.voiceListening {
-  color: #fff;
-  background: rgba(229,57,53,0.2);
-  border-color: rgba(229,57,53,0.7);
-}
-
-.composerRow > .voiceCancelButton {
-  flex: 0 0 auto;
-  color: #ffb4a9;
-  background: rgba(229,57,53,0.12);
-  border-color: rgba(229,57,53,0.35);
-}
-
-.composerRow > .voiceCancelButton:hover:not(:disabled) {
-  background: rgba(229,57,53,0.22);
-  border-color: rgba(229,57,53,0.7);
-}
-
 .composerRow > button:disabled { opacity: 0.42; cursor: not-allowed; }
 
 @media (max-width: 700px) {
@@ -314,15 +281,12 @@
   .composerRow { flex-wrap: wrap; align-items: center; gap: 5px; }
   .composerRow .messageInput { order: 0; flex: 1 0 100%; }
   .composerRow .attachmentMenuWrap { order: 1; }
-  .composerRow > .voiceButton,
-  .composerRow > .handsFreeControl,
-  .composerRow > .voiceCancelButton { order: 2; }
+  .composerRow > .handsFreeControl { order: 2; }
   .composerRow > .sendButton { order: 3; margin-left: auto; }
   .composerRow > .stopButton { order: 4; }
   .composerRow > .sendButton,
   .composerRow > .stopButton { width: 40px; min-width: 40px; flex: 0 0 40px; padding: 0; }
   .composerRow > .handsFreeControl { width: auto; min-height: 0; max-width: none; padding: 0; gap: 5px; background: transparent; border: 0; }
-  .composerRow > .voiceButton,
   .composerRow > .handsFreeControl .handsFreeButton { min-height: 40px; padding-inline: 8px; font-size: 12px; }
   .composerRow > button svg,
   .composerRow .attachButton svg { width: 19px; height: 19px; }
@@ -334,8 +298,6 @@
   .composerRow > .stopButton,
   .composerRow .attachButton { width: 36px; min-width: 36px; flex-basis: 36px; }
   .composerRow > .handsFreeControl .handsFreeButton { padding-inline: 4px; font-size: 11px; }
-  .composerRow > .voiceButton,
-  .composerRow > .voiceCancelButton { padding-inline: 4px; font-size: 11px; }
 }
 
 .composerRow > .sendButton svg,

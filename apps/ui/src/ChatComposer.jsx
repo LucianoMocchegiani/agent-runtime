@@ -42,12 +42,6 @@ export default function ChatComposer({
 
   attachmentMenuRef,
 
-  voiceState,
-
-  handleVoiceButton,
-
-  handleCancelVoice,
-
   messageInputRef,
 
   input,
@@ -180,26 +174,6 @@ export default function ChatComposer({
 
         </div>
 
-        {voiceAvailable && !handsFreeMode && <button
-
-          className={`${ChatStyles.voiceButton} ${voiceState === 'listening' ? ChatStyles.voiceListening : ''}`}
-
-          type="button"
-
-          onClick={handleVoiceButton}
-
-          disabled={isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState === 'transcribing'}
-
-          title={voiceState === 'idle' ? 'Dictar o transcribir' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Esperando la transcripción de voz' : 'Terminar de hablar y enviar'}
-
-          aria-label={voiceState === 'idle' ? 'Dictar o transcribir' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Procesando voz' : 'Terminar de hablar y enviar'}
-
-        >
-
-          {voiceState === 'idle' ? '🎙 Dictar o transcribir' : voiceState === 'connecting' ? 'Conectando…' : voiceState === 'transcribing' ? 'Procesando…' : 'Enviar voz'}
-
-        </button>}
-
       {voiceAvailable && <div className={ChatStyles.handsFreeControl}>
 
         <button
@@ -210,7 +184,7 @@ export default function ChatComposer({
 
           onClick={() => toggleHandsFree({ isLoading, isDelegatedActive, editingMessage })}
 
-          disabled={!handsFreeMode && (isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState !== 'idle')}
+          disabled={!handsFreeMode && (isLoading || isDelegatedActive || Boolean(editingMessage))}
 
           aria-pressed={handsFreeMode}
 
@@ -239,24 +213,6 @@ export default function ChatComposer({
         </span>}
 
       </div>}
-
-        {voiceAvailable && !handsFreeMode && voiceState !== 'idle' && <button
-
-          className={ChatStyles.voiceCancelButton}
-
-          type="button"
-
-          onClick={handleCancelVoice}
-
-          title="Cancelar y descartar la grabación de voz"
-
-          aria-label="Cancelar y descartar la grabación de voz"
-
-        >
-
-          Cancelar
-
-        </button>}
 
         <textarea
 
@@ -296,19 +252,7 @@ export default function ChatComposer({
 
           ? 'La escucha se pausa mientras responde el asistente y se reanuda al terminar. Salí del modo para apagar el micrófono.'
 
-          : voiceState === 'listening'
-
-            ? 'Escuchando. Tocá «Enviar voz» para enviar o «Cancelar» para descartarla.'
-
-            : voiceState === 'connecting'
-
-              ? 'Conectando con el reconocimiento de voz… Tocá «Cancelar» para salir.'
-
-              : voiceState === 'transcribing'
-
-                ? 'Procesando la transcripción… Podés cancelarla antes de que se envíe.'
-
-                : `${input.length.toLocaleString('es-AR')} / ${MAX_MESSAGE_CHARS.toLocaleString('es-AR')} caracteres · el límite de contexto del modelo también aplica`}
+          : `${input.length.toLocaleString('es-AR')} / ${MAX_MESSAGE_CHARS.toLocaleString('es-AR')} caracteres · el límite de contexto del modelo también aplica`}
 
       </small>
 

@@ -55,12 +55,12 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     conversationId,
     isVisible,
     onError: setError,
-    onSubmitTranscript: text => handleSubmit(null, text, true),
+    onRecognizedSpeech: text => handleSubmit(null, text, true),
   });
   const {
-    voiceState, voiceAvailable, handsFreeMode, handsFreeStatus, voiceAudioUrl,
+    voiceAvailable, handsFreeMode, handsFreeStatus, voiceAudioUrl,
     isPreparingVoice, isPlayingVoice, stopVoicePlayback,
-    toggleHandsFree, handleVoiceButton, handleReplayVoice, handleCancelVoice,
+    toggleHandsFree, handleReplayVoice,
   } = voice;
   const {
     input,
@@ -105,7 +105,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   });
 
   function canStartEditingMessage(message) {
-    return !isLoading && voiceState === 'idle' && pendingImageReads === 0
+    return !isLoading && !handsFreeMode && pendingImageReads === 0
       && images.length === 0 && !message.pending && message.role === 'user';
   }
 
@@ -151,7 +151,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         onScroll={handleMessagesScroll}
       >
         {isLoadingOlder && <div className={ChatStyles.historyLoading} role="status">Cargando mensajes anteriores…</div>}
-        <MessageList messages={messages} onOpenConversation={onOpenConversation} onEditMessage={!isLoading && !isDelegatedActive && !handsFreeMode && voiceState === 'idle' && images.length === 0 ? startEditingMessage : null} />
+        <MessageList messages={messages} onOpenConversation={onOpenConversation} onEditMessage={!isLoading && !isDelegatedActive && !handsFreeMode && images.length === 0 ? startEditingMessage : null} />
         {isLoading && (
           <div className={ChatStyles.thinkingSlot}>
             {activity === 'thinking' && <ThinkingIndicator />}
@@ -181,9 +181,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         setIsAttachMenuOpen={setIsAttachMenuOpen}
         isAttachMenuOpen={isAttachMenuOpen}
         attachmentMenuRef={attachmentMenuRef}
-        voiceState={voiceState}
-        handleVoiceButton={handleVoiceButton}
-        handleCancelVoice={handleCancelVoice}
         messageInputRef={messageInputRef}
         input={input}
         handleInputChange={handleInputChange}
