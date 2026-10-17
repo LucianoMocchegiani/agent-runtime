@@ -10,7 +10,7 @@ Cliente HTTP y de streaming para integrar agent-runtime en una UI. No depende de
 import { createClient } from 'agent-runtime-client';
 
 const client = createClient({
-  baseUrl: 'http://localhost:3010',
+  baseUrl: 'http://localhost:3030',
   // Debe devolver el mismo token estable para todas las solicitudes de una sesión.
   getBearer: () => localStorage.getItem('token'),
   // Opcional: credenciales MCP por servidor.

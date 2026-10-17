@@ -27,7 +27,7 @@ export function splitModelId(id: string): { provider: string; model: string } | 
 
 function parsePort(raw: string | undefined): number {
   if (!raw?.trim()) {
-    return 3010;
+    return 3030;
   }
   const port = Number(raw);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {

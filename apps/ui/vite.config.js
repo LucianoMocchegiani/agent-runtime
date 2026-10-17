@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-const runtime = process.env.AGENT_RUNTIME_URL || 'http://localhost:3010';
+const runtime = process.env.AGENT_RUNTIME_URL || 'http://localhost:3030';
 
 export default defineConfig({
   plugins: [react()],

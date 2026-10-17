@@ -28,5 +28,5 @@ USER node
 # API image is also used by the one-shot migration task (with an overridden command).
 FROM runtime-base AS api
 WORKDIR /app/apps/api
-EXPOSE 3010
+EXPOSE 3030
 CMD ["node", "dist/index.js"]

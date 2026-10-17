@@ -1,6 +1,6 @@
 # Contrato HTTP
 
-Base local: `http://localhost:3010`. Prefijo de API: `/v1`.
+Base local: `http://localhost:3030`. Prefijo de API: `/v1`.
 
 Header opcional para credenciales MCP por servidor: `X-MCP-Auth` (JSON, por ejemplo `{"mcp":"token"}`). Los turnos se transmiten como UI Message Stream del AI SDK. Los eventos de delegación usan SSE estándar.
 

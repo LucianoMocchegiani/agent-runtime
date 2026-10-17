@@ -50,7 +50,7 @@ No se requieren `MEMORY_MCP_URL`, `MEMORY_MCP_PORT`, ni un token para que Memory
 docker compose up -d --build
 ```
 
-El Compose normal ejecuta PostgreSQL, una tarea efímera de migración y una instancia de Runtime en `http://localhost:3010`. Se conserva el volumen `pgdata`; las migraciones se aplican antes de iniciar la API.
+El Compose normal ejecuta PostgreSQL, una tarea efímera de migración y una instancia de Runtime en `http://localhost:3030`. Se conserva el volumen `pgdata`; las migraciones se aplican antes de iniciar la API.
 
 ### Escalable: varias instancias
 
@@ -58,11 +58,11 @@ El Compose normal ejecuta PostgreSQL, una tarea efímera de migración y una ins
 docker compose -f docker-compose.scalable.yml up -d --build --scale agent-runtime=3
 ```
 
-Este modo usa el mismo PostgreSQL compartido, levanta las réplicas API sin publicar sus puertos y expone HAProxy en `http://localhost:3010`. El balanceador conserva las conexiones de streaming; podés cambiar `3` por la cantidad de réplicas deseada. Los dos Compose son modos alternativos: ambos usan el mismo nombre de proyecto, volumen y puerto local.
+Este modo usa el mismo PostgreSQL compartido, levanta las réplicas API sin publicar sus puertos y expone HAProxy en `http://localhost:3030`. El balanceador conserva las conexiones de streaming; podés cambiar `3` por la cantidad de réplicas deseada. Los dos Compose son modos alternativos: ambos usan el mismo nombre de proyecto, volumen y puerto local.
 
 La coordinación de turnos normales usa leases atómicos en PostgreSQL. El lease dura hasta 120 segundos y se renueva cada 30; ante la caída de un proceso, puede haber que esperar a que venza antes de enviar otro turno. El stream interrumpido **no se reanuda ni se reintenta** automáticamente.
 
-- UI: `http://localhost:3010/`
+- UI: `http://localhost:3030/`
 - Health: `GET /health` (API y conectividad PostgreSQL)
 - Conversaciones: `GET/POST /v1/conversations`
 - Mensajes: `POST /v1/conversations/:id/messages`
@@ -104,4 +104,4 @@ npm run build
 npm run typecheck
 ```
 
-La API sirve en `:3010` y Vite en `:3001`. La UI permite elegir perfil para nuevos chats y cambiar el perfil asignado a una conversación; el cambio afecta los turnos siguientes, no altera un turno que ya está en curso.
+La API sirve en `:3030` y Vite en `:3001`. La UI permite elegir perfil para nuevos chats y cambiar el perfil asignado a una conversación; el cambio afecta los turnos siguientes, no altera un turno que ya está en curso.

@@ -1,5 +1,5 @@
 # agent-runtime completo: PostgreSQL + aplicación Runtime (API y UI).
-#   docker compose up -d --build   →   http://localhost:3010
+#   docker compose up -d --build   →   http://localhost:3030
 name: agent-runtime
 
 services:
@@ -39,7 +39,7 @@ services:
       target: api
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3010:3010"
+      - "127.0.0.1:3030:3030"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

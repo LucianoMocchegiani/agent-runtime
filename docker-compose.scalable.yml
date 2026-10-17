@@ -1,6 +1,6 @@
 # Despliegue horizontal: PostgreSQL compartido, varias réplicas API y HAProxy.
 #   docker compose -f docker-compose.scalable.yml up -d --build --scale agent-runtime=3
-#   http://localhost:3010
+#   http://localhost:3030
 name: agent-runtime
 
 services:
@@ -50,7 +50,7 @@ services:
     image: haproxy:3.2-alpine
     restart: unless-stopped
     ports:
-      - "127.0.0.1:3010:3010"
+      - "127.0.0.1:3030:3030"
     volumes:
       - ./deploy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
     depends_on:
