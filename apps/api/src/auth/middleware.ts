@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import type { AppEnv, Principal } from './contracts.js';
 import { AuthServiceError, resolvePrincipal } from './service.js';
 import { ANONYMOUS_TOKEN_PREFIX } from './constants.js';
+import { config } from '../config.js';
 
 function readBearer(header: string | undefined): string | null {
   if (!header) {
@@ -57,6 +58,17 @@ export const requirePrincipal = createMiddleware<AppEnv>(async (c, next) => {
     };
     c.set('principal', principal);
     c.set('accessToken', token);
+    c.set('mcpAuth', parseMcpAuth(c.req.header('X-MCP-Auth')));
+    await next();
+    return;
+  }
+
+  // Sin servicio de introspección, no se puede autenticar un Bearer opaco:
+  // la API funciona pública y asigna una identidad anónima a cada solicitud.
+  if (!config.authIntrospectUrl) {
+    const sessionId = randomUUID();
+    c.set('principal', { userId: sessionId, email: null, name: null });
+    c.set('accessToken', '');
     c.set('mcpAuth', parseMcpAuth(c.req.header('X-MCP-Auth')));
     await next();
     return;

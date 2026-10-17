@@ -7,14 +7,6 @@ import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-function required(name: string): string {
-  const value = process.env[name]?.trim();
-  if (!value) {
-    throw new Error(`Missing required env ${name}`);
-  }
-  return value;
-}
-
 /** Proveedores de modelos cuyo soporte está integrado en esta aplicación. */
 export const AI_PROVIDERS = ['openrouter', 'openai'] as const;
 
@@ -44,15 +36,11 @@ function parsePort(raw: string | undefined): number {
   return port;
 }
 
-function parseOrigins(raw: string): string[] {
-  const origins = raw
+function parseOrigins(raw: string | undefined): string[] {
+  return (raw ?? '')
     .split(',')
     .map((item) => item.trim())
     .filter(Boolean);
-  if (origins.length === 0) {
-    throw new Error('CORS_ORIGIN must list at least one origin');
-  }
-  return origins;
 }
 
 function parseAuthMapping(raw: string | undefined): AuthMapping {
@@ -137,7 +125,8 @@ export type AiConfig = {
 export type ChatConfig = {
   port: number;
   mcpConfig: McpConfig;
-  authIntrospectUrl: string;
+  /** Null deshabilita la introspección y deja las rutas en modo público/anónimo. */
+  authIntrospectUrl: string | null;
   authMapping: AuthMapping;
   ai: AiConfig;
   corsOrigins: string[];
@@ -165,10 +154,10 @@ export type ChatConfig = {
 export const config: ChatConfig = {
   port: parsePort(process.env.PORT),
   mcpConfig: {},
-  authIntrospectUrl: required('AUTH_INTROSPECT_URL'),
+  authIntrospectUrl: process.env.AUTH_INTROSPECT_URL?.trim() || null,
   authMapping: parseAuthMapping(process.env.AUTH_MAPPING),
   ai: { defaultModel: '', providers: {} },
-  corsOrigins: parseOrigins(required('CORS_ORIGIN')),
+  corsOrigins: parseOrigins(process.env.CORS_ORIGIN),
   corsAppDomain: process.env.CORS_APP_DOMAIN?.trim().toLowerCase() || null,
   chatSystemPrompt: DEFAULT_SYSTEM_PROMPT,
   contextTokenBudget: 10_000,

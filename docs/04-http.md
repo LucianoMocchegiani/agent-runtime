@@ -6,7 +6,9 @@ Header opcional para credenciales MCP por servidor: `X-MCP-Auth` (JSON, por ejem
 
 ## Identidad y autorización
 
-Las rutas `/v1` asocian cada solicitud a una identidad. El middleware acepta el token del sistema huésped y resuelve su identidad mediante `AUTH_INTROSPECT_URL`, o un token anónimo `anon:<uuid>`. La UI nativa conserva ese token anónimo en `localStorage`; los clientes huéspedes deben enviar un token estable en cada solicitud para mantener la misma identidad. Si se omite el Bearer, el middleware crea una identidad aleatoria nueva para esa solicitud, que no permite recuperar conversaciones en solicitudes posteriores.
+Las rutas `/v1` asocian cada solicitud a una identidad. Si `AUTH_INTROSPECT_URL` está configurada, el middleware resuelve allí el token del sistema huésped; también acepta un token anónimo `anon:<uuid>`. Si `AUTH_INTROSPECT_URL` está vacía, la API funciona en modo público: cualquier solicitud puede acceder a `/v1` y recibe una identidad anónima aleatoria (los Bearer opacos se ignoran). La UI nativa conserva un token `anon:<uuid>` en `localStorage` para mantener la identidad entre solicitudes. Sin ese token, se crea una identidad nueva por solicitud y no se pueden recuperar conversaciones en solicitudes posteriores.
+
+El modo público no configura CORS automáticamente: para permitir llamadas desde una UI alojada en otro origen, configurá `CORS_ORIGIN` o `CORS_APP_DOMAIN`.
 
 Las rutas administrativas están bajo `/admin` y tienen autorización propia. La UI y las rutas de administración no sustituyen la autenticación y autorización del sistema huésped.
 

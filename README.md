@@ -35,10 +35,10 @@ Al primer inicio, Runtime crea `runtime.config` con valores mínimos. Los provee
 | `DATABASE_URL` | PostgreSQL compartido por Memory y configuración de Runtime; Compose apunta al servicio `postgres` |
 | `RUNTIME_CONFIG_ENCRYPTION_KEY` | Obligatoria para cifrar `runtime.config`; generar con `openssl rand -hex 32` y conservarla |
 | `DELEGATION_PAYLOAD_ENCRYPTION_KEY` | Opcional; habilita delegaciones. Clave hex de 32 bytes distinta a la anterior, compartida por todas las réplicas |
-| `AUTH_INTROSPECT_URL` | Endpoint `GET` para resolver la identidad del huésped |
+| `AUTH_INTROSPECT_URL` | Opcional. Endpoint `GET` para resolver la identidad del huésped; vacío, la API acepta solicitudes públicas con identidad anónima |
 | `AUTH_MAPPING` | Mapeo JSON de los campos devueltos por introspección |
 | `UI_ENABLED` / `UI_DIR` | Habilitar y localizar la UI nativa |
-| `CORS_ORIGIN` / `CORS_APP_DOMAIN` | Orígenes de UIs externas |
+| `CORS_ORIGIN` / `CORS_APP_DOMAIN` | Orígenes de UIs externas; vacíos, no se habilita acceso CORS desde otros orígenes |
 
 No se requieren `MEMORY_MCP_URL`, `MEMORY_MCP_PORT`, ni un token para que Memory consulte Runtime.
 

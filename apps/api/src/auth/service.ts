@@ -98,6 +98,11 @@ function parseIntrospectBody(body: unknown): {
  * @throws {AuthServiceError} 401 si el token es inválido; 502 si falla la introspección o su respuesta.
  */
 export async function resolvePrincipal(token: string): Promise<Principal> {
+  const introspectUrl = config.authIntrospectUrl;
+  if (!introspectUrl) {
+    throw new AuthServiceError(401, 'Bearer authentication is not configured');
+  }
+
   const key = tokenCacheKey(token);
   const cached = cacheGet(key);
   if (cached) {
@@ -106,7 +111,7 @@ export async function resolvePrincipal(token: string): Promise<Principal> {
 
   let response: Response;
   try {
-    response = await fetch(config.authIntrospectUrl, {
+    response = await fetch(introspectUrl, {
       headers: { Authorization: `Bearer ${token}` },
       signal: AbortSignal.timeout(AUTH_INTROSPECT_TIMEOUT_MS),
     });
