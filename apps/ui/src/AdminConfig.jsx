@@ -228,7 +228,7 @@ export default function AdminConfig({ onBack }) {
         <button className={loginMode === 'user' ? styles.active : ''} onClick={() => setLoginMode('user')}>Usuario autenticado</button>
       </div>
       {loginMode === 'bootstrap' ? <>
-        <p>Acceso inicial clásico. Usuario y contraseña predeterminados: <code>admin</code> / <code>admin</code>. Se desactiva al configurar el primer usuario administrador.</p>
+        <p className={styles.bootstrapWarning}><strong>Acceso inicial con credenciales predeterminadas</strong><span> Usuario y contraseña: <code>admin</code> / <code>admin</code>. Creá una cuenta administradora propia para desactivar este acceso cuanto antes.</span></p>
         <label className={sharedStyles.field}>Usuario<input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
         <label className={sharedStyles.field}>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
       </> : <>
@@ -236,6 +236,7 @@ export default function AdminConfig({ onBack }) {
         <label className={sharedStyles.field}>Access token del usuario<input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></label>
       </>}
       <button className={sharedStyles.primaryButton} disabled={busy || (loginMode === 'bootstrap' ? !username.trim() || !password : !token.trim())} onClick={signIn}>{busy ? 'Verificando…' : 'Continuar'}</button>
+      {!busy && ((loginMode === 'bootstrap' && (!username.trim() || !password)) || (loginMode === 'user' && !token.trim())) && <p className={styles.loginHint} role="status">{loginMode === 'bootstrap' ? 'Ingresá el usuario y la contraseña para continuar.' : 'Ingresá el access token para continuar.'}</p>}
     </section> : <>
       {Object.keys(config.ai?.providers ?? {}).length === 0 && <p className={`${sharedStyles.notice} ${styles.notice}`} role="status">Instalación nueva: no hay proveedores de IA configurados. Agregá una clave y modelos habilitados en Provider. Después elegí el modelo en el perfil predeterminado.</p>}
       <nav className={styles.tabs} role="tablist" aria-label="Configuración del runtime">

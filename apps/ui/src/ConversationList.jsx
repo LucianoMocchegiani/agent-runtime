@@ -95,12 +95,14 @@ export default function ConversationList({ isSidebarOpen = false, hasActiveChat 
 
   return (
     <div className={`${styles.sidebar} ${isSidebarOpen ? styles.sidebarOpen : ''} ${!hasActiveChat ? styles.sidebarNoChat : ''}`}>
-      <h2>
-        <span>Chat</span>
-        <button className={styles.sidebarAction} onClick={onOpenMemory} aria-label="Memoria" title="Ver y administrar preferencias guardadas"><Icon name="memory" /></button>
-        <button className={styles.sidebarAction} onClick={onOpenAdmin} aria-label="Administración" title="Configuración del runtime">⚙</button>
-        <button className={styles.sidebarAction} onClick={handleNew} disabled={busyId === 'new'} aria-label="Nuevo chat" title="Crear un nuevo chat"><Icon name="plus" /></button>
-      </h2>
+      <div className={styles.sidebarToolbar}>
+        <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={onOpenMemory} aria-label="Preferencias" title="Ver y administrar preferencias guardadas"><Icon name="memory" /><span>Preferencias</span></button>
+        <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={onOpenAdmin} aria-label="Configuración" title="Configuración del runtime"><Icon name="settings" /><span>Configuración</span></button>
+      </div>
+      <div className={styles.conversationHeadingRow}>
+        <h2 className={styles.conversationHeading}>Conversaciones</h2>
+        <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={handleNew} disabled={busyId === 'new'} aria-label="Nueva conversación" title="Crear una nueva conversación"><Icon name="plus" /><span>Nuevo</span></button>
+      </div>
       <div className={styles.conversationListTabs} role="tablist" aria-label="Conversaciones">
         <button type="button" role="tab" aria-selected={!showArchived} className={!showArchived ? styles.active : ''} onClick={() => { setShowArchived(false); setActionError(''); setActionNotice(''); }}>Activas</button>
         <button type="button" role="tab" aria-selected={showArchived} className={showArchived ? styles.active : ''} onClick={() => { setShowArchived(true); setActionError(''); setActionNotice(''); }}>Archivadas</button>
@@ -133,9 +135,7 @@ export default function ConversationList({ isSidebarOpen = false, hasActiveChat 
                 <span className={styles.convDate}>{fmtDate(c.updatedAt)}</span>
               </button>
               {showArchived ? (
-                <button type="button" className={styles.restoreButton} onClick={() => handleRestore(c.id)} disabled={busyId === c.id} aria-label={`Restaurar ${title}`} title={`Restaurar ${title}`}>
-                  {busyId === c.id ? 'Restaurando…' : 'Restaurar'}
-                </button>
+                <button type="button" className={styles.archiveButton} onClick={() => handleRestore(c.id)} disabled={busyId === c.id} aria-label={busyId === c.id ? `Restaurando ${title}` : `Restaurar ${title}`} title={busyId === c.id ? `Restaurando ${title}` : `Restaurar ${title}`}><Icon name="restore" /></button>
               ) : (
                 <button type="button" className={styles.archiveButton} onClick={() => handleArchive(c.id)} disabled={busyId === c.id} aria-label={`Archivar ${title}`} title={`Archivar ${title}`}><Icon name="archive" /></button>
               )}

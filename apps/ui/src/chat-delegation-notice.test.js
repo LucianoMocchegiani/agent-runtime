@@ -88,15 +88,16 @@ test('el borrador, la edición y la interacción del textarea quedan en su hook'
   assert.match(chatComposerViewSource, /className=\{ChatStyles\.attachButton\}/);
 });
 
-test('la cabecera, el título, el perfil y los controles de recarga y voz quedan en ChatHeader', () => {
+test('la cabecera conserva sus controles y el estado de audio se muestra como toast', () => {
   assert.match(chatSource, /import ChatHeader from '\.\/ChatHeader\.jsx'/);
-  assert.match(chatSource, /<ChatHeader[\s\S]*loadMessages=\{loadMessages\}/);
+  assert.match(chatSource, /<ChatHeader[\s\S]*handleReplayVoice=\{handleReplayVoice\}/);
+  assert.match(chatSource, /isPreparingVoice && \([\s\S]*ChatStyles\.audioToast[\s\S]*Generando audio/);
+  assert.doesNotMatch(chatSource, /loadMessages=\{loadMessages\}/);
   assert.doesNotMatch(chatSource, /<header className="chat-header">|className="conversation-title-form"|className="chat-profile-picker"/);
   assert.match(chatHeaderSource, /className=\{ChatStyles\.chatHeader\}/);
   assert.match(chatHeaderSource, /ChatStyles\.conversationTitleForm/);
   assert.match(chatHeaderSource, /ChatStyles\.chatProfilePicker/);
-  assert.match(chatHeaderSource, /Preparando audio/);
-  assert.match(chatHeaderSource, /loadMessages\(\{ preserveHistory: true \}\)/);
+  assert.doesNotMatch(chatHeaderSource, /Recargar|loadMessages|Preparando audio/);
 });
 
 test('la lista de mensajes y la presentación de herramientas quedan separadas', () => {

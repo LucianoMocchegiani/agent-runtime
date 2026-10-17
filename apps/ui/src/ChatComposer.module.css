@@ -101,9 +101,17 @@
 
 .composerRow { align-items: flex-end; }
 
-.handsFreeControl { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; min-height: 38px; }
+.handsFreeControl {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 38px;
+  width: fit-content;
+  max-width: 100%;
+}
 
-.handsFreeButton { min-height: 36px; padding: 5px 12px; color: var(--text); background: #20263b; border: 1px solid var(--border-input); border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; }
+.handsFreeButton { min-height: 40px; padding: 0 10px; color: var(--text); background: #20263b; border: 1px solid var(--border-input); border-radius: var(--radius); cursor: pointer; font: inherit; font-size: 13px; font-weight: 650; }
 
 .handsFreeButton:hover:not(:disabled) { border-color: var(--accent); background: #252f49; }
 
@@ -175,9 +183,15 @@
 
 .composerRow > .voiceButton {
   flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 10px;
   color: var(--text);
   background: #20263b;
-  border-color: var(--border-input);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
 }
 
 .composerRow > .voiceButton:hover:not(:disabled) { border-color: var(--accent); background: #252f49; }
@@ -271,6 +285,70 @@
 .attachButton { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 
 .composerRow > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+
+.composerRow {
+  padding: 5px;
+  background: rgba(10, 16, 31, .22);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.composerRow:focus-within {
+  border-color: rgba(79, 195, 247, .7);
+  box-shadow: 0 0 0 2px rgba(79, 195, 247, .1);
+}
+
+.composerRow .messageInput,
+.composerRow .messageInput:hover:not(:disabled),
+.composerRow .messageInput:focus {
+  background: transparent;
+  border-color: transparent;
+  outline: none;
+  box-shadow: none;
+}
+
+.composerRow .messageInput:focus-visible { outline: none; }
+
+@media (max-width: 700px) {
+  .composerRow { flex-wrap: wrap; align-items: center; gap: 5px; }
+  .composerRow .messageInput { order: 0; flex: 1 0 100%; }
+  .composerRow .attachmentMenuWrap { order: 1; }
+  .composerRow > .voiceButton,
+  .composerRow > .handsFreeControl,
+  .composerRow > .voiceCancelButton { order: 2; }
+  .composerRow > .sendButton { order: 3; margin-left: auto; }
+  .composerRow > .stopButton { order: 4; }
+  .composerRow > .sendButton,
+  .composerRow > .stopButton { width: 40px; min-width: 40px; flex: 0 0 40px; padding: 0; }
+  .composerRow > .handsFreeControl { width: auto; min-height: 0; max-width: none; padding: 0; gap: 5px; background: transparent; border: 0; }
+  .composerRow > .voiceButton,
+  .composerRow > .handsFreeControl .handsFreeButton { min-height: 40px; padding-inline: 8px; font-size: 12px; }
+  .composerRow > button svg,
+  .composerRow .attachButton svg { width: 19px; height: 19px; }
+}
+
+@media (max-width: 380px) {
+  .composerRow { gap: 3px; }
+  .composerRow > .sendButton,
+  .composerRow > .stopButton,
+  .composerRow .attachButton { width: 36px; min-width: 36px; flex-basis: 36px; }
+  .composerRow > .handsFreeControl .handsFreeButton { padding-inline: 4px; font-size: 11px; }
+  .composerRow > .voiceButton,
+  .composerRow > .voiceCancelButton { padding-inline: 4px; font-size: 11px; }
+}
+
+.composerRow > .sendButton svg,
+.composerRow > .stopButton svg { width: 18px; height: 18px; }
+.attachButton { width: 40px; min-width: 40px; padding: 0; }
+.attachButton svg { width: 19px; height: 19px; }
+.composerRow > .sendButton,
+.composerRow > .stopButton { flex: 0 0 40px; width: 40px; padding: 0; }
+.handsFreeStatus { min-width: 0; max-width: 14ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.handsFreeStatusDot { flex: 0 0 8px; }
+.handsFreeControl { flex: 0 0 auto; }
+.handsFreeButton { white-space: nowrap; }
+
 
 .imageAttachmentPreview button { display: inline-grid; place-items: center; width: 36px; min-width: 36px; }
 

@@ -133,14 +133,18 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         changeAgentProfile={changeAgentProfile}
         isChangingProfile={isChangingProfile}
         isLoading={isLoading}
-        isPreparingVoice={isPreparingVoice}
         voiceAudioUrl={voiceAudioUrl}
         handsFreeMode={handsFreeMode}
         isPlayingVoice={isPlayingVoice}
         stopVoicePlayback={stopVoicePlayback}
         handleReplayVoice={handleReplayVoice}
-        loadMessages={loadMessages}
       />
+      {isPreparingVoice && (
+        <div className={ChatStyles.audioToast} role="status" aria-live="polite">
+          <span className={ChatStyles.audioToastSpinner} aria-hidden="true" />
+          <span>Generando audio…</span>
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
         className={ChatStyles.messages}

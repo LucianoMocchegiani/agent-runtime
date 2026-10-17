@@ -134,46 +134,6 @@ export default function ChatComposer({
 
       />
 
-      {voiceAvailable && <div className={ChatStyles.handsFreeControl}>
-
-        <button
-
-          type="button"
-
-          className={`${ChatStyles.handsFreeButton} ${handsFreeMode ? ChatStyles.handsFreeActive : ''}`}
-
-          onClick={() => toggleHandsFree({ isLoading, isDelegatedActive, editingMessage })}
-
-          disabled={!handsFreeMode && (isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState !== 'idle')}
-
-          aria-pressed={handsFreeMode}
-
-          title={handsFreeMode ? 'Salir del modo manos libres y apagar el micrófono' : 'Activar conversación por voz sin tener que apretar para hablar'}
-
-        >
-
-          {handsFreeMode ? '■ Salir de manos libres' : '🎙 Manos libres'}
-
-        </button>
-
-        {handsFreeMode && <span className={`${ChatStyles.handsFreeStatus} ${ChatStyles[`handsFreeStatus${handsFreeStatus[0].toUpperCase()}${handsFreeStatus.slice(1)}`]}`} role="status" aria-live="polite">
-
-          <span className={ChatStyles.handsFreeStatusDot} aria-hidden="true" />
-
-          {handsFreeStatus === 'connecting' ? 'Conectando al micrófono…'
-
-            : handsFreeStatus === 'listening' ? 'Escuchando. Hablá cuando quieras.'
-
-              : handsFreeStatus === 'processing' ? 'Procesando tu mensaje…'
-
-                : handsFreeStatus === 'speaking' ? 'El asistente está hablando…'
-
-                  : 'Modo manos libres'}
-
-        </span>}
-
-      </div>}
-
       <div className={ChatStyles.composerRow}>
 
         <div className={ChatStyles.attachmentMenuWrap} ref={attachmentMenuRef}>
@@ -190,15 +150,15 @@ export default function ChatComposer({
 
             aria-expanded={isAttachMenuOpen}
 
-            title="Adjuntar un archivo"
+            title={images.length > 0 ? `Adjuntar archivo (${images.length}/${MAX_IMAGES})` : 'Adjuntar un archivo'}
+
+            aria-label={images.length > 0 ? `Adjuntar archivo (${images.length} de ${MAX_IMAGES})` : 'Adjuntar un archivo'}
 
             onClick={() => setIsAttachMenuOpen(open => !open)}
 
           >
 
             <Icon name="attach" />
-
-            Adjuntar{images.length > 0 ? ` (${images.length}/${MAX_IMAGES})` : ''}
 
           </button>
 
@@ -230,15 +190,55 @@ export default function ChatComposer({
 
           disabled={isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState === 'transcribing'}
 
-          title={voiceState === 'idle' ? 'Hablar por voz' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Esperando la transcripción de voz' : 'Terminar de hablar y enviar'}
+          title={voiceState === 'idle' ? 'Dictar o transcribir' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Esperando la transcripción de voz' : 'Terminar de hablar y enviar'}
 
-          aria-label={voiceState === 'idle' ? 'Hablar por voz' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Procesando voz' : 'Terminar de hablar y enviar'}
+          aria-label={voiceState === 'idle' ? 'Dictar o transcribir' : voiceState === 'connecting' ? 'Conectando con reconocimiento de voz' : voiceState === 'transcribing' ? 'Procesando voz' : 'Terminar de hablar y enviar'}
 
         >
 
-          {voiceState === 'idle' ? '🎙 Hablar' : voiceState === 'connecting' ? 'Conectando…' : voiceState === 'transcribing' ? 'Procesando…' : 'Enviar voz'}
+          {voiceState === 'idle' ? '🎙 Dictar o transcribir' : voiceState === 'connecting' ? 'Conectando…' : voiceState === 'transcribing' ? 'Procesando…' : 'Enviar voz'}
 
         </button>}
+
+      {voiceAvailable && <div className={ChatStyles.handsFreeControl}>
+
+        <button
+
+          type="button"
+
+          className={`${ChatStyles.handsFreeButton} ${handsFreeMode ? ChatStyles.handsFreeActive : ''}`}
+
+          onClick={() => toggleHandsFree({ isLoading, isDelegatedActive, editingMessage })}
+
+          disabled={!handsFreeMode && (isLoading || isDelegatedActive || Boolean(editingMessage) || voiceState !== 'idle')}
+
+          aria-pressed={handsFreeMode}
+
+          title={handsFreeMode ? 'Finalizar la conversación hablada y apagar el micrófono' : 'Iniciar una conversación hablada sin tener que mantener apretado el botón'}
+
+        >
+
+          {handsFreeMode ? '■ Finalizar conversación' : '🎙 Conversación hablada'}
+
+        </button>
+
+        {handsFreeMode && <span className={`${ChatStyles.handsFreeStatus} ${ChatStyles[`handsFreeStatus${handsFreeStatus[0].toUpperCase()}${handsFreeStatus.slice(1)}`]}`} role="status" aria-live="polite">
+
+          <span className={ChatStyles.handsFreeStatusDot} aria-hidden="true" />
+
+          {handsFreeStatus === 'connecting' ? 'Conectando al micrófono…'
+
+            : handsFreeStatus === 'listening' ? 'Escuchando. Hablá cuando quieras.'
+
+              : handsFreeStatus === 'processing' ? 'Procesando tu mensaje…'
+
+                : handsFreeStatus === 'speaking' ? 'El asistente está hablando…'
+
+                  : 'Modo manos libres'}
+
+        </span>}
+
+      </div>}
 
         {voiceAvailable && !handsFreeMode && voiceState !== 'idle' && <button
 
@@ -284,9 +284,9 @@ export default function ChatComposer({
 
         />
 
-        <button className={ChatStyles.sendButton} type="submit" disabled={isLoading || isDelegatedActive || handsFreeMode || (!input.trim() && images.length === 0)} title={editingMessage ? 'Guardar la edición y generar una respuesta nueva' : 'Enviar mensaje'} aria-label={editingMessage ? 'Guardar y reenviar mensaje editado' : 'Enviar mensaje'}><Icon name="send" /><span>{editingMessage ? 'Guardar y reenviar' : 'Enviar'}</span></button>
+        <button className={ChatStyles.sendButton} type="submit" disabled={isLoading || isDelegatedActive || handsFreeMode || (!input.trim() && images.length === 0)} title={editingMessage ? 'Guardar la edición y generar una respuesta nueva' : 'Enviar mensaje'} aria-label={editingMessage ? 'Guardar y reenviar mensaje editado' : 'Enviar mensaje'}><Icon name="send" /></button>
 
-        <button className={ChatStyles.stopButton} type="button" disabled={!isLoading} onClick={handleAbort} title="Detener la respuesta" aria-label="Detener la respuesta"><Icon name="stop" /><span>Parar</span></button>
+        <button className={ChatStyles.stopButton} type="button" disabled={!isLoading} onClick={handleAbort} title="Detener la respuesta" aria-label="Detener la respuesta"><Icon name="stop" /></button>
 
       </div>
 

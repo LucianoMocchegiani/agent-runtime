@@ -57,6 +57,20 @@
 .error { max-width: var(--content-width); margin: 14px auto 0; }
 .notice { display: block; }
 .page code { color: #e5c07b; overflow-wrap: anywhere; }
+.bootstrapWarning {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 16px !important;
+  padding: 12px 14px;
+  color: #f3dca5 !important;
+  background: rgba(255, 193, 7, .075);
+  border: 1px solid rgba(255, 193, 7, .28);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+.bootstrapWarning strong { color: #ffdfa0; }
+.bootstrapWarning span { color: var(--text-muted); }
+.loginHint { margin: 8px 0 0 !important; color: var(--text-muted); font-size: 12px; }
 @media (max-width: 700px) {
   .adminHeader .secondaryButton { padding-inline: 9px; font-size: 12px; }
   .json { min-height: 280px !important; }

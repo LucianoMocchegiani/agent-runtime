@@ -10,7 +10,7 @@
   line-height: 1.5;
   word-break: break-word;
   background: var(--tool-bubble);
-  border: 1px solid #5d4037;
+  border: 1px solid #3b455f;
 }
 
 .toolHeading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
@@ -45,9 +45,9 @@
   align-self: stretch;
   min-width: 0;
   padding: 8px 12px;
-  color: var(--text-muted);
+  color: #8FAFC2;
   background: var(--tool-bubble);
-  border: 1px solid #5d4037;
+  border: 1px solid #3b455f;
   border-radius: var(--radius);
 }
 
@@ -64,17 +64,17 @@
 
 .toolStackSummary::-webkit-details-marker { display: none; }
 
-.toolStackSummary::before { content: '▸'; flex: 0 0 auto; color: var(--text-muted); transition: transform 0.15s ease; }
+.toolStackSummary::before { content: '▸'; flex: 0 0 auto; color: #8FAFC2; transition: transform 0.15s ease; }
 
 .toolStack[open] > .toolStackSummary::before { transform: rotate(90deg); }
 
-.toolStackSummary:hover { color: var(--text); }
+.toolStackSummary:hover { color: #5CB8E6; }
 
-.toolStackCount { flex: 0 0 auto; color: var(--text); font-weight: 600; }
+.toolStackCount { flex: 0 0 auto; color: inherit; font-weight: 600; }
 
 .toolStackNames { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-.toolStackStatus { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; color: var(--text-muted); }
+.toolStackStatus { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; color: #8FAFC2; }
 
 .toolStackStatus .toolSpinner { width: 10px; height: 10px; }
 
