@@ -23,6 +23,7 @@ services:
   # Tarea efímera de despliegue: aplica migraciones antes de iniciar la aplicación.
   migrate:
     image: agent-runtime:local
+    working_dir: /app
     command: ["npm", "run", "prisma:deploy", "-w", "apps/api"]
     restart: "no"
     depends_on:
