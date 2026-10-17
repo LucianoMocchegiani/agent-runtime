@@ -25,10 +25,7 @@ COPY --from=build /app/apps/api/dist apps/api/dist
 COPY --from=build /app/apps/ui/dist apps/ui/dist
 USER node
 
-# One-shot deployment task; Prisma schema and migrations belong to the API.
-FROM runtime-base AS migrate
-CMD ["npm", "run", "prisma:deploy", "-w", "apps/api"]
-
+# API image is also used by the one-shot migration task (with an overridden command).
 FROM runtime-base AS api
 WORKDIR /app/apps/api
 EXPOSE 3010

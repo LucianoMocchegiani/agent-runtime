@@ -22,9 +22,8 @@ services:
       retries: 30
 
   migrate:
-    build:
-      context: .
-      target: migrate
+    image: agent-runtime:local
+    command: ["npm", "run", "prisma:deploy", "-w", "apps/api"]
     restart: "no"
     depends_on:
       postgres:
@@ -33,6 +32,7 @@ services:
       - DATABASE_URL=postgresql://agent:agent@postgres:5432/memory?schema=public
 
   agent-runtime:
+    image: agent-runtime:local
     build:
       context: .
       target: api

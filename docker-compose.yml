@@ -22,9 +22,8 @@ services:
 
   # Tarea efímera de despliegue: aplica migraciones antes de iniciar la aplicación.
   migrate:
-    build:
-      context: .
-      target: migrate
+    image: agent-runtime:local
+    command: ["npm", "run", "prisma:deploy", "-w", "apps/api"]
     restart: "no"
     depends_on:
       postgres:
@@ -34,6 +33,7 @@ services:
 
   # Único servicio de aplicación: HTTP API + módulo Memory en el mismo proceso.
   agent-runtime:
+    image: agent-runtime:local
     build:
       context: .
       target: api
