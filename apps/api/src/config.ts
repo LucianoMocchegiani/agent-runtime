@@ -93,12 +93,22 @@ export type McpServerConfig = {
 export type McpConfig = Record<string, McpServerConfig>;
 
 /** Clave y catálogo de modelos/contextos de un proveedor de IA. */
+export type AiProviderVoiceConfig = {
+  /** URL base OpenAI-compatible usada para Realtime y audio/speech. */
+  baseUrl: string;
+  transcriptionModels: string[];
+  speechModels: string[];
+  speechVoices: string[];
+};
+
 export type AiProviderConfig = {
   apiKey: string;
   /** Modelos ofrecidos en el selector (ids del proveedor, sin prefijo). */
   models: string[];
   /** Ventanas explícitas en tokens, indexadas por id del modelo del proveedor. */
   contextWindows: Record<string, number>;
+  /** Catálogo opcional de capacidades de voz. Actualmente solo se implementa para OpenAI. */
+  voice?: AiProviderVoiceConfig;
 };
 
 /** Proveedores habilitados y modelo seleccionado como valor de compatibilidad. */

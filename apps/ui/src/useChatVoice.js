@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import client from './client.js';
 
-export default function useChatVoice({ conversationId, isVisible, onError, onRecognizedSpeech }) {
+export default function useChatVoice({ conversationId, agentProfileId, isVisible, onError, onRecognizedSpeech }) {
   const [voiceAvailable, setVoiceAvailable] = useState(false);
   const [handsFreeMode, setHandsFreeMode] = useState(false);
   const [handsFreeStatus, setHandsFreeStatus] = useState('off');
@@ -30,7 +30,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onRec
       .then(status => { if (active) setVoiceAvailable(status.available); })
       .catch(() => { if (active) setVoiceAvailable(false); });
     return () => { active = false; };
-  }, [conversationId]);
+  }, [conversationId, agentProfileId]);
 
   useEffect(() => {
     if (isVisible) return;
@@ -47,7 +47,7 @@ export default function useChatVoice({ conversationId, isVisible, onError, onRec
     setHandsFreeStatus('off');
     stopVoiceCapture();
     stopVoicePlayback({ discard: true });
-  }, [conversationId]);
+  }, [conversationId, agentProfileId]);
 
   useEffect(() => () => {
     voiceSynthesisIdRef.current++;

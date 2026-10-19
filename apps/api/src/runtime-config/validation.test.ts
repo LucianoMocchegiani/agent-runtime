@@ -26,6 +26,25 @@ test('valida, normaliza y no muta el objeto recibido', () => {
   assert.equal(result.mcpConfig.local?.optional, false);
 });
 
+test('valida catálogo de voz OpenAI y permite endpoint HTTP configurable', () => {
+  const value = validSettings();
+  const providers = (value.ai as { providers: Record<string, any> }).providers;
+  providers.openai.voice = {
+    baseUrl: ' http://voice.local:8080/v1/ ',
+    transcriptionModels: [' transcribe ', 'transcribe'],
+    speechModels: ['speech'],
+    speechVoices: ['alloy'],
+  };
+  const normalized = validateRuntimeSettings(value);
+  assert.deepEqual(normalized.ai.providers.openai?.voice, {
+    baseUrl: 'http://voice.local:8080/v1',
+    transcriptionModels: ['transcribe'], speechModels: ['speech'], speechVoices: ['alloy'],
+  });
+
+  providers.openai.voice.baseUrl = 'ftp://voice.local/v1';
+  assert.throws(() => validateRuntimeSettings(value), /Invalid voice.baseUrl/);
+});
+
 test('rechaza proveedores no permitidos y URLs MCP con credenciales', () => {
   const unknownProvider = validSettings();
   (unknownProvider.ai as { providers: Record<string, unknown> }).providers.anthropic = { apiKey: 'secret', models: ['x'] };

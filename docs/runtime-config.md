@@ -18,6 +18,8 @@ El modelo y el comportamiento del agente viven en perfiles de Runtime. Las conve
 
 Cambiar el perfil predeterminado no reasigna conversaciones existentes. Los perfiles archivados siguen resolviéndose para los hilos que ya los tienen asignados, aunque dejan de aparecer en selectores nuevos. Ver [Perfiles de agente](./agent-profiles.md).
 
+La voz se configura en dos niveles: el catálogo y endpoint compatibles se declaran dentro de `ai.providers.openai.voice` en Administración → Provider; cada perfil habilita la función de forma explícita con `config.voice`. Si la propiedad está ausente, ese perfil no usa voz. Las APIs de voz llaman el endpoint configurado con la credencial OpenAI del servidor; la clave permanente no se entrega al navegador. Se admiten endpoints HTTP y HTTPS. Ver [Perfiles de agente](./agent-profiles.md#configuración-de-voz-por-perfil).
+
 ## Variables requeridas
 
 `DATABASE_URL` y `RUNTIME_CONFIG_ENCRYPTION_KEY` son obligatorias. La clave de cifrado debe conservarse mientras haya settings guardados. Memory usa la misma base de datos sin requerir `MEMORY_MCP_URL`, `MEMORY_MCP_PORT` ni `RUNTIME_CONFIG_INTERNAL_TOKEN`.

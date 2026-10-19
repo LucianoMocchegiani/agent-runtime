@@ -53,6 +53,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
   } = useChatHistory({ conversationId, isVisible, delegationStatus, addLocalImagePreviews, setError });
   const voice = useChatVoice({
     conversationId,
+    agentProfileId,
     isVisible,
     onError: setError,
     onRecognizedSpeech: text => handleSubmit(null, text, true),

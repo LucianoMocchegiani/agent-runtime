@@ -40,9 +40,39 @@ export function validateAgentProfileInput(name: unknown, modelId: unknown, rawCo
     || typeof candidate.llmTraceRequests !== 'boolean' || typeof candidate.summariesEnabled !== 'boolean') {
     throw new Error('Configuración de agente inválida');
   }
+  let voice: AgentProfileWrite['config']['voice'];
+  if (Object.hasOwn(candidate, 'voice')) {
+    const rawVoice = candidate.voice;
+    if (!rawVoice || typeof rawVoice !== 'object' || Array.isArray(rawVoice)) {
+      throw new Error('config.voice debe definir transcriptionModel, speechModel, speechVoice y language');
+    }
+    const value = rawVoice as Record<string, unknown>;
+    if (typeof value.transcriptionModel !== 'string' || !value.transcriptionModel.trim()
+      || typeof value.speechModel !== 'string' || !value.speechModel.trim()
+      || typeof value.speechVoice !== 'string' || !value.speechVoice.trim()
+      || typeof value.language !== 'string' || !value.language.trim()) {
+      throw new Error('config.voice debe definir transcriptionModel, speechModel, speechVoice y language');
+    }
+    const providerVoice = config.ai.providers.openai?.voice;
+    if (!providerVoice) throw new Error('Configurá primero las capacidades de voz del proveedor OpenAI');
+    if (!providerVoice.transcriptionModels.includes(value.transcriptionModel.trim())
+      || !providerVoice.speechModels.includes(value.speechModel.trim())
+      || !providerVoice.speechVoices.includes(value.speechVoice.trim())) {
+      throw new Error('La configuración de voz del perfil debe elegir modelos y voz habilitados en Provider');
+    }
+    voice = {
+      transcriptionModel: value.transcriptionModel.trim(),
+      speechModel: value.speechModel.trim(),
+      speechVoice: value.speechVoice.trim(),
+      language: value.language.trim(),
+    };
+  }
   return {
     name: name.trim(),
     modelId: normalizedModelId,
-    config: Object.fromEntries(AGENT_PROFILE_CONFIG_FIELDS.map((field) => [field, candidate[field]])) as AgentProfileWrite['config'],
+    config: {
+      ...Object.fromEntries(AGENT_PROFILE_CONFIG_FIELDS.map((field) => [field, candidate[field]])),
+      ...(voice ? { voice } : {}),
+    } as AgentProfileWrite['config'],
   };
 }

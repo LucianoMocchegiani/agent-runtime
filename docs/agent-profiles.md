@@ -18,6 +18,37 @@ La asociación es una referencia sin FK entre esquemas. Runtime valida el perfil
 - Los perfiles archivados no se ofrecen para nuevas asignaciones, pero se conservan para las conversaciones que ya los usan. Runtime puede resolverlos para esos hilos.
 - Un cambio en la configuración del perfil se aplica a los próximos turnos. Un turno en curso conserva la instantánea con la que comenzó.
 
+## Configuración de voz por perfil
+
+La voz no se habilita implícitamente. Si `config.voice` está ausente, no aparece como disponible para las conversaciones del perfil y no se aplica ningún modelo, voz o idioma predeterminado. Para deshabilitarla, eliminá la propiedad `voice` del JSON del perfil.
+
+Para habilitarla, configurá primero el catálogo de voz de OpenAI en Administración → Provider y agregá `voice` a la configuración completa del perfil. El JSON de ejemplo muestra el objeto `config` completo: al editar un perfil, conservá todos los campos requeridos y agregá o quitá solo la propiedad opcional `voice` según corresponda.
+
+```json
+{
+  "chatSystemPrompt": "Sos un asistente útil y claro.",
+  "contextTokenBudget": 10000,
+  "maxContextMessages": 20,
+  "maxOutputTokens": 4096,
+  "reserveOutputTokens": 4096,
+  "contextSafetyTokens": 512,
+  "maxToolSteps": 8,
+  "llmTraceRequests": false,
+  "summariesEnabled": true,
+  "summaryTokenBudget": 300,
+  "voice": {
+    "transcriptionModel": "gpt-4o-mini-transcribe",
+    "speechModel": "tts-1",
+    "speechVoice": "alloy",
+    "language": "es"
+  }
+}
+```
+
+Runtime valida que los modelos de transcripción y síntesis y la voz elegidos estén habilitados en Provider. La configuración del proveedor contiene `baseUrl`, `transcriptionModels`, `speechModels` y `speechVoices`; actualmente la integración usa la clave del proveedor OpenAI y sus APIs Realtime y `audio/speech`. La URL puede ser HTTP o HTTPS y debe ser accesible desde el servicio Runtime. El formato PCM, la frecuencia, la detección de silencio y el formato de audio se mantienen como parámetros técnicos del transporte.
+
+La disponibilidad se resuelve para el perfil asignado a cada conversación. Al cambiar de perfil, la opción de voz se actualiza; las conversaciones con perfiles sin `config.voice` no usan voz aunque el proveedor esté configurado. Quitar del catálogo una opción que utiliza un perfil la deja temporalmente no disponible hasta que el perfil se actualice o se vuelva a habilitar esa opción.
+
 ## Migración de hilos existentes
 
 La migración agrega `agent_profile_id` a `public.conversations` sin FK entre el esquema público y `runtime`. Al iniciar Runtime, los hilos sin asignación se fijan al perfil activo más antiguo según `created_at` e `id`. Este backfill es idempotente: cambiar el perfil predeterminado más adelante no reasigna conversaciones existentes. El inicio falla si quedan hilos sin asignar (por ejemplo, si no hay un perfil activo), en vez de dejar datos ambiguos. La columna heredada `sort_order` permanece en la tabla por compatibilidad, pero ya no determina la selección de perfiles.

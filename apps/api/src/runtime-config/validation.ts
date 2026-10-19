@@ -15,6 +15,22 @@ export function validateRuntimeSettings(value: unknown): RuntimeSettings {
     if (provider.contextWindows !== undefined && (!provider.contextWindows || typeof provider.contextWindows !== 'object' || Array.isArray(provider.contextWindows) || Object.values(provider.contextWindows).some((n: any) => !Number.isInteger(n) || n < 1))) throw new Error('Invalid contextWindows for ' + name);
     provider.models = [...new Set(provider.models.map((model: string) => model.trim()))];
     provider.contextWindows ??= {};
+    if (provider.voice !== undefined) {
+      if (name !== 'openai' || !provider.voice || typeof provider.voice !== 'object' || Array.isArray(provider.voice)) {
+        throw new Error('Voice configuration is currently supported only for OpenAI');
+      }
+      const voice = provider.voice;
+      if (typeof voice.baseUrl !== 'string' || !voice.baseUrl.trim()) throw new Error('Invalid voice.baseUrl for ' + name);
+      const voiceUrl = new URL(voice.baseUrl.trim());
+      if (!['http:', 'https:'].includes(voiceUrl.protocol) || voiceUrl.username || voiceUrl.password) throw new Error('Invalid voice.baseUrl for ' + name);
+      for (const field of ['transcriptionModels', 'speechModels', 'speechVoices']) {
+        if (!Array.isArray(voice[field]) || voice[field].length === 0 || voice[field].some((item: unknown) => typeof item !== 'string' || !item.trim())) {
+          throw new Error('Invalid voice.' + field + ' for ' + name);
+        }
+        voice[field] = [...new Set(voice[field].map((item: string) => item.trim()))];
+      }
+      voice.baseUrl = voice.baseUrl.trim().replace(/\/+$/, '');
+    }
   }
   if (!v.mcpConfig || typeof v.mcpConfig !== 'object' || Array.isArray(v.mcpConfig)) throw new Error('mcpConfig must be an object');
   for (const [name, mcp] of Object.entries(v.mcpConfig) as [string, any][]) {

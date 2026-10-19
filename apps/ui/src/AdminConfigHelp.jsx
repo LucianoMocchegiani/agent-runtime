@@ -2,7 +2,7 @@ import styles from './AdminConfigHelp.module.css';
 
 const guides = {
   Profiles: {
-    intro: 'Un perfil reúne el modelo y los parámetros de comportamiento del agente. Cada conversación usa el perfil que tiene asignado; el predeterminado se utiliza solo al crear chats nuevos. Las credenciales de proveedores, MCP y embeddings se configuran en sus pestañas globales.',
+    intro: 'Un perfil reúne el modelo y los parámetros de comportamiento del agente. Cada conversación usa el perfil que tiene asignado; el predeterminado se utiliza solo al crear chats nuevos. El editor JSON de config requiere todos los campos obligatorios: el ejemplo muestra la configuración completa con voice opcional. Las credenciales de proveedores, MCP y embeddings se configuran en sus pestañas globales.',
     fields: [
       ['name', 'Nombre visible del perfil para identificarlo en la administración.'],
       ['modelId', 'ID exacto de un modelo habilitado en Provider. Se usa el modelo del perfil asignado a la conversación; no se toma del navegador.'],
@@ -13,8 +13,10 @@ const guides = {
       ['config.contextSafetyTokens', 'Margen para variaciones de tokenización y evitar exceder la ventana del modelo.'],
       ['config.maxToolSteps', 'Máximo de rondas de uso de herramientas permitidas por turno.'],
       ['config.summariesEnabled / config.summaryTokenBudget', 'Controlan la generación y el tamaño de los resúmenes persistentes del historial.'],
+      ['config.voice', 'Opcional. Si omitís o eliminás esta propiedad, la voz queda deshabilitada en las conversaciones de este perfil; no se seleccionan valores por defecto. Para activarla, configurá los modelos y voces disponibles en Provider y elegí explícitamente transcriptionModel, speechModel, speechVoice y language.'],
     ],
-    note: 'Editar un perfil afecta los próximos turnos de las conversaciones que lo tienen asignado. Para cambiar el perfil de una conversación existente, usá el selector de esa conversación; cambiar el predeterminado no la modifica.',
+    example: '{\n  "chatSystemPrompt": "Sos un asistente útil y claro.",\n  "contextTokenBudget": 10000,\n  "maxContextMessages": 20,\n  "maxOutputTokens": 4096,\n  "reserveOutputTokens": 4096,\n  "contextSafetyTokens": 512,\n  "maxToolSteps": 8,\n  "llmTraceRequests": false,\n  "summariesEnabled": true,\n  "summaryTokenBudget": 300,\n  "voice": {\n    "transcriptionModel": "gpt-4o-mini-transcribe",\n    "speechModel": "tts-1",\n    "speechVoice": "alloy",\n    "language": "es"\n  }\n}',
+    note: 'Editar un perfil afecta los próximos turnos de las conversaciones que lo tienen asignado. Para cambiar el perfil de una conversación existente, usá el selector de esa conversación; cambiar el predeterminado no la modifica. La voz solo está habilitada cuando config.voice existe y sus opciones coinciden con el catálogo de Provider.',
   },
   Chat: {
     intro: 'Los enteros deben ser positivos. Estos ajustes controlan el contexto y la ejecución de cada turno.',
@@ -37,9 +39,10 @@ const guides = {
       ['ai.providers.<proveedor>.apiKey', 'Clave privada. Creala en OpenAI: https://platform.openai.com/api-keys o OpenRouter: https://openrouter.ai/keys. La cuenta debe tener acceso/crédito. No la compartas ni la pegues en documentación pública.'],
       ['ai.providers.<proveedor>.models', 'IDs de modelos que se ofrecen en el selector. Consultá https://platform.openai.com/docs/models o https://openrouter.ai/models. OpenAI usa ID sin prefijo; OpenRouter usa el slug completo, por ejemplo openai/gpt-4.1-mini.'],
       ['ai.providers.<proveedor>.contextWindows', 'Mapa opcional de ID exacto de modelo a ventana en tokens. Consultá la documentación/ficha del modelo; si no conocés el valor, dejá {} y se usará contextTokenBudget de Chat. Cada valor debe ser entero positivo.'],
+      ['ai.providers.openai.voice', 'Catálogo opcional de voz disponible solo para OpenAI: baseUrl (endpoint OpenAI-compatible), transcriptionModels, speechModels y speechVoices. HTTP y HTTPS son válidos; la URL debe ser accesible desde el runtime. Las listas habilitan opciones para perfiles, pero no activan voz por sí solas.'],
     ],
-    example: '{\n  "providers": {\n    "openai": {\n      "apiKey": "PEGAR_CLAVE_API",\n      "models": ["gpt-4.1-mini"],\n      "contextWindows": {}\n    }\n  }\n}',
-    note: 'Disponibilidad, permisos y precios dependen del proveedor y la cuenta. Verificá antes de seleccionar un modelo.',
+    example: '{\n  "providers": {\n    "openai": {\n      "apiKey": "PEGAR_CLAVE_API",\n      "models": ["gpt-4.1-mini"],\n      "contextWindows": {},\n      "voice": {\n        "baseUrl": "https://api.openai.com/v1",\n        "transcriptionModels": ["gpt-4o-mini-transcribe"],\n        "speechModels": ["tts-1"],\n        "speechVoices": ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]\n      }\n    }\n  }\n}',
+    note: 'Disponibilidad, permisos y precios dependen del proveedor y la cuenta. Verificá antes de seleccionar un modelo. El soporte de voz usa las rutas OpenAI Realtime y audio/speech; agregar un catálogo no implica compatibilidad automática con otros proveedores.',
   },
   Embeddings: {
     intro: 'Convierte documentos en vectores para búsqueda semántica. La base actual requiere vectores de exactamente 1536 dimensiones.',

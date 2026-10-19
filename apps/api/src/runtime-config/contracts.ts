@@ -2,8 +2,15 @@ import type { ChatConfig } from '../config.js';
 
 /** Credenciales y modelo del proveedor de embeddings, o `null` si está deshabilitado. */
 export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
+/** Opciones de voz activadas explícitamente para un perfil. */
+export type AgentProfileVoiceConfig = {
+  transcriptionModel: string;
+  speechModel: string;
+  speechVoice: string;
+  language: string;
+};
 /** Ajustes de conversación que pertenecen a un perfil de agente. */
-export type AgentProfileConfig = Pick<ChatConfig, 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'>;
+export type AgentProfileConfig = Pick<ChatConfig, 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { voice?: AgentProfileVoiceConfig };
 /** Perfil persistido que fija modelo y parámetros de comportamiento para un hilo. */
 export type AgentProfile = { id: string; name: string; modelId: string; config: AgentProfileConfig; createdAt: string; updatedAt: string };
 /** Ajustes efectivos del runtime: infraestructura global y valores de chat heredados. */

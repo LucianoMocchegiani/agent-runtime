@@ -1,23 +1,11 @@
-/** URL base de la API de OpenAI utilizada para Realtime y síntesis de voz. */
-export const VOICE_OPENAI_API_URL = 'https://api.openai.com/v1';
-
 /** Longitud máxima del texto aceptado por el endpoint de síntesis. */
 export const VOICE_SPEECH_TEXT_MAX_LENGTH = 4_000;
 
 /** Formato PCM y frecuencia que espera la sesión de transcripción Realtime. */
 export const VOICE_REALTIME_SAMPLE_RATE_HZ = 24_000;
 
-/** Modelo de transcripción en streaming usado por la sesión Realtime. */
-export const VOICE_TRANSCRIPTION_MODEL = 'gpt-4o-mini-transcribe';
-
 /** Silencio requerido para que el detector de voz cierre una intervención. */
 export const VOICE_TURN_SILENCE_MS = 2_000;
-
-/** Modelo de síntesis elegido por su baja latencia inicial. */
-export const VOICE_SPEECH_MODEL = 'tts-1';
-
-/** Voz predeterminada para sintetizar las respuestas del agente. */
-export const VOICE_SPEECH_VOICE = 'alloy';
 
 /** Formato de audio devuelto por el proveedor de síntesis. */
 export const VOICE_SPEECH_FORMAT = 'mp3';
