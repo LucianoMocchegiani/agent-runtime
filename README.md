@@ -35,10 +35,10 @@ Al primer inicio, Runtime crea `runtime.config` con valores mínimos. Los provee
 | `DATABASE_URL` | PostgreSQL compartido por Memory y configuración de Runtime; Compose apunta al servicio `postgres` |
 | `RUNTIME_CONFIG_ENCRYPTION_KEY` | Obligatoria para cifrar `runtime.config`; generar con `openssl rand -hex 32` y conservarla |
 | `DELEGATION_PAYLOAD_ENCRYPTION_KEY` | Opcional; habilita delegaciones. Clave hex de 32 bytes distinta a la anterior, compartida por todas las réplicas |
-| `AUTH_INTROSPECT_URL` | Opcional. Endpoint `GET` para resolver la identidad del huésped; vacío, la API acepta solicitudes públicas con identidad anónima |
-| `AUTH_MAPPING` | Mapeo JSON de los campos devueltos por introspección |
 | `UI_ENABLED` / `UI_DIR` | Habilitar y localizar la UI nativa |
 | `CORS_ORIGIN` / `CORS_APP_DOMAIN` | Orígenes de UIs externas; vacíos, no se habilita acceso CORS desde otros orígenes |
+
+La URL de introspección de autenticación y el mapeo de identidad se configuran desde Administración → Auth, no mediante variables de entorno. La pestaña documenta el modo público/anónimo, los efectos en `/v1` y en el acceso administrativo allowlisted, y permite probar el endpoint con un Bearer antes de guardar. Ver también [Contrato HTTP: identidad y autorización](./docs/04-http.md#identidad-y-autorización).
 
 No se requieren `MEMORY_MCP_URL`, `MEMORY_MCP_PORT`, ni un token para que Memory consulte Runtime.
 
@@ -78,7 +78,7 @@ Los trabajos se reclaman en PostgreSQL con `FOR UPDATE SKIP LOCKED`; un lease co
 - Estados: `queued`, `running`, `completed`, `failed`, `interrupted`
 - Si un worker cae, el lease vence y el trabajo queda `interrupted`; no se reintenta automáticamente. Tokens expirados o fallos al ejecutar producen `failed`.
 
-Los identificadores de eventos son cursores monotónicos persistidos en la base. `LISTEN/NOTIFY` no se usa como fuente de verdad; los workers consultan la cola cada segundo. Asegurá que la clave de delegación se mantenga fuera del repositorio y que las copias de seguridad de PostgreSQL tengan controles apropiados. Las imágenes se publican en `ghcr.io/lucianomocchegiani/agent-runtime`. Para instalación con las imágenes publicadas desde una copia del repositorio, prepará `deploy/.env` (por ejemplo, copiando `.env.example`, descomentando `AGENT_RUNTIME_VERSION=0.1.0` para fijar esta versión en lugar de `latest`, agregando la clave requerida y revisando `AUTH_INTROSPECT_URL`) y ejecutá `docker compose -f deploy/docker-compose.yml up -d`. Compose espera el archivo de variables junto al YAML. La instalación de imágenes publicadas todavía no tiene un Compose escalable equivalente.
+Los identificadores de eventos son cursores monotónicos persistidos en la base. `LISTEN/NOTIFY` no se usa como fuente de verdad; los workers consultan la cola cada segundo. Asegurá que la clave de delegación se mantenga fuera del repositorio y que las copias de seguridad de PostgreSQL tengan controles apropiados. Las imágenes se publican en `ghcr.io/lucianomocchegiani/agent-runtime`. Para instalación con las imágenes publicadas desde una copia del repositorio, prepará `deploy/.env` (por ejemplo, copiando `.env.example`, descomentando `AGENT_RUNTIME_VERSION=0.1.0` para fijar esta versión en lugar de `latest`, agregando la clave requerida y configurando autenticación desde Administración → Auth) y ejecutá `docker compose -f deploy/docker-compose.yml up -d`. Compose espera el archivo de variables junto al YAML. La instalación de imágenes publicadas todavía no tiene un Compose escalable equivalente.
 
 ## Estructura
 

@@ -62,6 +62,17 @@ const guides = {
     example: '{\n  "mi_mcp": {\n    "url": "http://host.docker.internal:3020/mcp",\n    "auth": null,\n    "headers": {},\n    "optional": true\n  }\n}',
     note: 'Todavía no hay prueba de conexión desde la UI. Después de guardar, revisá logs y probá una conversación. No incluyas tokens reales en capturas.',
   },
+  Auth: {
+    intro: 'La introspección permite que Runtime consulte el sistema de autenticación del huésped para validar cada Bearer opaco y obtener la identidad de usuario. Se hace un GET al endpoint configurado con Authorization: Bearer <token>; Runtime no valida firmas JWT por sí mismo.',
+    fields: [
+      ['authIntrospectUrl', 'URL absoluta HTTP o HTTPS, accesible desde el proceso/contenedor de agent-runtime (por ejemplo http://host.docker.internal:3001/auth/me durante desarrollo). Dejala vacía o en null para desactivar la introspección. Se permiten HTTP y HTTPS; quien administra la instalación debe decidir si HTTP es apropiado para su red.'],
+      ['authMapping.userId', 'Nombre de la propiedad en el JSON de respuesta que contiene el identificador de usuario; obligatorio y no vacío. Por ejemplo, si la respuesta es {"sub":"123"}, usá "sub".'],
+      ['authMapping.email', 'Nombre de la propiedad que contiene el email, o null para no mapearlo. Un campo ausente o que no sea texto queda como null.'],
+      ['authMapping.name', 'Nombre de la propiedad que contiene el nombre visible, o null para no mapearlo. Un campo ausente o que no sea texto queda como null.'],
+    ],
+    example: '{\n  "authIntrospectUrl": "http://host.docker.internal:3001/auth/me",\n  "authMapping": {\n    "userId": "userId",\n    "email": "email",\n    "name": "name"\n  }\n}',
+    note: 'Comportamiento y errores: sin URL, todas las rutas /v1 siguen siendo públicas y reciben identidad anónima; un Bearer opaco no se valida. Sin token también se asigna identidad anónima aunque la introspección esté activa; anon:<uuid> conserva la misma sesión entre solicitudes. Esto afecta a toda la API, no solo a una ruta. El acceso de administración basado en RUNTIME_CONFIG_ADMIN_USERS también depende de la introspección; el token RUNTIME_CONFIG_ADMIN_TOKEN y el acceso bootstrap, cuando está habilitado, son vías independientes. Si el endpoint rechaza el token con HTTP 401/403, la API responde 401. Si no conecta, vence el timeout de 8 segundos, da otro error, devuelve JSON inválido o falta userId, responde 502. Una identidad ya comprobada puede seguir en caché hasta 30 segundos; al cambiar URL o mapeo se vacía la caché. Probar conexión requiere ingresar un Bearer real: la prueba usa el JSON actual del editor, no guarda el token ni la configuración, y muestra la identidad mapeada. Una URL que no funciona no impide guardar, pero los Bearer normales fallarán hasta corregirla o desactivar la introspección.',
+  },
 };
 
 function linkedText(text) {

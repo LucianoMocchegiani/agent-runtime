@@ -1,10 +1,12 @@
 import type { RuntimeSettings } from './contracts.js';
+import { validateAuthSettings } from '../auth/settings.js';
 import { RUNTIME_CONFIG_POSITIVE_INTEGER_FIELDS, RUNTIME_CONFIG_PROVIDER_NAMES } from './constants.js';
 
 /** Valida y normaliza una configuración runtime procedente de almacenamiento o de la API. */
 export function validateRuntimeSettings(value: unknown): RuntimeSettings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Settings must be an object');
   const v = structuredClone(value) as Record<string, any>;
+  Object.assign(v, validateAuthSettings(v));
   if (!v.ai || typeof v.ai !== 'object' || Array.isArray(v.ai) || !v.ai.providers || typeof v.ai.providers !== 'object' || Array.isArray(v.ai.providers)) throw new Error('ai.providers is required');
   if (typeof v.ai.defaultModel !== 'string') throw new Error('ai.defaultModel is required');
   for (const [name, provider] of Object.entries(v.ai.providers) as [string, any][]) {

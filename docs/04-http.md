@@ -6,7 +6,13 @@ Header opcional para credenciales MCP por servidor: `X-MCP-Auth` (JSON, por ejem
 
 ## Identidad y autorización
 
-Las rutas `/v1` asocian cada solicitud a una identidad. Si `AUTH_INTROSPECT_URL` está configurada, el middleware resuelve allí el token del sistema huésped; también acepta un token anónimo `anon:<uuid>`. Si `AUTH_INTROSPECT_URL` está vacía, la API funciona en modo público: cualquier solicitud puede acceder a `/v1` y recibe una identidad anónima aleatoria (los Bearer opacos se ignoran). La UI nativa conserva un token `anon:<uuid>` en `localStorage` para mantener la identidad entre solicitudes. Sin ese token, se crea una identidad nueva por solicitud y no se pueden recuperar conversaciones en solicitudes posteriores.
+Las rutas `/v1` asocian cada solicitud a una identidad. La URL de introspección y el mapeo del JSON de identidad se configuran de forma persistente y cifrada desde Administración → Auth (`runtime.config`), no mediante variables de entorno. Cuando hay URL, Runtime reenvía el Bearer opaco a ese endpoint con una solicitud GET y asigna la respuesta a `userId`, `email` y `name` según el mapeo configurado. Runtime no valida localmente firmas JWT. También acepta un token anónimo `anon:<uuid>` sin consultar el endpoint.
+
+Sin URL de introspección, la API funciona en modo público: cualquier solicitud puede acceder a `/v1` y recibe una identidad anónima aleatoria; los Bearer opacos se ignoran. Sin token se asigna una identidad nueva por solicitud. La UI nativa conserva `anon:<uuid>` en `localStorage` para mantener la identidad entre solicitudes. Por tanto, dejar la URL vacía cambia la autenticación de todas las rutas `/v1`, no de una ruta aislada.
+
+Un endpoint de introspección que rechace el token con HTTP 401/403 causa respuesta 401. Fallos de conexión, timeout (8 segundos), otros estados HTTP, JSON inválido o ausencia del campo configurado como `userId` causan 502. Las identidades válidas se almacenan en caché hasta 30 segundos; un cambio de URL o mapeo invalida esa caché.
+
+El acceso administrativo basado en `RUNTIME_CONFIG_ADMIN_USERS` también requiere que la identidad pueda resolverse mediante introspección. `RUNTIME_CONFIG_ADMIN_TOKEN` y el acceso bootstrap, mientras esté habilitado, son vías administrativas independientes. La pestaña Auth permite probar la URL y el mapeo con un Bearer suministrado para la prueba; no guarda ese token. Se aceptan URL HTTP y HTTPS: quien despliega es responsable de elegir un transporte apropiado para su red.
 
 El modo público no configura CORS automáticamente: para permitir llamadas desde una UI alojada en otro origen, configurá `CORS_ORIGIN` o `CORS_APP_DOMAIN`.
 

@@ -1,4 +1,5 @@
 import { config } from '../config.js';
+import { clearAuthCache } from '../auth/service.js';
 import { setEmbeddingConfig } from '../memory-search/service.js';
 import type { AgentProfile, EmbeddingConfig, RuntimeSettings } from './contracts.js';
 import {
@@ -21,6 +22,8 @@ function currentSettings(): RuntimeSettings {
   return {
     ai: config.ai,
     mcpConfig: config.mcpConfig,
+    authIntrospectUrl: config.authIntrospectUrl,
+    authMapping: config.authMapping,
     chatSystemPrompt: config.chatSystemPrompt,
     contextTokenBudget: config.contextTokenBudget,
     maxContextMessages: config.maxContextMessages,
@@ -35,9 +38,15 @@ function currentSettings(): RuntimeSettings {
   };
 }
 
+function authSettingsChanged(next: RuntimeSettings): boolean {
+  return config.authIntrospectUrl !== next.authIntrospectUrl
+    || JSON.stringify(config.authMapping) !== JSON.stringify(next.authMapping);
+}
+
 async function applyPersistedSettings(payload: unknown, version: number): Promise<void> {
   if (version <= appliedVersion) return;
   const next = validateRuntimeSettings(payload);
+  if (authSettingsChanged(next)) clearAuthCache();
   Object.assign(config, next);
   embeddingConfig = next.embeddingConfig;
   await setEmbeddingConfig(embeddingConfig);
@@ -113,6 +122,7 @@ export async function saveRuntimeSettings(value: unknown, expectedVersion?: numb
     if (error instanceof RuntimeConfigPersistenceConflictError) throw new RuntimeConfigConflictError();
     throw error;
   }
+  if (authSettingsChanged(validated)) clearAuthCache();
   Object.assign(config, validated);
   embeddingConfig = validated.embeddingConfig;
   await setEmbeddingConfig(embeddingConfig);

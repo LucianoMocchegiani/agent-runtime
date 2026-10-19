@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-process.env.AUTH_INTROSPECT_URL ||= 'https://auth.example.test/introspect';
 process.env.CORS_ORIGIN ||= 'https://app.example.test';
 const [{ config }, { validateAgentProfileInput }] = await Promise.all([
   import('../config.js'),

@@ -2,7 +2,8 @@ import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/contracts.js';
 import { authorized } from './authorization.js';
-import { AuthServiceError } from '../auth/service.js';
+import { AuthServiceError, testAuthIntrospection } from '../auth/service.js';
+import { validateAuthSettings } from '../auth/settings.js';
 import { getRuntimeConfigVersion, getRuntimeSettings, isRuntimeConfigStoreEnabled, RuntimeConfigConflictError, saveRuntimeSettings } from './service.js';
 import { RUNTIME_CONFIG_SECRET_MASK } from './constants.js';
 /** Endpoints administrativos para leer y actualizar la configuración global del runtime. */
@@ -43,6 +44,23 @@ runtimeConfigRoutes.use('*', async (c, next) => {
     throw error;
   }
   await next();
+});
+
+runtimeConfigRoutes.post('/test-auth', async (c) => {
+  let body: unknown;
+  try { body = await c.req.json(); } catch { return c.json({ error: 'Invalid JSON body' }, 400); }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return c.json({ error: 'Expected an object' }, 400);
+  const request = body as Record<string, unknown>;
+  if (typeof request.token !== 'string' || !request.token.trim()) return c.json({ error: 'A Bearer token is required for the test' }, 400);
+  try {
+    const auth = validateAuthSettings(request.settings);
+    if (!auth.authIntrospectUrl) return c.json({ error: 'Configure an introspection URL before testing' }, 400);
+    const identity = await testAuthIntrospection(auth.authIntrospectUrl, auth.authMapping, request.token.trim());
+    return c.json({ identity });
+  } catch (error) {
+    if (error instanceof AuthServiceError) return c.json({ error: error.message }, error.status);
+    return c.json({ error: error instanceof Error ? error.message : 'Invalid auth settings' }, 400);
+  }
 });
 
 runtimeConfigRoutes.get('/', (c) => c.json({ version: getRuntimeConfigVersion(), settings: maskSecrets(getRuntimeSettings()) }));

@@ -23,7 +23,7 @@ Este documento reúne los temas que todavía conviene resolver o verificar antes
   - **Requiere decisión de los responsables:** elegir y monitorear el canal de contacto (por ejemplo, una dirección o función de reporte privado del hosting).
 
 - [ ] **Aclarar límites de autenticación y exposición.** La configuración inicial documentada usa `admin/admin` cuando `RUNTIME_CONFIG_ADMIN_USERS` está vacío; el Compose local también usa credenciales de desarrollo para PostgreSQL. El modo anónimo se basa en una identidad UUID persistida por el cliente y no equivale a autenticación fuerte multiusuario.
-  - Antes de exponer una instalación, configurar administradores y credenciales únicas, usar secretos fuera del repositorio, restringir el acceso de red y revisar CORS y `AUTH_INTROSPECT_URL`/`AUTH_MAPPING` para el entorno real.
+  - Antes de exponer una instalación, configurar administradores y credenciales únicas, usar secretos fuera del repositorio, restringir el acceso de red y revisar CORS y configurar la introspección desde Administración → Auth para el entorno real.
   - Documentar explícitamente qué mecanismo protege cada endpoint, cómo se identifica al usuario y cuáles son las limitaciones del modo anónimo. No presentar ese modo como adecuado para despliegues públicos multiusuario sin una evaluación específica.
   - Revisar además el manejo de secretos, TLS/proxy, permisos de base de datos, copias de seguridad y rotación/recuperación de claves de cifrado.
 

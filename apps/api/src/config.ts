@@ -43,18 +43,6 @@ function parseOrigins(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-function parseAuthMapping(raw: string | undefined): AuthMapping {
-  if (!raw?.trim()) {
-    return { userId: 'userId', email: null, name: null };
-  }
-  const parsed = JSON.parse(raw) as Record<string, string>;
-  return {
-    userId: parsed.userId ?? 'userId',
-    email: parsed.email ?? null,
-    name: parsed.name ?? null,
-  };
-}
-
 /**
  * Carpeta con el build de la UI (`index.html`). Default `apps/ui/dist`, relativo a este módulo
  * (sirve igual desde `src/` con tsx y desde `dist/` compilado, local o en la imagen).
@@ -154,8 +142,8 @@ export type ChatConfig = {
 export const config: ChatConfig = {
   port: parsePort(process.env.PORT),
   mcpConfig: {},
-  authIntrospectUrl: process.env.AUTH_INTROSPECT_URL?.trim() || null,
-  authMapping: parseAuthMapping(process.env.AUTH_MAPPING),
+  authIntrospectUrl: null,
+  authMapping: { userId: 'userId', email: null, name: null },
   ai: { defaultModel: '', providers: {} },
   corsOrigins: parseOrigins(process.env.CORS_ORIGIN),
   corsAppDomain: process.env.CORS_APP_DOMAIN?.trim().toLowerCase() || null,

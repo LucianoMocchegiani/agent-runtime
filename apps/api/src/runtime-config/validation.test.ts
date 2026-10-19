@@ -36,6 +36,29 @@ test('rechaza proveedores no permitidos y URLs MCP con credenciales', () => {
   assert.throws(() => validateRuntimeSettings(invalidUrl), /Invalid MCP URL/);
 });
 
+test('normaliza autenticación por defecto y admite introspección HTTP', () => {
+  const value = validSettings();
+  const normalized = validateRuntimeSettings(value);
+  assert.equal(normalized.authIntrospectUrl, null);
+  assert.deepEqual(normalized.authMapping, { userId: 'userId', email: null, name: null });
+
+  value.authIntrospectUrl = ' http://auth.example.test/me ';
+  value.authMapping = { userId: ' sub ', email: null, name: ' displayName ' };
+  const withAuth = validateRuntimeSettings(value);
+  assert.equal(withAuth.authIntrospectUrl, 'http://auth.example.test/me');
+  assert.deepEqual(withAuth.authMapping, { userId: 'sub', email: null, name: 'displayName' });
+});
+
+test('rechaza URL o mapeo de identidad inválidos', () => {
+  const invalidProtocol = validSettings();
+  invalidProtocol.authIntrospectUrl = 'ftp://auth.example.test/me';
+  assert.throws(() => validateRuntimeSettings(invalidProtocol), /HTTP or HTTPS/);
+
+  const invalidMapping = validSettings();
+  invalidMapping.authMapping = { userId: '  ', email: null, name: null };
+  assert.throws(() => validateRuntimeSettings(invalidMapping), /userId must be a non-empty/);
+});
+
 test('rechaza reservas de salida menores al máximo de respuesta', () => {
   const value = validSettings();
   value.reserveOutputTokens = 1;

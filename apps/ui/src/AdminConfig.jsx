@@ -8,6 +8,7 @@ const TABS = [
   { id: 'Providers', label: 'Provider' },
   { id: 'Embeddings', label: 'Embedding' },
   { id: 'MCP', label: 'MCP' },
+  { id: 'Auth', label: 'Auth' },
 ];
 const API = import.meta.env.VITE_BASE_URL || '';
 
@@ -23,6 +24,7 @@ function editableProfile(profile) {
 function tabValue(config, tab) {
   if (tab === 'Providers') return { providers: config.ai.providers };
   if (tab === 'Embeddings') return config.embeddingConfig;
+  if (tab === 'Auth') return { authIntrospectUrl: config.authIntrospectUrl, authMapping: config.authMapping };
   return config.mcpConfig;
 }
 
@@ -40,13 +42,14 @@ export default function AdminConfig({ onBack }) {
   const [version, setVersion] = useState(0);
   const [tab, setTab] = useState('Profiles');
   const [draft, setDraft] = useState('');
+  const [authTestToken, setAuthTestToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
   function loadData(data) {
     const needsProvider = Object.keys(data.settings.ai?.providers ?? {}).length === 0;
-    const nextTab = needsProvider && tab !== 'Profiles' ? 'Providers' : tab;
+    const nextTab = needsProvider && tab === 'Profiles' ? 'Providers' : tab;
     setConfig(data.settings);
     setVersion(data.version);
     setTab(nextTab);
@@ -101,7 +104,10 @@ export default function AdminConfig({ onBack }) {
   function applyValue(target, name, value) {
     if (name === 'Providers') target.ai = { ...target.ai, providers: value.providers };
     else if (name === 'Embeddings') target.embeddingConfig = value;
-    else target.mcpConfig = value;
+    else if (name === 'Auth') {
+      target.authIntrospectUrl = value.authIntrospectUrl;
+      target.authMapping = value.authMapping;
+    } else target.mcpConfig = value;
   }
 
   function changeTab(nextTab) {
@@ -130,6 +136,24 @@ export default function AdminConfig({ onBack }) {
       if (!res.ok) throw new Error(await errorText(res));
       loadData(await res.json());
       setNotice('Cambios guardados correctamente.');
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function testAuth() {
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const settings = JSON.parse(draft);
+      const res = await fetch(`${API}/admin/runtime-config/test-auth`, {
+        method: 'POST',
+        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ settings, token: authTestToken }),
+      });
+      if (!res.ok) throw new Error(await errorText(res));
+      const { identity } = await res.json();
+      setNotice(`Introspección correcta · userId: ${identity.userId}${identity.email ? ` · email: ${identity.email}` : ''}${identity.name ? ` · name: ${identity.name}` : ''}`);
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
@@ -280,7 +304,11 @@ export default function AdminConfig({ onBack }) {
           <h2>{TABS.find((item) => item.id === tab)?.label}</h2>
           <AdminConfigHelp tab={tab} />
           <label className={sharedStyles.field}>Configuración JSON<textarea className={styles.json} spellCheck="false" value={draft} onChange={(e) => setDraft(e.target.value)} /></label>
-          <div className={styles.actions}><button className={sharedStyles.secondaryButton} disabled={busy} onClick={() => load()}>Recargar</button><button className={sharedStyles.primaryButton} disabled={busy} onClick={save}>{busy ? 'Guardando…' : 'Validar y guardar'}</button></div>
+          {tab === 'Auth' && <>
+            <label className={sharedStyles.field}>Bearer para probar la introspección<input type="password" autoComplete="off" value={authTestToken} onChange={(e) => setAuthTestToken(e.target.value)} /></label>
+            <p className={styles.subtitle}>El token se usa solo para esta prueba, no se guarda y se envía al endpoint configurado.</p>
+          </>}
+          <div className={styles.actions}><button className={sharedStyles.secondaryButton} disabled={busy} onClick={() => load()}>Recargar</button>{tab === 'Auth' && <button className={sharedStyles.secondaryButton} disabled={busy || !authTestToken.trim()} onClick={testAuth}>Probar conexión</button>}<button className={sharedStyles.primaryButton} disabled={busy} onClick={save}>{busy ? 'Guardando…' : 'Validar y guardar'}</button></div>
         </section>
       </>}
     </>}

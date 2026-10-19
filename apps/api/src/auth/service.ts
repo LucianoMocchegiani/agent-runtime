@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { config } from '../config.js';
+import { config, type AuthMapping } from '../config.js';
 import type { Principal } from './contracts.js';
 import { AUTH_CACHE_MAX_ENTRIES, AUTH_CACHE_TTL_MS, AUTH_INTROSPECT_TIMEOUT_MS } from './constants.js';
 
@@ -32,6 +32,10 @@ function cacheGet(key: string): Principal | null {
     return null;
   }
   return hit.principal;
+}
+
+export function clearAuthCache(): void {
+  cache.clear();
 }
 
 function cacheSet(key: string, principal: Principal): void {
@@ -69,7 +73,7 @@ function readString(record: Record<string, unknown>, key: string): string | null
  * @returns Identificador de usuario y atributos opcionales configurados.
  * @throws {AuthServiceError} 502 si la respuesta no es válida o no contiene `userId`.
  */
-function parseIntrospectBody(body: unknown): {
+function parseIntrospectBody(body: unknown, m: AuthMapping): {
   userId: string;
   email: string | null;
   name: string | null;
@@ -78,7 +82,6 @@ function parseIntrospectBody(body: unknown): {
   if (!record) {
     throw new AuthServiceError(502, 'Introspect response is not JSON object');
   }
-  const m = config.authMapping;
   const userId = readString(record, m.userId);
   if (!userId) {
     throw new AuthServiceError(502, 'Introspect response missing userId');
@@ -90,25 +93,8 @@ function parseIntrospectBody(body: unknown): {
   };
 }
 
-/**
- * Resuelve la identidad reenviando el Bearer al servicio configurado de introspección.
- * @param token Token Bearer recibido del cliente.
- * @returns Principal identificado por el servicio de autenticación.
- * @remarks Usa una caché breve indexada por hash; no valida localmente firmas JWT.
- * @throws {AuthServiceError} 401 si el token es inválido; 502 si falla la introspección o su respuesta.
- */
-export async function resolvePrincipal(token: string): Promise<Principal> {
-  const introspectUrl = config.authIntrospectUrl;
-  if (!introspectUrl) {
-    throw new AuthServiceError(401, 'Bearer authentication is not configured');
-  }
-
-  const key = tokenCacheKey(token);
-  const cached = cacheGet(key);
-  if (cached) {
-    return cached;
-  }
-
+/** Llama al endpoint y traduce su JSON sin escribir en caché (usado también por la prueba administrativa). */
+export async function testAuthIntrospection(introspectUrl: string, mapping: AuthMapping, token: string): Promise<Principal> {
   let response: Response;
   try {
     response = await fetch(introspectUrl, {
@@ -120,10 +106,10 @@ export async function resolvePrincipal(token: string): Promise<Principal> {
   }
 
   if (response.status === 401 || response.status === 403) {
-    throw new AuthServiceError(401, 'Unauthorized');
+    throw new AuthServiceError(401, 'Unauthorized: the introspection endpoint rejected this token');
   }
   if (!response.ok) {
-    throw new AuthServiceError(502, 'Auth introspection failed');
+    throw new AuthServiceError(502, `Auth introspection failed with HTTP ${response.status}`);
   }
 
   let body: unknown;
@@ -133,12 +119,23 @@ export async function resolvePrincipal(token: string): Promise<Principal> {
     throw new AuthServiceError(502, 'Auth introspection returned non-JSON');
   }
 
-  const parsed = parseIntrospectBody(body);
-  const principal: Principal = {
-    userId: parsed.userId,
-    email: parsed.email,
-    name: parsed.name,
-  };
+  const parsed = parseIntrospectBody(body, mapping);
+  return { userId: parsed.userId, email: parsed.email, name: parsed.name };
+}
+
+/**
+ * Resuelve la identidad reenviando el Bearer al servicio configurado de introspección.
+ * @remarks Usa una caché breve indexada por hash; no valida localmente firmas JWT.
+ */
+export async function resolvePrincipal(token: string): Promise<Principal> {
+  const introspectUrl = config.authIntrospectUrl;
+  if (!introspectUrl) throw new AuthServiceError(401, 'Bearer authentication is not configured');
+
+  const key = tokenCacheKey(token);
+  const cached = cacheGet(key);
+  if (cached) return cached;
+
+  const principal = await testAuthIntrospection(introspectUrl, config.authMapping, token);
   cacheSet(key, principal);
   return principal;
 }
