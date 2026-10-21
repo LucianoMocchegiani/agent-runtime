@@ -18,11 +18,6 @@ export default function ChatHeader({
   changeAgentProfile,
   isChangingProfile,
   isLoading,
-  voiceAudioUrl,
-  handsFreeMode,
-  isPlayingVoice,
-  stopVoicePlayback,
-  handleReplayVoice,
 }) {
   const [titleWidth, setTitleWidth] = useState(null);
 
@@ -74,13 +69,6 @@ export default function ChatHeader({
         )}
       </div>
       <span className={ChatStyles.headerSpacer} />
-      <div className={ChatStyles.toolbar}>
-        {voiceAudioUrl && !handsFreeMode && (
-          <button type="button" onClick={isPlayingVoice ? () => stopVoicePlayback() : handleReplayVoice} title={isPlayingVoice ? 'Detener la respuesta hablada' : 'Reproducir la última respuesta hablada'}>
-            {isPlayingVoice ? 'Detener voz' : 'Reproducir voz'}
-          </button>
-        )}
-      </div>
     </header>
   );
 }

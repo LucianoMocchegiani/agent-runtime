@@ -158,20 +158,6 @@
 
 .modelPicker optgroup { color: var(--text); background: var(--bg-input); }
 
-.toolbar { display: flex; flex: 0 0 auto; gap: 6px; }
-
-.toolbar button {
-  padding: 0 12px;
-  color: var(--text-dim);
-  background: #20263b;
-  border: 1px solid var(--border-input);
-  font-size: 12px;
-}
-
-.toolbar button:hover:not(:disabled) { color: var(--text); border-color: #607d91; background: #252f49; }
-
-.toolbar button:disabled { opacity: 0.45; cursor: not-allowed; }
-
 .mobileMenuButton { display: none; }
 
 @media (max-width: 700px) {
@@ -217,20 +203,12 @@
 .modelPicker { width: auto; flex: 1 1 auto; max-width: 240px; font-size: 12px; }
 }
 
-@media (max-width: 700px) {
-.toolbar button { min-height: 40px; padding: 0 9px; }
-}
-
 @media (max-width: 380px) {
 .chatHeader { gap: 6px; padding-inline: 7px; }
 }
 
 @media (max-width: 380px) {
 .modelPicker { padding-left: 7px; padding-right: 26px; }
-}
-
-@media (max-width: 380px) {
-.toolbar button { padding-inline: 7px; font-size: 11px; }
 }
 
 @media (max-width: 380px) {
@@ -276,19 +254,11 @@
 .chatProfilePicker { display: none; }
 }
 
-.toolbar button {
-  min-height: 40px; border-radius: var(--radius); font: inherit; cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
-  -webkit-tap-highlight-color: transparent;
-}
-
 .mobileMenuButton {
   min-height: 40px; border-radius: var(--radius); font: inherit; cursor: pointer;
   transition: background-color 0.15s, border-color 0.15s, color 0.15s;
   -webkit-tap-highlight-color: transparent;
 }
-
-.toolbar button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 
 .mobileMenuButton svg { width: 19px; height: 19px; }
 
@@ -296,13 +266,10 @@
 
 @media (max-width: 700px) {
   .conversationTitle { max-width: 34vw; }
-  .toolbar { margin-left: auto; }
 }
 
 @media (max-width: 480px) {
   .conversationTitle { max-width: 30vw; }
-  .toolbar button { width: 40px; min-width: 40px; padding: 0; }
-  .toolbar button span { display: none; }
 }
 
 @media (max-width: 480px) {

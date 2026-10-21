@@ -92,23 +92,27 @@ export type McpServerConfig = {
 /** Servidores MCP configurados, indexados por nombre lógico. */
 export type McpConfig = Record<string, McpServerConfig>;
 
-/** Clave y catálogo de modelos/contextos de un proveedor de IA. */
-export type AiProviderVoiceConfig = {
-  /** URL base OpenAI-compatible usada para Realtime y audio/speech. */
-  baseUrl: string;
-  transcriptionModels: string[];
-  speechModels: string[];
-  speechVoices: string[];
+/** Modelos del proveedor agrupados por modalidad de uso. */
+export type AiProviderModels = {
+  /** Modelos de chat ofrecidos en el selector de perfiles. */
+  chat: string[];
+  /** Modelos OpenAI Realtime disponibles para conversaciones habladas. */
+  realtime?: string[];
+};
+
+/** Capacidades de salida de audio Realtime disponibles para OpenAI. */
+export type AiProviderRealtimeConfig = {
+  /** Voces disponibles para la salida de audio Realtime. */
+  voices: string[];
 };
 
 export type AiProviderConfig = {
   apiKey: string;
-  /** Modelos ofrecidos en el selector (ids del proveedor, sin prefijo). */
-  models: string[];
-  /** Ventanas explícitas en tokens, indexadas por id del modelo del proveedor. */
-  contextWindows: Record<string, number>;
-  /** Catálogo opcional de capacidades de voz. Actualmente solo se implementa para OpenAI. */
-  voice?: AiProviderVoiceConfig;
+  /** URL base del proveedor; en OpenAI se comparte entre chat y Realtime. */
+  baseUrl?: string;
+  models: AiProviderModels;
+  /** Capacidades opcionales de OpenAI Realtime. */
+  realtime?: AiProviderRealtimeConfig;
 };
 
 /** Proveedores habilitados y modelo seleccionado como valor de compatibilidad. */

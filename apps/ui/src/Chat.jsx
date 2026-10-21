@@ -51,18 +51,12 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     handleMessagesScroll,
     retryHistoryLoad,
   } = useChatHistory({ conversationId, isVisible, delegationStatus, addLocalImagePreviews, setError });
-  const voice = useChatVoice({
+  const { voiceAvailable, handsFreeMode, handsFreeStatus, toggleHandsFree } = useChatVoice({
     conversationId,
     agentProfileId,
     isVisible,
     onError: setError,
-    onRecognizedSpeech: text => handleSubmit(null, text, true),
   });
-  const {
-    voiceAvailable, handsFreeMode, handsFreeStatus, voiceAudioUrl,
-    isPreparingVoice, isPlayingVoice, stopVoicePlayback,
-    toggleHandsFree, handleReplayVoice,
-  } = voice;
   const {
     input,
     setInput,
@@ -102,7 +96,6 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
     clearImages,
     pendingImageReads,
     rememberLocalImagePreview,
-    voice,
   });
 
   function canStartEditingMessage(message) {
@@ -134,18 +127,7 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         changeAgentProfile={changeAgentProfile}
         isChangingProfile={isChangingProfile}
         isLoading={isLoading}
-        voiceAudioUrl={voiceAudioUrl}
-        handsFreeMode={handsFreeMode}
-        isPlayingVoice={isPlayingVoice}
-        stopVoicePlayback={stopVoicePlayback}
-        handleReplayVoice={handleReplayVoice}
       />
-      {isPreparingVoice && (
-        <div className={ChatStyles.audioToast} role="status" aria-live="polite">
-          <span className={ChatStyles.audioToastSpinner} aria-hidden="true" />
-          <span>Generando audio…</span>
-        </div>
-      )}
       <div
         ref={scrollContainerRef}
         className={ChatStyles.messages}

@@ -24,7 +24,7 @@ export async function streamAgentTurn(
   abortSignal?: AbortSignal,
   mcpTokens?: Record<string, string>,
   images: IncomingImage[] = [],
-  agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'modelId' | 'config'>,
+  agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'model' | 'config'>,
   options: { userMessageAlreadySaved?: boolean } = {},
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';

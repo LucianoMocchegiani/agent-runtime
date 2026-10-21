@@ -41,7 +41,7 @@ export type Conversation = {
 };
 
 /** Campos públicos del perfil de agente disponibles para la aplicación cliente. */
-export type AgentProfileInfo = { id: string; name: string; modelId: string };
+export type AgentProfileInfo = { id: string; name: string; model: { chat: string; realtime?: string } };
 
 /** Preferencia persistente devuelta por Memory. */
 export type UserPreference = {

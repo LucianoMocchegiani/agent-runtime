@@ -190,8 +190,8 @@ messageRoutes.post('/:messageId/edit', async (c) => {
   }
   const profile = await getAgentProfile(conversation.agentProfileId, true);
   if (!profile) throw new HTTPException(409, { message: 'El perfil asignado a esta conversación ya no está disponible.' });
-  const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
-  if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
+  const model = resolveModel(profile.model.chat, profile.config.chat.contextTokenBudget);
+  if (!model) throw new HTTPException(503, { message: profile.model.chat ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
 
   const principal = c.get('principal');
   let turnLease;
@@ -275,8 +275,8 @@ messageRoutes.post('/', async (c) => {
   }
   const profile = await getAgentProfile(conversation.agentProfileId, true);
   if (!profile) throw new HTTPException(409, { message: 'El perfil asignado a esta conversación ya no está disponible.' });
-  const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
-  if (!model) throw new HTTPException(503, { message: profile.modelId ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
+  const model = resolveModel(profile.model.chat, profile.config.chat.contextTokenBudget);
+  if (!model) throw new HTTPException(503, { message: profile.model.chat ? 'El modelo del perfil no está habilitado.' : 'Configurá un modelo en el primer perfil activo para habilitar el chat.' });
   const principal = c.get('principal');
   let turnLease;
   try {

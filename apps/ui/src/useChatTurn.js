@@ -33,20 +33,18 @@ export default function useChatTurn({
   clearImages,
   pendingImageReads,
   rememberLocalImagePreview,
-  voice,
 }) {
-  const { enqueueVoiceSpeech, finishVoiceReply, restartHandsFreeCapture, isHandsFreeMode } = voice;
   const [isLoading, setIsLoading] = useState(false);
   const [activity, setActivity] = useState('idle');
   const abortRef = useRef(null);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
-  async function handleSubmit(e, submittedText, fromVoice = false) {
+  async function handleSubmit(e, submittedText) {
     e?.preventDefault();
     const text = typeof submittedText === 'string' ? submittedText.trim() : input.trim();
     const editTarget = editingMessage;
-    const selectedImages = fromVoice || editTarget ? [] : images;
+    const selectedImages = editTarget ? [] : images;
     if ((!text && selectedImages.length === 0) || isLoading || pendingImageReads > 0 || DELEGATION_ACTIVE_STATUSES.has(delegationStatus)) return;
     if (editTarget) {
       const laterCount = messages.filter(message => !message.pending && isMessageAfter(message, editTarget)).length;
@@ -54,18 +52,7 @@ export default function useChatTurn({
       if (!window.confirm(warning)) return;
     }
 
-    let assistantResponseText = '';
-    let assistantSpeechSegment = '';
     let streamFailure = '';
-    let willSpeakVoiceReply = false;
-    const voiceTraceId = fromVoice
-      ? (globalThis.crypto?.randomUUID?.() ?? `voice-${Date.now()}-${Math.random().toString(16).slice(2)}`)
-      : null;
-    const voiceTurnStartedAt = Date.now();
-    let firstVoiceTextLogged = false;
-    if (fromVoice) {
-      console.info('[voice-debug] turn-submitted', JSON.stringify({ traceId: voiceTraceId, textChars: text.length }));
-    }
     const imageNote = selectedImages.length === 1
       ? '[Imagen adjunta; no almacenada]'
       : `[${selectedImages.length} imágenes adjuntas; no almacenadas]`;
@@ -101,14 +88,6 @@ export default function useChatTurn({
 
     const handlers = {
       onTextDelta: (delta) => {
-        if (fromVoice && !firstVoiceTextLogged) {
-          firstVoiceTextLogged = true;
-          console.info('[voice-debug] first-text-delta', JSON.stringify({
-            traceId: voiceTraceId, msFromTurnSubmit: Date.now() - voiceTurnStartedAt,
-          }));
-        }
-        assistantResponseText += delta;
-        assistantSpeechSegment += delta;
         setActivity('responding');
         setMessages(prev => {
           const last = prev[prev.length - 1];
@@ -123,10 +102,6 @@ export default function useChatTurn({
         });
       },
       onToolStart: (id, name) => {
-        if (fromVoice && assistantSpeechSegment.trim()) {
-          void enqueueVoiceSpeech(assistantSpeechSegment, voiceTraceId, voiceTurnStartedAt);
-          assistantSpeechSegment = '';
-        }
         setActivity('tool');
         setMessages(prev => [...prev, {
           id, conversationId, role: 'tool', status: 'running', pending: true,
@@ -168,23 +143,8 @@ export default function useChatTurn({
           images: selectedImages.map(image => image.dataUrl),
         });
       if (result === 'ok' && !streamFailure) {
-        if (fromVoice) {
-          console.info('[voice-debug] assistant-stream-complete', JSON.stringify({
-            traceId: voiceTraceId, msFromTurnSubmit: Date.now() - voiceTurnStartedAt,
-            replyChars: assistantResponseText.length,
-          }));
-        }
-        // La recarga del historial y la síntesis de voz no deben dejar «Respondiendo» activo.
         void loadMessages({ preserveHistory: true });
         void refreshConversation().catch(error => setError(error.message));
-        if (fromVoice && assistantResponseText.trim()) {
-          if (assistantSpeechSegment.trim()) {
-            void enqueueVoiceSpeech(assistantSpeechSegment, voiceTraceId, voiceTurnStartedAt);
-          }
-          willSpeakVoiceReply = finishVoiceReply();
-        } else if (fromVoice) {
-          console.warn('[voice-debug] no-assistant-text', JSON.stringify({ traceId: voiceTraceId, result }));
-        }
       } else {
         const reconciled = await loadMessages({ preserveHistory: true });
         if (!reconciled) setMessages(prev => prev.filter(message => !message.pending));
@@ -210,9 +170,6 @@ export default function useChatTurn({
       abortRef.current = null;
       setIsLoading(false);
       setActivity('idle');
-      if (fromVoice && isHandsFreeMode() && !willSpeakVoiceReply) {
-        void restartHandsFreeCapture();
-      }
     }
   }
 

@@ -250,7 +250,7 @@ export default function ChatComposer({
 
         {handsFreeMode
 
-          ? 'La escucha se pausa mientras responde el asistente y se reanuda al terminar. Salí del modo para apagar el micrófono.'
+          ? 'Podés interrumpir al asistente hablando. Salí del modo para apagar el micrófono.'
 
           : `${input.length.toLocaleString('es-AR')} / ${MAX_MESSAGE_CHARS.toLocaleString('es-AR')} caracteres · el límite de contexto del modelo también aplica`}
 

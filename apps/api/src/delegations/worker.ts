@@ -82,7 +82,7 @@ async function processJob(job: DelegationJob, workerId: string): Promise<void> {
     }
     const profile = await getAgentProfile(conversation.agentProfileId, true);
     if (!profile) throw new Error('profile_unavailable');
-    const model = resolveModel(profile.modelId, profile.config.contextTokenBudget);
+    const model = resolveModel(profile.model.chat, profile.config.chat.contextTokenBudget);
     if (!model) throw new Error('model_unavailable');
 
     turnLease = await acquireConversationTurn(payload.principal.userId, job.target_conversation_id);

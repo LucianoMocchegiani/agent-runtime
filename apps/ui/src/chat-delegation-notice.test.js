@@ -42,16 +42,15 @@ test('la selección, lectura y retención de adjuntos de imagen quedan en su hoo
   assert.match(chatAttachmentsSource, /rememberLocalImagePreview/);
 });
 
-test('la captura, síntesis y reproducción de voz quedan en su hook', () => {
+test('la conversación de voz Realtime usa WebRTC y las tools pasan por Runtime', () => {
   assert.match(chatSource, /import useChatVoice from '\.\/useChatVoice\.js'/);
-  assert.match(chatSource, /useChatVoice\(\{[\s\S]*onRecognizedSpeech:/);
-  assert.doesNotMatch(chatSource, /RTCPeerConnection|createRealtimeToken|voiceSynthesisQueueRef|new Audio\(/);
+  assert.match(chatSource, /useChatVoice\(\{[\s\S]*onError: setError/);
+  assert.doesNotMatch(chatSource, /RTCPeerConnection|createRealtimeToken/);
   assert.match(chatVoiceSource, /navigator\.mediaDevices\?\.getUserMedia/);
-  assert.match(chatVoiceSource, /client\.voice\.synthesize/);
-  assert.match(chatVoiceSource, /input_audio_buffer\.speech_stopped/);
-  assert.match(chatVoiceSource, /conversation\.item\.input_audio_transcription\.completed/);
-  assert.match(chatVoiceSource, /onRecognizedSpeech/);
-  assert.doesNotMatch(chatVoiceSource, /handleVoiceButton|handleCancelVoice|transcribing|onSubmitTranscript/);
+  assert.match(chatVoiceSource, /client\.voice\.createRealtimeSession/);
+  assert.match(chatVoiceSource, /client\.voice\.executeTool/);
+  assert.match(chatVoiceSource, /RTCPeerConnection/);
+  assert.doesNotMatch(chatVoiceSource, /transcri|MediaRecorder|onRecognizedSpeech|response\.output_audio_transcript/);
   assert.doesNotMatch(chatSource, /voiceState|handleVoiceButton|handleCancelVoice/);
 });
 
@@ -66,13 +65,13 @@ test('la carga, paginación y scroll del historial quedan en su hook', () => {
 
 test('el envío, el streaming y la cancelación del turno quedan en su hook', () => {
   assert.match(chatSource, /import useChatTurn, \{ DELEGATION_ACTIVE_STATUSES \} from '\.\/useChatTurn\.js'/);
-  assert.match(chatSource, /useChatTurn\(\{[\s\S]*rememberLocalImagePreview,[\s\S]*voice,/);
+  assert.match(chatSource, /useChatTurn\(\{[\s\S]*rememberLocalImagePreview,/);
   assert.doesNotMatch(chatSource, /client\.messages\.(send|edit)|new AbortController\(|onTextDelta:/);
   assert.match(chatTurnSource, /client\.messages\.send/);
   assert.match(chatTurnSource, /client\.messages\.edit/);
   assert.match(chatTurnSource, /onToolStart/);
   assert.match(chatTurnSource, /function handleAbort/);
-  assert.match(chatTurnSource, /finishVoiceReply\(\)/);
+  assert.doesNotMatch(chatTurnSource, /fromVoice|enqueueVoiceSpeech|finishVoiceReply|restartHandsFreeCapture/);
 });
 
 test('el borrador, la edición y la interacción del textarea quedan en su hook', () => {
@@ -92,16 +91,16 @@ test('el borrador, la edición y la interacción del textarea quedan en su hook'
   assert.match(chatComposerViewSource, /className=\{ChatStyles\.attachButton\}/);
 });
 
-test('la cabecera conserva sus controles y el estado de audio se muestra como toast', () => {
+test('la cabecera conserva sus controles sin síntesis de audio adicional', () => {
   assert.match(chatSource, /import ChatHeader from '\.\/ChatHeader\.jsx'/);
-  assert.match(chatSource, /<ChatHeader[\s\S]*handleReplayVoice=\{handleReplayVoice\}/);
-  assert.match(chatSource, /isPreparingVoice && \([\s\S]*ChatStyles\.audioToast[\s\S]*Generando audio/);
+  assert.match(chatSource, /<ChatHeader[\s\S]*isLoading=\{isLoading\}/);
+  assert.doesNotMatch(chatSource, /isPreparingVoice|audioToast|handleReplayVoice|stopVoicePlayback/);
   assert.doesNotMatch(chatSource, /loadMessages=\{loadMessages\}/);
   assert.doesNotMatch(chatSource, /<header className="chat-header">|className="conversation-title-form"|className="chat-profile-picker"/);
   assert.match(chatHeaderSource, /className=\{ChatStyles\.chatHeader\}/);
   assert.match(chatHeaderSource, /ChatStyles\.conversationTitleForm/);
   assert.match(chatHeaderSource, /ChatStyles\.chatProfilePicker/);
-  assert.doesNotMatch(chatHeaderSource, /Recargar|loadMessages|Preparando audio/);
+  assert.doesNotMatch(chatHeaderSource, /Recargar|loadMessages|Reproducir voz/);
 });
 
 test('la lista de mensajes y la presentación de herramientas quedan separadas', () => {

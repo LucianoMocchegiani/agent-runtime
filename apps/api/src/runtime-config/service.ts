@@ -72,11 +72,13 @@ export async function startRuntimeConfigStore(): Promise<void> {
 }
 
 /** Devuelve una copia aislada de los ajustes efectivos y aplica, si se indica, un perfil. */
-export function getRuntimeSettings(profile?: Pick<AgentProfile, 'modelId' | 'config'>): RuntimeSettings {
+export function getRuntimeSettings(profile?: Pick<AgentProfile, 'model' | 'config'>): RuntimeSettings {
   const current = structuredClone(currentSettings());
   if (profile) {
-    current.ai.defaultModel = profile.modelId;
-    Object.assign(current, structuredClone(profile.config));
+    current.ai.defaultModel = profile.model.chat;
+    const profileConfig = structuredClone(profile.config);
+    current.chatSystemPrompt = profileConfig.systemPrompt;
+    Object.assign(current, profileConfig.chat);
   }
   return current;
 }
@@ -112,7 +114,7 @@ export async function saveRuntimeSettings(value: unknown, expectedVersion?: numb
   validated.summaryTokenBudget = config.summaryTokenBudget;
   const availableModels = new Set<string>();
   for (const [providerName, provider] of Object.entries(validated.ai.providers)) {
-    for (const model of provider?.models ?? []) availableModels.add(`${providerName}/${model}`);
+    for (const model of provider?.models.chat ?? []) availableModels.add(`${providerName}/${model}`);
   }
 
   let version: number;

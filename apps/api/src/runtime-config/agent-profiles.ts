@@ -55,13 +55,13 @@ export async function getNewChatDefaultAgentProfile(): Promise<AgentProfile> {
 }
 
 /** Valida y crea un perfil de agente activo. */
-export async function createAgentProfile(input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile> {
-  return insertAgentProfile(validateAgentProfileInput(input.name, input.modelId, input.config));
+export async function createAgentProfile(input: { name: unknown; model: unknown; config: unknown }): Promise<AgentProfile> {
+  return insertAgentProfile(validateAgentProfileInput(input.name, input.model, input.config));
 }
 
 /** Valida y actualiza un perfil activo; devuelve null si no existe o está archivado. */
-export async function updateAgentProfile(id: string, input: { name: unknown; modelId: unknown; config: unknown }): Promise<AgentProfile | null> {
-  return updateAgentProfileRecord(id, validateAgentProfileInput(input.name, input.modelId, input.config));
+export async function updateAgentProfile(id: string, input: { name: unknown; model: unknown; config: unknown }): Promise<AgentProfile | null> {
+  return updateAgentProfileRecord(id, validateAgentProfileInput(input.name, input.model, input.config));
 }
 
 /** Archiva un perfil preservando la existencia de un perfil activo. */
@@ -72,16 +72,18 @@ export async function archiveAgentProfile(id: string): Promise<boolean> {
 /** Migra la configuración heredada al primer perfil activo de forma segura entre réplicas. */
 export async function seedDefaultAgentProfile(): Promise<void> {
   const legacyConfig: AgentProfileConfig = {
-    chatSystemPrompt: config.chatSystemPrompt,
-    contextTokenBudget: config.contextTokenBudget,
-    maxContextMessages: config.maxContextMessages,
-    maxOutputTokens: config.maxOutputTokens,
-    reserveOutputTokens: config.reserveOutputTokens,
-    contextSafetyTokens: config.contextSafetyTokens,
-    maxToolSteps: config.maxToolSteps,
-    llmTraceRequests: config.llmTraceRequests,
-    summariesEnabled: config.summariesEnabled,
-    summaryTokenBudget: config.summaryTokenBudget,
+    systemPrompt: config.chatSystemPrompt,
+    chat: {
+      contextTokenBudget: config.contextTokenBudget,
+      maxContextMessages: config.maxContextMessages,
+      maxOutputTokens: config.maxOutputTokens,
+      reserveOutputTokens: config.reserveOutputTokens,
+      contextSafetyTokens: config.contextSafetyTokens,
+      maxToolSteps: config.maxToolSteps,
+      llmTraceRequests: config.llmTraceRequests,
+      summariesEnabled: config.summariesEnabled,
+      summaryTokenBudget: config.summaryTokenBudget,
+    },
   };
   await seedLegacyAgentProfile(config.ai.defaultModel, legacyConfig);
 }

@@ -1,7 +1,22 @@
 import { randomUUID } from 'node:crypto';
 import type { Pool } from 'pg';
 import type { AgentProfile, AgentProfileConfig, AgentProfileWrite } from './contracts.js';
-import { DEFAULT_AGENT_PROFILE_NAME, DEFAULT_PROFILE_PREFERENCE_ID } from './constants.js';
+import {
+  AGENT_PROFILE_CHAT_CONFIG_FIELDS,
+  AGENT_PROFILE_REALTIME_DEFAULT_MAX_CONTEXT_MESSAGES,
+  AGENT_PROFILE_REALTIME_DEFAULT_MAX_INSTRUCTIONS_CHARACTERS,
+  AGENT_PROFILE_REALTIME_DEFAULT_MAX_MESSAGE_CHARACTERS,
+  AGENT_PROFILE_REALTIME_DEFAULT_MAX_TOOL_RESULT_CHARACTERS,
+  AGENT_PROFILE_REALTIME_DEFAULT_MAX_SUMMARY_CHARACTERS,
+  AGENT_PROFILE_REALTIME_DEFAULT_MAX_OUTPUT_TOKENS,
+  AGENT_PROFILE_REALTIME_DEFAULT_VAD_THRESHOLD,
+  AGENT_PROFILE_REALTIME_DEFAULT_VAD_PREFIX_PADDING_MS,
+  AGENT_PROFILE_REALTIME_DEFAULT_VAD_SILENCE_DURATION_MS,
+  AGENT_PROFILE_REALTIME_DEFAULT_VAD_CREATE_RESPONSE,
+  AGENT_PROFILE_REALTIME_DEFAULT_VAD_INTERRUPT_RESPONSE,
+  DEFAULT_AGENT_PROFILE_NAME,
+  DEFAULT_PROFILE_PREFERENCE_ID,
+} from './constants.js';
 
 let pool: Pool | undefined;
 
@@ -12,12 +27,14 @@ export async function initializeAgentProfilePersistence(value: Pool): Promise<vo
     id text PRIMARY KEY,
     name text NOT NULL,
     model_id text NOT NULL,
+    realtime_model text NULL,
     sort_order integer NOT NULL,
     config jsonb NOT NULL,
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     archived_at timestamptz NULL
   )`);
+  await value.query('ALTER TABLE runtime.agent_profile_configs ADD COLUMN IF NOT EXISTS realtime_model text NULL');
   await value.query(`CREATE TABLE IF NOT EXISTS runtime.agent_profile_preferences (
     id text PRIMARY KEY,
     default_profile_id text NOT NULL,
@@ -30,12 +47,62 @@ function db(): Pool {
   return pool;
 }
 
+function normalizeRealtime(value: Record<string, unknown>): NonNullable<AgentProfileConfig['realtime']> {
+  const vad = value.vad && typeof value.vad === 'object' && !Array.isArray(value.vad)
+    ? value.vad as Record<string, unknown>
+    : {};
+  return {
+    ...value,
+    maxContextMessages: value.maxContextMessages ?? AGENT_PROFILE_REALTIME_DEFAULT_MAX_CONTEXT_MESSAGES,
+    maxInstructionsCharacters: value.maxInstructionsCharacters ?? AGENT_PROFILE_REALTIME_DEFAULT_MAX_INSTRUCTIONS_CHARACTERS,
+    maxMessageCharacters: value.maxMessageCharacters ?? AGENT_PROFILE_REALTIME_DEFAULT_MAX_MESSAGE_CHARACTERS,
+    maxToolResultCharacters: value.maxToolResultCharacters ?? AGENT_PROFILE_REALTIME_DEFAULT_MAX_TOOL_RESULT_CHARACTERS,
+    maxSummaryCharacters: value.maxSummaryCharacters ?? AGENT_PROFILE_REALTIME_DEFAULT_MAX_SUMMARY_CHARACTERS,
+    maxOutputTokens: value.maxOutputTokens ?? AGENT_PROFILE_REALTIME_DEFAULT_MAX_OUTPUT_TOKENS,
+    vad: {
+      ...vad,
+      threshold: vad.threshold ?? AGENT_PROFILE_REALTIME_DEFAULT_VAD_THRESHOLD,
+      prefixPaddingMs: vad.prefixPaddingMs ?? AGENT_PROFILE_REALTIME_DEFAULT_VAD_PREFIX_PADDING_MS,
+      silenceDurationMs: vad.silenceDurationMs ?? AGENT_PROFILE_REALTIME_DEFAULT_VAD_SILENCE_DURATION_MS,
+      createResponse: vad.createResponse ?? AGENT_PROFILE_REALTIME_DEFAULT_VAD_CREATE_RESPONSE,
+      interruptResponse: vad.interruptResponse ?? AGENT_PROFILE_REALTIME_DEFAULT_VAD_INTERRUPT_RESPONSE,
+    },
+  } as unknown as NonNullable<AgentProfileConfig['realtime']>;
+}
+
 function toDomain(row: any): AgentProfile {
+  const storedConfig = row.config as Record<string, unknown>;
+  let profileConfig: AgentProfileConfig;
+  if (storedConfig.chat && typeof storedConfig.chat === 'object' && !Array.isArray(storedConfig.chat)) {
+    // Perfiles escritos con el contrato nuevo: completar límites Realtime omitidos con defaults seguros.
+    const realtime = storedConfig.realtime && typeof storedConfig.realtime === 'object' && !Array.isArray(storedConfig.realtime)
+      ? storedConfig.realtime as Record<string, unknown>
+      : undefined;
+    profileConfig = {
+      ...storedConfig,
+      ...(realtime ? { realtime: normalizeRealtime(realtime) } : {}),
+    } as AgentProfileConfig;
+  } else {
+    // Migra al vuelo perfiles previamente guardados con los campos de chat en el nivel superior.
+    const legacyVoice = storedConfig.voice && typeof storedConfig.voice === 'object' && !Array.isArray(storedConfig.voice)
+      ? (storedConfig.voice as Record<string, unknown>).realtime
+      : undefined;
+    const realtimeValue = storedConfig.realtime ?? legacyVoice;
+    const realtime = realtimeValue && typeof realtimeValue === 'object' && !Array.isArray(realtimeValue)
+      ? realtimeValue as Record<string, unknown>
+      : undefined;
+    const chat = Object.fromEntries(AGENT_PROFILE_CHAT_CONFIG_FIELDS.map((field) => [field, storedConfig[field]]));
+    profileConfig = {
+      systemPrompt: typeof storedConfig.chatSystemPrompt === 'string' ? storedConfig.chatSystemPrompt : '',
+      chat: chat as AgentProfileConfig['chat'],
+      ...(realtime && typeof realtime.voice === 'string' ? { realtime: normalizeRealtime(realtime) } : {}),
+    };
+  }
   return {
     id: row.id,
     name: row.name,
-    modelId: row.model_id,
-    config: row.config,
+    model: { chat: row.model_id, ...(row.realtime_model ? { realtime: row.realtime_model } : {}) },
+    config: profileConfig,
     createdAt: new Date(row.created_at).toISOString(),
     updatedAt: new Date(row.updated_at).toISOString(),
   };
@@ -88,8 +155,8 @@ export async function insertInitialDefaultProfile(profileId: string): Promise<vo
 /** Inserta un perfil previamente validado y devuelve el registro persistido. */
 export async function insertAgentProfile(input: AgentProfileWrite): Promise<AgentProfile> {
   const result = await db().query(
-    'INSERT INTO runtime.agent_profile_configs (id,name,model_id,sort_order,config) VALUES ($1,$2,$3,0,$4) RETURNING *',
-    [randomUUID(), input.name, input.modelId, JSON.stringify(input.config)],
+    'INSERT INTO runtime.agent_profile_configs (id,name,model_id,realtime_model,sort_order,config) VALUES ($1,$2,$3,$4,0,$5) RETURNING *',
+    [randomUUID(), input.name, input.model.chat, input.model.realtime ?? null, JSON.stringify(input.config)],
   );
   return toDomain(result.rows[0]);
 }
@@ -97,8 +164,8 @@ export async function insertAgentProfile(input: AgentProfileWrite): Promise<Agen
 /** Actualiza un perfil activo y devuelve null si no existe o ya está archivado. */
 export async function updateAgentProfileRecord(id: string, input: AgentProfileWrite): Promise<AgentProfile | null> {
   const result = await db().query(
-    'UPDATE runtime.agent_profile_configs SET name=$2,model_id=$3,config=$4,updated_at=now() WHERE id=$1 AND archived_at IS NULL RETURNING *',
-    [id, input.name, input.modelId, JSON.stringify(input.config)],
+    'UPDATE runtime.agent_profile_configs SET name=$2,model_id=$3,realtime_model=$4,config=$5,updated_at=now() WHERE id=$1 AND archived_at IS NULL RETURNING *',
+    [id, input.name, input.model.chat, input.model.realtime ?? null, JSON.stringify(input.config)],
   );
   return result.rows[0] ? toDomain(result.rows[0]) : null;
 }
@@ -131,7 +198,7 @@ export async function archiveAgentProfileRecord(id: string): Promise<boolean> {
 }
 
 /** Crea el perfil migrado solo en una instalación nueva, con exclusión entre réplicas. */
-export async function seedLegacyAgentProfile(modelId: string, profileConfig: AgentProfileConfig): Promise<void> {
+export async function seedLegacyAgentProfile(chatModel: string, profileConfig: AgentProfileConfig): Promise<void> {
   const client = await db().connect();
   try {
     await client.query('BEGIN');
@@ -143,7 +210,7 @@ export async function seedLegacyAgentProfile(modelId: string, profileConfig: Age
     }
     await client.query(
       'INSERT INTO runtime.agent_profile_configs (id,name,model_id,sort_order,config) VALUES ($1,$2,$3,0,$4)',
-      [randomUUID(), DEFAULT_AGENT_PROFILE_NAME, modelId, JSON.stringify(profileConfig)],
+      [randomUUID(), DEFAULT_AGENT_PROFILE_NAME, chatModel, JSON.stringify(profileConfig)],
     );
     await client.query('COMMIT');
   } catch (error) {

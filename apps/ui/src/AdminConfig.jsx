@@ -18,7 +18,7 @@ async function errorText(res) {
 }
 
 function editableProfile(profile) {
-  return { name: profile.name, modelId: profile.modelId, config: profile.config };
+  return { name: profile.name, model: profile.model, config: profile.config };
 }
 
 function tabValue(config, tab) {
@@ -295,7 +295,7 @@ export default function AdminConfig({ onBack }) {
           </div>
         </div>
         {selectedProfileId && <>
-          <label className={sharedStyles.field}>Perfil JSON · name, modelId y config<textarea className={styles.json} spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
+          <label className={sharedStyles.field}>Perfil JSON · name, model y config<textarea className={styles.json} spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
           <div className={styles.actions}><button className={sharedStyles.primaryButton} disabled={busy} onClick={saveProfile}>{busy ? 'Guardando…' : 'Validar y guardar perfil'}</button></div>
         </>}
       </section> : <>

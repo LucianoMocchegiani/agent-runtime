@@ -2,9 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { validateRuntimeSettings } from './validation.js';
 
-function validSettings(): Record<string, unknown> {
+function validSettings(): Record<string, any> {
   return {
-    ai: { defaultModel: 'openai/gpt-test', providers: { openai: { apiKey: 'secret', models: ['gpt-test', ' gpt-test '], contextWindows: { 'gpt-test': 32_000 } } } },
+    ai: { defaultModel: 'openai/gpt-test', providers: { openai: {
+      apiKey: 'secret', baseUrl: 'https://api.openai.com/v1/',
+      models: { chat: ['gpt-test', ' gpt-test '], realtime: ['gpt-realtime'] },
+      realtime: { voices: ['alloy', 'alloy'] },
+    } } },
     mcpConfig: { local: { url: 'https://mcp.example.test', headers: { Authorization: 'secret' } } },
     embeddingConfig: { apiKey: 'embedding-secret', baseUrl: 'https://embeddings.example.test/v1/', model: ' embed-v1 ' },
     chatSystemPrompt: 'system', contextTokenBudget: 10_000, maxContextMessages: 20,
@@ -19,39 +23,49 @@ test('valida, normaliza y no muta el objeto recibido', () => {
   const result = validateRuntimeSettings(source);
 
   assert.deepEqual(source, original);
-  assert.deepEqual(result.ai.providers.openai?.models, ['gpt-test']);
+  assert.deepEqual(result.ai.providers.openai?.models, { chat: ['gpt-test'], realtime: ['gpt-realtime'] });
+  assert.deepEqual(result.ai.providers.openai?.realtime, { voices: ['alloy'] });
+  assert.equal(result.ai.providers.openai?.baseUrl, 'https://api.openai.com/v1');
   assert.equal(result.embeddingConfig?.baseUrl, 'https://embeddings.example.test/v1');
   assert.equal(result.embeddingConfig?.model, 'embed-v1');
   assert.equal(result.mcpConfig.local?.auth, null);
   assert.equal(result.mcpConfig.local?.optional, false);
 });
 
-test('valida catálogo de voz OpenAI y permite endpoint HTTP configurable', () => {
-  const value = validSettings();
-  const providers = (value.ai as { providers: Record<string, any> }).providers;
-  providers.openai.voice = {
-    baseUrl: ' http://voice.local:8080/v1/ ',
-    transcriptionModels: [' transcribe ', 'transcribe'],
-    speechModels: ['speech'],
-    speechVoices: ['alloy'],
+test('rechaza el formato anterior del proveedor en lugar de migrarlo', () => {
+  const oldVoiceFormat = validSettings();
+  oldVoiceFormat.ai.providers.openai = {
+    apiKey: 'secret', models: ['gpt-test'],
+    voice: { baseUrl: 'http://voice.local/v1', realtimeModels: ['gpt-realtime'], speechVoices: ['alloy'] },
   };
-  const normalized = validateRuntimeSettings(value);
-  assert.deepEqual(normalized.ai.providers.openai?.voice, {
-    baseUrl: 'http://voice.local:8080/v1',
-    transcriptionModels: ['transcribe'], speechModels: ['speech'], speechVoices: ['alloy'],
-  });
+  assert.throws(() => validateRuntimeSettings(oldVoiceFormat), /provider.voice is no longer supported/);
 
-  providers.openai.voice.baseUrl = 'ftp://voice.local/v1';
-  assert.throws(() => validateRuntimeSettings(value), /Invalid voice.baseUrl/);
+  const oldChatModelsFormat = validSettings();
+  oldChatModelsFormat.ai.providers.openai.models = ['gpt-test'];
+  assert.throws(() => validateRuntimeSettings(oldChatModelsFormat), /Invalid models/);
+
+  const removedContextWindows = validSettings();
+  removedContextWindows.ai.providers.openai.contextWindows = { 'gpt-test': 32_000 };
+  assert.throws(() => validateRuntimeSettings(removedContextWindows), /contextWindows is no longer supported/);
+});
+
+test('rechaza URLs de proveedor inválidas y proveedores/capacidades no permitidos', () => {
+  const invalidUrl = validSettings();
+  invalidUrl.ai.providers.openai.baseUrl = 'ftp://voice.local/v1';
+  assert.throws(() => validateRuntimeSettings(invalidUrl), /Invalid baseUrl/);
+
+  const noRealtimeVoices = validSettings();
+  delete noRealtimeVoices.ai.providers.openai.realtime;
+  assert.throws(() => validateRuntimeSettings(noRealtimeVoices), /realtime.voices is required/);
 });
 
 test('rechaza proveedores no permitidos y URLs MCP con credenciales', () => {
   const unknownProvider = validSettings();
-  (unknownProvider.ai as { providers: Record<string, unknown> }).providers.anthropic = { apiKey: 'secret', models: ['x'] };
+  unknownProvider.ai.providers.anthropic = { apiKey: 'secret', models: { chat: ['x'] } };
   assert.throws(() => validateRuntimeSettings(unknownProvider), /Invalid provider/);
 
   const invalidUrl = validSettings();
-  (invalidUrl.mcpConfig as Record<string, { url: string }>).local.url = 'https://user:pass@mcp.example.test';
+  invalidUrl.mcpConfig.local.url = 'https://user:pass@mcp.example.test';
   assert.throws(() => validateRuntimeSettings(invalidUrl), /Invalid MCP URL/);
 });
 

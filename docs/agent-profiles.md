@@ -20,34 +20,53 @@ La asociación es una referencia sin FK entre esquemas. Runtime valida el perfil
 
 ## Configuración de voz por perfil
 
-La voz no se habilita implícitamente. Si `config.voice` está ausente, no aparece como disponible para las conversaciones del perfil y no se aplica ningún modelo, voz o idioma predeterminado. Para deshabilitarla, eliminá la propiedad `voice` del JSON del perfil.
+La voz no se habilita implícitamente. Aunque `model.realtime` puede estar configurado, la voz queda deshabilitada si `config.realtime` está ausente. Para deshabilitarla, eliminá la propiedad `realtime` de `config`.
 
-Para habilitarla, configurá primero el catálogo de voz de OpenAI en Administración → Provider y agregá `voice` a la configuración completa del perfil. El JSON de ejemplo muestra el objeto `config` completo: al editar un perfil, conservá todos los campos requeridos y agregá o quitá solo la propiedad opcional `voice` según corresponda.
+Para habilitarla, configurá primero `ai.providers.openai.models.realtime` y `ai.providers.openai.realtime.voices` en Administración → Provider. Luego seleccioná `model.realtime` y agregá `config.realtime` al perfil. `config.systemPrompt` es compartido por chat y Realtime; los límites de chat están aislados en `config.chat`. En Realtime, `maxContextMessages` limita los mensajes anteriores incluidos (default 12) y `maxInstructionsCharacters` limita la longitud total de instrucciones enviadas al modelo (default 24000). `maxMessageCharacters`, `maxToolResultCharacters` y `maxSummaryCharacters` limitan por separado el contenido de mensajes, resultados de herramientas y resumen (defaults 4000, 2000 y 4000). `maxOutputTokens` limita la salida por respuesta (default 4096; el proveedor admite enteros entre 1 y 4096 e incluye llamadas a herramientas). El objeto `vad` ajusta el VAD server-side: threshold (0.5), prefixPaddingMs (300), silenceDurationMs (500), createResponse (true) e interruptResponse (true). Todos son configurables por perfil y reciben defaults si se omiten.
 
 ```json
 {
-  "chatSystemPrompt": "Sos un asistente útil y claro.",
-  "contextTokenBudget": 10000,
-  "maxContextMessages": 20,
-  "maxOutputTokens": 4096,
-  "reserveOutputTokens": 4096,
-  "contextSafetyTokens": 512,
-  "maxToolSteps": 8,
-  "llmTraceRequests": false,
-  "summariesEnabled": true,
-  "summaryTokenBudget": 300,
-  "voice": {
-    "transcriptionModel": "gpt-4o-mini-transcribe",
-    "speechModel": "tts-1",
-    "speechVoice": "alloy",
-    "language": "es"
+  "name": "Predeterminado",
+  "model": {
+    "chat": "openai/gpt-4.1-mini",
+    "realtime": "gpt-realtime"
+  },
+  "config": {
+    "systemPrompt": "Sos un asistente útil y claro.",
+    "chat": {
+      "contextTokenBudget": 10000,
+      "maxContextMessages": 20,
+      "maxOutputTokens": 4096,
+      "reserveOutputTokens": 4096,
+      "contextSafetyTokens": 512,
+      "maxToolSteps": 8,
+      "llmTraceRequests": false,
+      "summariesEnabled": true,
+      "summaryTokenBudget": 300
+    },
+    "realtime": {
+      "voice": "alloy",
+      "maxContextMessages": 12,
+      "maxInstructionsCharacters": 24000,
+      "maxMessageCharacters": 4000,
+      "maxToolResultCharacters": 2000,
+      "maxSummaryCharacters": 4000,
+      "maxOutputTokens": 4096,
+      "vad": {
+        "threshold": 0.5,
+        "prefixPaddingMs": 300,
+        "silenceDurationMs": 500,
+        "createResponse": true,
+        "interruptResponse": true
+      }
+    }
   }
 }
 ```
 
-Runtime valida que los modelos de transcripción y síntesis y la voz elegidos estén habilitados en Provider. La configuración del proveedor contiene `baseUrl`, `transcriptionModels`, `speechModels` y `speechVoices`; actualmente la integración usa la clave del proveedor OpenAI y sus APIs Realtime y `audio/speech`. La URL puede ser HTTP o HTTPS y debe ser accesible desde el servicio Runtime. El formato PCM, la frecuencia, la detección de silencio y el formato de audio se mantienen como parámetros técnicos del transporte.
+Runtime valida `model.realtime` y `config.realtime.voice` contra los catálogos de Provider. `model` solo admite `chat` y `realtime`; `config.realtime` admite voz, límites de contexto/salida y ajustes VAD documentados arriba; `vad` controla solo los parámetros de `server_vad`, no el modo de detección ni modelos de audio. Los perfiles existentes se normalizan al leerlos: los ajustes de chat planos pasan a `config.chat`, `chatSystemPrompt` pasa a `systemPrompt` y los límites Realtime omitidos reciben los defaults indicados. La voz de conversación usa WebRTC con OpenAI Realtime: Runtime crea una credencial efímera, aplica las instrucciones e historial reciente del perfil asignado y envía al modelo las tools MCP/delegación autorizadas. Las llamadas de tools vuelven al backend autenticado y no exponen MCP al navegador. No se solicita ni se persiste transcripción; tampoco se almacena el audio de la sesión. El navegador se conecta al endpoint Realtime anunciado por Runtime y recibe audio directamente; las claves permanentes nunca salen del servidor.
 
-La disponibilidad se resuelve para el perfil asignado a cada conversación. Al cambiar de perfil, la opción de voz se actualiza; las conversaciones con perfiles sin `config.voice` no usan voz aunque el proveedor esté configurado. Quitar del catálogo una opción que utiliza un perfil la deja temporalmente no disponible hasta que el perfil se actualice o se vuelva a habilitar esa opción.
+La disponibilidad se resuelve para el perfil asignado a cada conversación. Al cambiar de perfil, la opción de voz se actualiza; las conversaciones con perfiles sin `config.realtime` no usan voz aunque el proveedor esté configurado. Quitar del catálogo una opción que utiliza un perfil la deja temporalmente no disponible hasta que el perfil se actualice o se vuelva a habilitar esa opción.
 
 ## Migración de hilos existentes
 

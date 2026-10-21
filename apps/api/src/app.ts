@@ -55,6 +55,7 @@ export function createApp(): Hono<AppEnv> {
         'X-MCP-Auth',
         'Last-Event-ID',
         'X-Voice-Trace-Id',
+        'X-Voice-Call-Id',
       ],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     }),

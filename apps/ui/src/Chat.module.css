@@ -19,48 +19,6 @@
 
 .errorBar { flex: 0 0 auto; }
 
-.audioToast {
-  position: absolute;
-  z-index: 5;
-  right: 24px;
-  bottom: 92px;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  max-width: min(320px, calc(100% - 32px));
-  padding: 11px 14px;
-  color: var(--text);
-  background: #20263b;
-  border: 1px solid var(--border-input);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .35);
-  font-size: 13px;
-  pointer-events: none;
-  animation: audioToastEnter .18s ease-out;
-}
-
-.audioToastSpinner {
-  width: 15px;
-  height: 15px;
-  flex: 0 0 15px;
-  border: 2px solid rgba(79, 195, 247, .28);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: audioToastSpin .8s linear infinite;
-}
-
-@keyframes audioToastSpin { to { transform: rotate(360deg); } }
-@keyframes audioToastEnter { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-@media (max-width: 700px) {
-  .audioToast { right: 12px; bottom: 86px; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .audioToast { animation: none; }
-  .audioToastSpinner { animation-duration: 2s; }
-}
-
 .messages {
   flex: 1 1 auto;
   min-height: 0;

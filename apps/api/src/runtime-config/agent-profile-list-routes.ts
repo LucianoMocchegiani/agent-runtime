@@ -6,5 +6,5 @@ import { listAgentProfiles } from './agent-profiles.js';
 export const agentProfileListRoutes = new Hono<AppEnv>();
 agentProfileListRoutes.get('/', async (c) => {
   const items = await listAgentProfiles();
-  return c.json({ items: items.map(({ id, name, modelId }) => ({ id, name, modelId })) });
+  return c.json({ items: items.map(({ id, name, model }) => ({ id, name, model })) });
 });

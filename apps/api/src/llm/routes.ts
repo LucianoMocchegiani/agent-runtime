@@ -9,5 +9,5 @@ export const modelRoutes = new Hono<AppEnv>();
 
 modelRoutes.get('/', async (c) => {
   const profile = await getNewChatDefaultAgentProfile();
-  return c.json({ default: profile.modelId, items: listModels() });
+  return c.json({ default: profile.model.chat, items: listModels() });
 });

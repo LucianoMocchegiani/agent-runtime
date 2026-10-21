@@ -2,6 +2,59 @@ import type { RuntimeSettings } from './contracts.js';
 import { validateAuthSettings } from '../auth/settings.js';
 import { RUNTIME_CONFIG_POSITIVE_INTEGER_FIELDS, RUNTIME_CONFIG_PROVIDER_NAMES } from './constants.js';
 
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
+
+function normalizeCatalog(items: unknown, field: string, provider: string, allowEmpty = false): string[] {
+  if (!Array.isArray(items) || (!allowEmpty && items.length === 0) || items.some((item) => typeof item !== 'string' || !item.trim())) {
+    throw new Error(`Invalid ${field} for ${provider}`);
+  }
+  return [...new Set(items.map((item: string) => item.trim()))];
+}
+
+function normalizeProvider(name: string, provider: any): void {
+  if (!(RUNTIME_CONFIG_PROVIDER_NAMES as readonly string[]).includes(name) || !provider || typeof provider.apiKey !== 'string' || !provider.apiKey.trim() || provider.apiKey === 'replace-me') {
+    throw new Error('Invalid provider: ' + name);
+  }
+
+  if (provider.voice !== undefined) throw new Error('provider.voice is no longer supported; use provider.realtime');
+  if (provider.contextWindows !== undefined) throw new Error('provider.contextWindows is no longer supported');
+  if (provider.realtime !== undefined && (name !== 'openai' || !provider.realtime || typeof provider.realtime !== 'object' || Array.isArray(provider.realtime))) {
+    throw new Error('Realtime configuration is currently supported only for OpenAI');
+  }
+
+  const models = provider.models;
+  if (!models || typeof models !== 'object' || Array.isArray(models)) throw new Error('Invalid models for ' + name);
+  const chatModels = normalizeCatalog(models.chat, 'models.chat', name);
+  const normalizedModels: { chat: string[]; realtime?: string[] } = { chat: chatModels };
+  if (models.realtime !== undefined) {
+    if (name !== 'openai') throw new Error('Realtime models are currently supported only for OpenAI');
+    normalizedModels.realtime = normalizeCatalog(models.realtime, 'models.realtime', name, true);
+  }
+  provider.models = normalizedModels;
+
+  if (name === 'openai') {
+    const rawBaseUrl = provider.baseUrl ?? OPENAI_BASE_URL;
+    if (typeof rawBaseUrl !== 'string' || !rawBaseUrl.trim()) throw new Error('Invalid baseUrl for ' + name);
+    const baseUrl = rawBaseUrl.trim();
+    const parsedUrl = new URL(baseUrl);
+    if (!['http:', 'https:'].includes(parsedUrl.protocol) || parsedUrl.username || parsedUrl.password) throw new Error('Invalid baseUrl for ' + name);
+    provider.baseUrl = baseUrl.replace(/\/+$/, '');
+
+    const realtime = provider.realtime;
+    if (realtime !== undefined) {
+      if (!realtime || typeof realtime !== 'object' || Array.isArray(realtime)) throw new Error('Invalid realtime configuration for ' + name);
+      if (!normalizedModels.realtime?.length) throw new Error('models.realtime is required when realtime is configured');
+      const voices = normalizeCatalog(realtime.voices, 'realtime.voices', name);
+      provider.realtime = { voices };
+    } else if (normalizedModels.realtime?.length) {
+      throw new Error('realtime.voices is required when models.realtime is configured');
+    }
+  } else {
+    if (provider.baseUrl !== undefined) throw new Error('baseUrl is currently configurable only for OpenAI');
+    if (provider.realtime !== undefined) throw new Error('Realtime configuration is currently supported only for OpenAI');
+  }
+}
+
 /** Valida y normaliza una configuración runtime procedente de almacenamiento o de la API. */
 export function validateRuntimeSettings(value: unknown): RuntimeSettings {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new Error('Settings must be an object');
@@ -9,29 +62,7 @@ export function validateRuntimeSettings(value: unknown): RuntimeSettings {
   Object.assign(v, validateAuthSettings(v));
   if (!v.ai || typeof v.ai !== 'object' || Array.isArray(v.ai) || !v.ai.providers || typeof v.ai.providers !== 'object' || Array.isArray(v.ai.providers)) throw new Error('ai.providers is required');
   if (typeof v.ai.defaultModel !== 'string') throw new Error('ai.defaultModel is required');
-  for (const [name, provider] of Object.entries(v.ai.providers) as [string, any][]) {
-    if (!(RUNTIME_CONFIG_PROVIDER_NAMES as readonly string[]).includes(name) || !provider || typeof provider.apiKey !== 'string' || !provider.apiKey.trim() || provider.apiKey === 'replace-me') throw new Error('Invalid provider: ' + name);
-    if (!Array.isArray(provider.models) || provider.models.length === 0 || provider.models.some((model: unknown) => typeof model !== 'string' || !model.trim())) throw new Error('Invalid models for ' + name);
-    if (provider.contextWindows !== undefined && (!provider.contextWindows || typeof provider.contextWindows !== 'object' || Array.isArray(provider.contextWindows) || Object.values(provider.contextWindows).some((n: any) => !Number.isInteger(n) || n < 1))) throw new Error('Invalid contextWindows for ' + name);
-    provider.models = [...new Set(provider.models.map((model: string) => model.trim()))];
-    provider.contextWindows ??= {};
-    if (provider.voice !== undefined) {
-      if (name !== 'openai' || !provider.voice || typeof provider.voice !== 'object' || Array.isArray(provider.voice)) {
-        throw new Error('Voice configuration is currently supported only for OpenAI');
-      }
-      const voice = provider.voice;
-      if (typeof voice.baseUrl !== 'string' || !voice.baseUrl.trim()) throw new Error('Invalid voice.baseUrl for ' + name);
-      const voiceUrl = new URL(voice.baseUrl.trim());
-      if (!['http:', 'https:'].includes(voiceUrl.protocol) || voiceUrl.username || voiceUrl.password) throw new Error('Invalid voice.baseUrl for ' + name);
-      for (const field of ['transcriptionModels', 'speechModels', 'speechVoices']) {
-        if (!Array.isArray(voice[field]) || voice[field].length === 0 || voice[field].some((item: unknown) => typeof item !== 'string' || !item.trim())) {
-          throw new Error('Invalid voice.' + field + ' for ' + name);
-        }
-        voice[field] = [...new Set(voice[field].map((item: string) => item.trim()))];
-      }
-      voice.baseUrl = voice.baseUrl.trim().replace(/\/+$/, '');
-    }
-  }
+  for (const [name, provider] of Object.entries(v.ai.providers) as [string, any][]) normalizeProvider(name, provider);
   if (!v.mcpConfig || typeof v.mcpConfig !== 'object' || Array.isArray(v.mcpConfig)) throw new Error('mcpConfig must be an object');
   for (const [name, mcp] of Object.entries(v.mcpConfig) as [string, any][]) {
     if (!/^[a-zA-Z0-9_-]+$/.test(name) || !mcp || typeof mcp.url !== 'string') throw new Error('Invalid MCP: ' + name);
