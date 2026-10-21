@@ -1,7 +1,7 @@
 import type { ChatConfig } from '../config.js';
 
-/** Credenciales y modelo del proveedor de embeddings, o `null` si está deshabilitado. */
-export type EmbeddingConfig = { apiKey: string; baseUrl: string; model: string } | null;
+/** Modelo completo `proveedor/modelo` seleccionado, o `null` si embeddings está deshabilitado. */
+export type EmbeddingConfig = { model: string } | null;
 /** Selección de modelos específicos para cada capacidad de un perfil. */
 export type AgentProfileModelConfig = { chat: string; realtime?: string };
 /** Ajustes independientes de la sesión de voz Realtime. */

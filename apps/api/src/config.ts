@@ -96,6 +96,8 @@ export type McpConfig = Record<string, McpServerConfig>;
 export type AiProviderModels = {
   /** Modelos de chat ofrecidos en el selector de perfiles. */
   chat: string[];
+  /** Modelos de embeddings ofrecidos para seleccionar en la configuración de Embeddings. */
+  embeddings?: string[];
   /** Modelos OpenAI Realtime disponibles para conversaciones habladas. */
   realtime?: string[];
 };

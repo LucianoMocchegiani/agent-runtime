@@ -17,7 +17,9 @@ function normalizeProvider(name: string, provider: any): void {
   }
 
   if (provider.voice !== undefined) throw new Error('provider.voice is no longer supported; use provider.realtime');
-  if (provider.contextWindows !== undefined) throw new Error('provider.contextWindows is no longer supported');
+  // Older persisted settings may still contain this retired per-model metadata.
+  // Strip it during normalization so it cannot leak back into the admin editor.
+  delete provider.contextWindows;
   if (provider.realtime !== undefined && (name !== 'openai' || !provider.realtime || typeof provider.realtime !== 'object' || Array.isArray(provider.realtime))) {
     throw new Error('Realtime configuration is currently supported only for OpenAI');
   }
@@ -25,7 +27,10 @@ function normalizeProvider(name: string, provider: any): void {
   const models = provider.models;
   if (!models || typeof models !== 'object' || Array.isArray(models)) throw new Error('Invalid models for ' + name);
   const chatModels = normalizeCatalog(models.chat, 'models.chat', name);
-  const normalizedModels: { chat: string[]; realtime?: string[] } = { chat: chatModels };
+  const normalizedModels: { chat: string[]; embeddings?: string[]; realtime?: string[] } = { chat: chatModels };
+  if (models.embeddings !== undefined) {
+    normalizedModels.embeddings = normalizeCatalog(models.embeddings, 'models.embeddings', name, true);
+  }
   if (models.realtime !== undefined) {
     if (name !== 'openai') throw new Error('Realtime models are currently supported only for OpenAI');
     normalizedModels.realtime = normalizeCatalog(models.realtime, 'models.realtime', name, true);
@@ -77,13 +82,38 @@ export function validateRuntimeSettings(value: unknown): RuntimeSettings {
     mcp.optional ??= false;
   }
   v.embeddingConfig ??= null;
+  if (v.embeddingConfig && typeof v.embeddingConfig === 'object' && typeof v.embeddingConfig.apiKey === 'string' && typeof v.embeddingConfig.baseUrl === 'string' && typeof v.embeddingConfig.model === 'string') {
+    // Migrate the previous standalone embedding credentials only when they exactly match a configured provider.
+    const legacy = v.embeddingConfig;
+    const legacyUrl = legacy.baseUrl.trim().replace(/\/+$/, '');
+    const matchingProvider = Object.entries(v.ai.providers).find(([name, provider]: [string, any]) =>
+      provider.apiKey === legacy.apiKey.trim()
+      && (provider.baseUrl ?? (name === 'openrouter' ? 'https://openrouter.ai/api/v1' : OPENAI_BASE_URL)) === legacyUrl,
+    );
+    if (!matchingProvider) throw new Error('Legacy embedding credentials do not match a configured provider; move the key and endpoint to Provider before selecting its embedding model');
+    const [providerName, provider] = matchingProvider as [string, any];
+    const legacyModel = legacy.model.trim().startsWith(`${providerName}/`)
+      ? legacy.model.trim().slice(providerName.length + 1)
+      : legacy.model.trim();
+    provider.models.embeddings = [...new Set([...(provider.models.embeddings ?? []), legacyModel])];
+    v.embeddingConfig = { model: `${providerName}/${legacyModel}` };
+  }
   if (v.embeddingConfig !== null) {
     const embedding = v.embeddingConfig;
-    if (!embedding || typeof embedding !== 'object' || typeof embedding.apiKey !== 'string' || !embedding.apiKey.trim() || embedding.apiKey === 'replace-me' || typeof embedding.baseUrl !== 'string' || typeof embedding.model !== 'string' || !embedding.model.trim()) throw new Error('Invalid embeddingConfig');
-    const embeddingUrl = new URL(embedding.baseUrl);
-    if (!['http:', 'https:'].includes(embeddingUrl.protocol) || embeddingUrl.username || embeddingUrl.password) throw new Error('Invalid embeddingConfig.baseUrl');
-    embedding.baseUrl = embedding.baseUrl.replace(/\/+$/, '');
-    embedding.model = embedding.model.trim();
+    if (!embedding || typeof embedding !== 'object' || Array.isArray(embedding) || typeof embedding.model !== 'string' || !embedding.model.trim()) {
+      throw new Error('Invalid embeddingConfig: provide a selected model as provider/model');
+    }
+    const modelId = embedding.model.trim();
+    const slash = modelId.indexOf('/');
+    if (slash <= 0 || slash === modelId.length - 1) throw new Error('Invalid embeddingConfig.model: expected provider/model');
+    const providerName = modelId.slice(0, slash);
+    const modelName = modelId.slice(slash + 1);
+    const provider = v.ai.providers[providerName];
+    if (!provider || !provider.models.embeddings?.includes(modelName)) {
+      throw new Error(`embeddingConfig.model ${modelId} is not listed in ai.providers.${providerName}.models.embeddings`);
+    }
+    embedding.model = modelId;
+    v.embeddingConfig = { model: modelId };
   }
   if (Object.hasOwn(v, 'responseTokenReserve')) {
     throw new Error('responseTokenReserve is no longer supported; provide maxOutputTokens and reserveOutputTokens');

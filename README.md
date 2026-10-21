@@ -4,7 +4,7 @@ Runtime para ejecutar agentes de IA con perfiles reutilizables, conversaciones p
 
 **Versión actual: 0.1.0.** Los cambios de esta versión están resumidos en [`CHANGELOG.md`](./CHANGELOG.md).
 
-Visión del producto: [`docs/vision/00-que-es.md`](./docs/vision/00-que-es.md). Diseño y módulos: [`docs/`](./docs/00-indice.md). Convenciones para contribuir: [`docs/DEVELOPMENT.md`](./docs/DEVELOPMENT.md).
+Visión del producto: [`docs/vision/00-que-es.md`](./docs/vision/00-que-es.md). Diseño y módulos: [`docs/`](./docs/00-indice.md). Convenciones para contribuir: [`docs/09-guia-de-desarrollo.md`](./docs/09-guia-de-desarrollo.md).
 
 ## Componentes
 

@@ -49,7 +49,7 @@ src/
 └── index.ts                # Arranque del servidor
 ```
 
-El árbol es orientativo: no hace falta que cada módulo tenga los mismos tipos de archivos. Para conocer las responsabilidades y los flujos, consultá también [Módulos](./02-modulos.md), [Flujos](./03-flujos.md), [HTTP](./04-http.md) y [Arquitectura](./arquitectura.md).
+El árbol es orientativo: no hace falta que cada módulo tenga los mismos tipos de archivos. Para conocer las responsabilidades y los flujos, consultá también [Módulos](./02-modulos.md), [Flujos](./03-flujos.md), [HTTP](./04-http.md) y [Arquitectura](./08-arquitectura.md).
 
 ## Dónde ubicar un cambio
 
@@ -127,5 +127,3 @@ npm run dev
 ```
 
 `npm run dev` prepara los paquetes y la base e inicia API y UI. Para configuración de entorno, Compose y despliegue, seguí las instrucciones del [README](../README.md).
-./README.md).
-./README.md).

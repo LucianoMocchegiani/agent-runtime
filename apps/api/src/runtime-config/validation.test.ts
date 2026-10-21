@@ -6,11 +6,11 @@ function validSettings(): Record<string, any> {
   return {
     ai: { defaultModel: 'openai/gpt-test', providers: { openai: {
       apiKey: 'secret', baseUrl: 'https://api.openai.com/v1/',
-      models: { chat: ['gpt-test', ' gpt-test '], realtime: ['gpt-realtime'] },
+      models: { chat: ['gpt-test', ' gpt-test '], embeddings: ['text-embedding-3-small'], realtime: ['gpt-realtime'] },
       realtime: { voices: ['alloy', 'alloy'] },
     } } },
     mcpConfig: { local: { url: 'https://mcp.example.test', headers: { Authorization: 'secret' } } },
-    embeddingConfig: { apiKey: 'embedding-secret', baseUrl: 'https://embeddings.example.test/v1/', model: ' embed-v1 ' },
+    embeddingConfig: { model: ' openai/text-embedding-3-small ' },
     chatSystemPrompt: 'system', contextTokenBudget: 10_000, maxContextMessages: 20,
     maxOutputTokens: 4_096, reserveOutputTokens: 4_096, contextSafetyTokens: 512,
     maxToolSteps: 8, llmTraceRequests: false, summariesEnabled: true, summaryTokenBudget: 300,
@@ -23,11 +23,10 @@ test('valida, normaliza y no muta el objeto recibido', () => {
   const result = validateRuntimeSettings(source);
 
   assert.deepEqual(source, original);
-  assert.deepEqual(result.ai.providers.openai?.models, { chat: ['gpt-test'], realtime: ['gpt-realtime'] });
+  assert.deepEqual(result.ai.providers.openai?.models, { chat: ['gpt-test'], embeddings: ['text-embedding-3-small'], realtime: ['gpt-realtime'] });
   assert.deepEqual(result.ai.providers.openai?.realtime, { voices: ['alloy'] });
   assert.equal(result.ai.providers.openai?.baseUrl, 'https://api.openai.com/v1');
-  assert.equal(result.embeddingConfig?.baseUrl, 'https://embeddings.example.test/v1');
-  assert.equal(result.embeddingConfig?.model, 'embed-v1');
+  assert.deepEqual(result.embeddingConfig, { model: 'openai/text-embedding-3-small' });
   assert.equal(result.mcpConfig.local?.auth, null);
   assert.equal(result.mcpConfig.local?.optional, false);
 });
@@ -44,9 +43,36 @@ test('rechaza el formato anterior del proveedor en lugar de migrarlo', () => {
   oldChatModelsFormat.ai.providers.openai.models = ['gpt-test'];
   assert.throws(() => validateRuntimeSettings(oldChatModelsFormat), /Invalid models/);
 
-  const removedContextWindows = validSettings();
-  removedContextWindows.ai.providers.openai.contextWindows = { 'gpt-test': 32_000 };
-  assert.throws(() => validateRuntimeSettings(removedContextWindows), /contextWindows is no longer supported/);
+  const legacyContextWindows = validSettings();
+  legacyContextWindows.ai.providers.openai.contextWindows = { 'gpt-test': 32_000 };
+  const normalized = validateRuntimeSettings(legacyContextWindows);
+  assert.deepEqual(legacyContextWindows.ai.providers.openai.contextWindows, { 'gpt-test': 32_000 });
+  assert.equal(Object.hasOwn(normalized.ai.providers.openai!, 'contextWindows'), false);
+});
+
+test('migra credenciales heredadas de embeddings cuando coinciden con Provider', () => {
+  const legacy = validSettings();
+  delete legacy.ai.providers.openai.models.embeddings;
+  legacy.embeddingConfig = {
+    apiKey: 'secret', baseUrl: 'https://api.openai.com/v1/', model: 'text-embedding-3-small',
+  };
+  const normalized = validateRuntimeSettings(legacy);
+  assert.deepEqual(normalized.embeddingConfig, { model: 'openai/text-embedding-3-small' });
+  assert.deepEqual(normalized.ai.providers.openai?.models.embeddings, ['text-embedding-3-small']);
+});
+
+test('valida que el modelo de embeddings pertenezca al catálogo del proveedor', () => {
+  const missingCatalogModel = validSettings();
+  missingCatalogModel.embeddingConfig.model = 'openai/text-embedding-3-large';
+  assert.throws(() => validateRuntimeSettings(missingCatalogModel), /is not listed.*models.embeddings/);
+
+  const malformedModel = validSettings();
+  malformedModel.embeddingConfig.model = 'text-embedding-3-small';
+  assert.throws(() => validateRuntimeSettings(malformedModel), /expected provider\/model/);
+
+  const disabled = validSettings();
+  disabled.embeddingConfig = null;
+  assert.equal(validateRuntimeSettings(disabled).embeddingConfig, null);
 });
 
 test('rechaza URLs de proveedor inválidas y proveedores/capacidades no permitidos', () => {

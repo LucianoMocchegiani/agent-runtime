@@ -18,6 +18,21 @@ import { validateRuntimeSettings } from './validation.js';
 let embeddingConfig: EmbeddingConfig = null;
 let appliedVersion = 0;
 
+async function applyEmbeddingProviderSettings(settings: RuntimeSettings): Promise<void> {
+  const selection = settings.embeddingConfig;
+  if (!selection) {
+    await setEmbeddingConfig(null);
+    return;
+  }
+  const separator = selection.model.indexOf('/');
+  const providerName = selection.model.slice(0, separator) as keyof typeof settings.ai.providers;
+  const model = selection.model.slice(separator + 1);
+  const provider = settings.ai.providers[providerName];
+  if (!provider) throw new Error(`Embedding provider ${providerName} is not configured`);
+  const baseUrl = provider.baseUrl ?? 'https://openrouter.ai/api/v1';
+  await setEmbeddingConfig({ apiKey: provider.apiKey, baseUrl, model });
+}
+
 function currentSettings(): RuntimeSettings {
   return {
     ai: config.ai,
@@ -49,7 +64,7 @@ async function applyPersistedSettings(payload: unknown, version: number): Promis
   if (authSettingsChanged(next)) clearAuthCache();
   Object.assign(config, next);
   embeddingConfig = next.embeddingConfig;
-  await setEmbeddingConfig(embeddingConfig);
+  await applyEmbeddingProviderSettings(next);
   appliedVersion = version;
 }
 
@@ -127,7 +142,7 @@ export async function saveRuntimeSettings(value: unknown, expectedVersion?: numb
   if (authSettingsChanged(validated)) clearAuthCache();
   Object.assign(config, validated);
   embeddingConfig = validated.embeddingConfig;
-  await setEmbeddingConfig(embeddingConfig);
+  await applyEmbeddingProviderSettings(validated);
   appliedVersion = version;
   return version;
 }

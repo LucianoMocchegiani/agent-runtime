@@ -23,7 +23,7 @@ function editableProfile(profile) {
 
 function tabValue(config, tab) {
   if (tab === 'Providers') return { providers: config.ai.providers };
-  if (tab === 'Embeddings') return config.embeddingConfig;
+  if (tab === 'Embeddings') return config.embeddingConfig ?? { model: '' };
   if (tab === 'Auth') return { authIntrospectUrl: config.authIntrospectUrl, authMapping: config.authMapping };
   return config.mcpConfig;
 }
@@ -103,7 +103,7 @@ export default function AdminConfig({ onBack }) {
 
   function applyValue(target, name, value) {
     if (name === 'Providers') target.ai = { ...target.ai, providers: value.providers };
-    else if (name === 'Embeddings') target.embeddingConfig = value;
+    else if (name === 'Embeddings') target.embeddingConfig = value?.model?.trim() ? { model: value.model.trim() } : null;
     else if (name === 'Auth') {
       target.authIntrospectUrl = value.authIntrospectUrl;
       target.authMapping = value.authMapping;
@@ -299,7 +299,6 @@ export default function AdminConfig({ onBack }) {
           <div className={styles.actions}><button className={sharedStyles.primaryButton} disabled={busy} onClick={saveProfile}>{busy ? 'Guardando…' : 'Validar y guardar perfil'}</button></div>
         </>}
       </section> : <>
-        <p className={styles.subtitle}>El modelo y los parámetros de comportamiento se administran en Profiles. Esta sección contiene proveedores y credenciales, embeddings y servidores MCP globales.</p>
         <section className={`${sharedStyles.surface} ${styles.card}`} role="tabpanel">
           <h2>{TABS.find((item) => item.id === tab)?.label}</h2>
           <AdminConfigHelp tab={tab} />

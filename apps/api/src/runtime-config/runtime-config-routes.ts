@@ -16,12 +16,10 @@ function maskSecrets(settings: ReturnType<typeof getRuntimeSettings>) {
     if (mcp.auth) mcp.auth = RUNTIME_CONFIG_SECRET_MASK;
     for (const name of Object.keys(mcp.headers)) mcp.headers[name] = RUNTIME_CONFIG_SECRET_MASK;
   }
-  if (copy.embeddingConfig) copy.embeddingConfig.apiKey = RUNTIME_CONFIG_SECRET_MASK;
   return copy;
 }
 function restoreMaskedSecrets(next: any): void {
   const current = getRuntimeSettings();
-  if (next?.embeddingConfig?.apiKey === RUNTIME_CONFIG_SECRET_MASK) next.embeddingConfig.apiKey = current.embeddingConfig?.apiKey;
   for (const [name, provider] of Object.entries(next?.ai?.providers ?? {}) as [string, any][]) {
     if (provider?.apiKey === RUNTIME_CONFIG_SECRET_MASK) provider.apiKey = current.ai.providers[name as keyof typeof current.ai.providers]?.apiKey;
   }
