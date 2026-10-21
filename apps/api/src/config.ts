@@ -4,7 +4,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /** Proveedores de modelos cuyo soporte está integrado en esta aplicación. */
@@ -44,15 +44,13 @@ function parseOrigins(raw: string | undefined): string[] {
 }
 
 /**
- * Carpeta con el build de la UI (`index.html`). Default `apps/ui/dist`, relativo a este módulo
+ * Busca el build de la UI en `apps/ui/dist`, relativo a este módulo
  * (sirve igual desde `src/` con tsx y desde `dist/` compilado, local o en la imagen).
  *
  * @returns null si no hay build (la API sigue andando; en dev la UI corre en Vite).
  */
-function resolveUiDir(raw: string | undefined): string | null {
-  const dir = raw?.trim()
-    ? resolve(raw.trim())
-    : fileURLToPath(new URL('../../ui/dist', import.meta.url));
+function findUiBuildDir(): string | null {
+  const dir = fileURLToPath(new URL('../../ui/dist', import.meta.url));
   return existsSync(join(dir, 'index.html')) ? dir : null;
 }
 
@@ -175,6 +173,6 @@ export const config: ChatConfig = {
   summaryTokenBudget: 300,
   ui: {
     enabled: parseBool(process.env.UI_ENABLED, true),
-    dir: resolveUiDir(process.env.UI_DIR),
+    dir: findUiBuildDir(),
   },
 };

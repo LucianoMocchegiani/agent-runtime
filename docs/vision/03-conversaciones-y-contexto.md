@@ -4,8 +4,6 @@
 
 Las conversaciones persistentes forman parte de Agent Runtime. Runtime administra el ciclo de vida de cada conversación y conserva el historial de mensajes que sirve como contexto para los turnos del agente.
 
-No existe un **Memory MCP integrado** ni un servicio de memoria independiente. El nombre `Memory` que todavía aparece en algunos módulos internos del código describe detalles de implementación de persistencia y búsqueda; no es una frontera MCP ni una extensión que el usuario deba configurar.
-
 ```text
 Agent Runtime
   ├── Perfiles y ejecución del agente
@@ -52,4 +50,3 @@ Agent Runtime
    └── MCP de memoria (opcional, externo)
 ```
 
-Las preferencias persistentes disponibles en la aplicación son una capacidad concreta y separada del historial de conversación; no deben confundirse con un Memory MCP ni con una memoria general del agente.

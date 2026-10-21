@@ -21,7 +21,7 @@ export function mountUi(app: Hono<AppEnv>): void {
     return;
   }
   if (!config.ui.dir) {
-    console.warn('UI_ENABLED but no UI build found (run `npm run build` at the repo root or set UI_DIR). Serving API only.');
+    console.warn('UI_ENABLED but no UI build found (run `npm run build` at the repo root). Serving API only.');
     return;
   }
 
