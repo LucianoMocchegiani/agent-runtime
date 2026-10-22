@@ -33,7 +33,12 @@
 .conversationListTabs button:hover { background: rgba(255,255,255,.05); }
 .conversationListTabs button.active { color: var(--text); background: rgba(79,195,247,.1); border-color: rgba(79,195,247,.35); }
 .conversationListState { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; color: var(--text-muted); font-size: 12px; text-align: center; overflow-wrap: anywhere; }
-.conversationListMessage { margin: 8px 10px 0; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.conversationListMessage { display: flex; align-items: flex-start; gap: 8px; margin: 8px 10px 0; padding: 8px 10px; border-radius: var(--radius-sm); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+.conversationListMessage > span { flex: 1; min-width: 0; }
+.dismissMessage { display: inline-grid; flex: 0 0 auto; place-items: center; width: 24px; height: 24px; margin: -3px -5px 0 0; padding: 0; color: inherit; background: transparent; border: 0; border-radius: var(--radius-sm); cursor: pointer; }
+.dismissMessage:hover { background: rgba(255,255,255,.1); }
+.dismissMessage:focus-visible { outline: 2px solid currentColor; outline-offset: 1px; }
+.dismissMessage :global(svg) { width: 16px; height: 16px; }
 .conversationListError { color: var(--error-text); background: var(--bg-error); }
 .conversationListNotice { color: #a5e6ac; background: rgba(67,160,71,.12); }
 .convItem {

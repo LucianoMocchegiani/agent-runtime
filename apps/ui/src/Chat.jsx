@@ -9,6 +9,7 @@ import useChatHistory from './useChatHistory.js';
 import useChatTurn, { DELEGATION_ACTIVE_STATUSES } from './useChatTurn.js';
 import useChatComposer from './useChatComposer.js';
 import ChatComposer from './ChatComposer.jsx';
+import Icon from './Icon.jsx';
 export default function Chat({ conversationId, isVisible, delegationStatus, onOpenSidebar, onConversationUpdated, onActivityChange, onOpenConversation }) {
   const [error, setError] = useState(null);
   const {
@@ -145,6 +146,9 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         <div className={ChatStyles.errorBar} role="alert">
           <span>{error}</span>
           {isHistoryStale && <button type="button" className={ChatStyles.errorRetryButton} onClick={retryHistoryLoad}>Actualizar historial</button>}
+          <button type="button" className={ChatStyles.dismissErrorButton} onClick={() => setError(null)} aria-label="Cerrar mensaje de error" title="Cerrar mensaje de error">
+            <Icon name="close" />
+          </button>
         </div>
       )}
       <ChatComposer

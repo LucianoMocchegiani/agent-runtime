@@ -108,7 +108,14 @@ export default function ConversationList({ isSidebarOpen = false, hasActiveChat 
         <button type="button" role="tab" aria-selected={!showArchived} className={!showArchived ? styles.active : ''} onClick={() => { setShowArchived(false); setActionError(''); setActionNotice(''); }}>Activas</button>
         <button type="button" role="tab" aria-selected={showArchived} className={showArchived ? styles.active : ''} onClick={() => { setShowArchived(true); setActionError(''); setActionNotice(''); }}>Archivadas</button>
       </div>
-      {actionError && <div className={[styles.conversationListMessage, styles.conversationListError].join(' ')} role="alert">{actionError}</div>}
+      {actionError && (
+        <div className={[styles.conversationListMessage, styles.conversationListError].join(' ')} role="alert">
+          <span>{actionError}</span>
+          <button type="button" className={styles.dismissMessage} onClick={() => setActionError('')} aria-label="Cerrar mensaje de error" title="Cerrar mensaje de error">
+            <Icon name="close" />
+          </button>
+        </div>
+      )}
       {actionNotice && <div className={[styles.conversationListMessage, styles.conversationListNotice].join(' ')} role="status">{actionNotice}</div>}
       <div className={styles.convList} ref={listRef} aria-busy={loadState === 'loading' || loadingMore}>
         {loadState === 'loading' && <div className={styles.conversationListState} role="status">Cargando conversaciones…</div>}
