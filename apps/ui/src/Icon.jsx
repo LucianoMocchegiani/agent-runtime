@@ -12,6 +12,7 @@ const ICON_PATHS = {
   restore: <><path d="M3 4h18v4H3z" /><path d="M5 8v12h14V8" /><path d="M12 17v-5m-2 2 2-2 2 2" /></>,
   memory: <><path d="M12 3v18M3 12h18" /><circle cx="12" cy="12" r="7" /><circle cx="12" cy="12" r="2" /></>,
   settings: <><circle cx="12" cy="12" r="3.4" /><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.5-2-3.5-2.4 1a7.7 7.7 0 0 0-2.6-1.5L14 2h-4l-.4 3a7.7 7.7 0 0 0-2.6 1.5l-2.4-1-2 3.5 2 1.5a7.7 7.7 0 0 0 0 3l-2 1.5 2 3.5 2.4-1a7.7 7.7 0 0 0 2.6 1.5l.4 3h4l.4-3a7.7 7.7 0 0 0 2.6-1.5l2.4 1 2-3.5z" transform="translate(0 1) scale(.96) translate(.5 0)" /></>,
+  key: <><circle cx="8" cy="15" r="4" /><path d="m10.8 12.2 8-8 2 2-2 2 2 2-2 2-2-2-3.2 3.2" /></>,
   check: <path d="m5 12 4 4L19 6" />,
   edit: <><path d="m15 5 4 4" /><path d="M4 20h4l11-11a2.1 2.1 0 0 0-4-4L4 16v4Z" /></>,
   save: <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" /><path d="M17 21v-8H7v8M7 3v5h8" /></>,

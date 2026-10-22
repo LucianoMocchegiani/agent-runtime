@@ -1,4 +1,5 @@
 import { createClient } from 'agent-runtime-client/browser';
+import { getStoredBearerToken } from './authToken.js';
 
 function getSessionId() {
   const key = 'chat_session_id';
@@ -11,7 +12,7 @@ function getSessionId() {
 }
 
 function getBearer() {
-  return `anon:${getSessionId()}`;
+  return getStoredBearerToken() || `anon:${getSessionId()}`;
 }
 
 function getMcpAuth() {

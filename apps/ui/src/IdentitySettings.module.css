@@ -1,0 +1,24 @@
+.identityPage { --content-width: 1200px; }
+.identityHeader { max-width: var(--content-width); margin-bottom: 22px; }
+.intro { max-width: 760px; }
+.identityHeader h1 { margin: 4px 0 7px; color: var(--text-strong); font-size: clamp(24px, 4vw, 34px); }
+.intro,
+.help { color: var(--text-muted); font-size: 13px; line-height: 1.55; }
+.card { max-width: 760px; }
+.card h2 { margin-bottom: 14px; color: var(--text-strong); font-size: 19px; }
+.statusActive,
+.statusAnonymous { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+.statusActive { color: #a5e6ac; }
+.statusAnonymous { color: var(--text-muted); }
+.statusDot { width: 9px; height: 9px; border-radius: 50%; background: currentColor; }
+.help { margin-top: 8px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.clearButton { min-height: 40px; padding: 8px 12px; color: #ffb3ad; background: rgba(229, 57, 53, .08); border: 1px solid rgba(229, 57, 53, .35); border-radius: var(--radius-sm); cursor: pointer; }
+.clearButton:hover { border-color: var(--danger); background: rgba(229, 57, 53, .16); }
+.warning { margin-top: 18px; padding: 12px 14px; color: #f3dca5; background: rgba(255, 193, 7, .075); border: 1px solid rgba(255, 193, 7, .28); border-radius: var(--radius-sm); font-size: 12px; line-height: 1.55; }
+@media (max-width: 700px) {
+  .identityHeader { align-items: flex-start; }
+  .identityHeader .secondaryButton { flex: 0 0 auto; padding-inline: 9px; font-size: 12px; }
+  .actions { align-items: stretch; flex-direction: column-reverse; }
+  .actions button { width: 100%; white-space: normal; }
+}

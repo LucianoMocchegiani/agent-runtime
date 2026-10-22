@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test src/chat-delegation-notice.test.js"
+    "test": "node --test src/chat-delegation-notice.test.js src/authToken.test.js"
   },
   "dependencies": {
     "agent-runtime-client": "*",
