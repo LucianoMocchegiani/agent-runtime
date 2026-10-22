@@ -14,6 +14,7 @@ function maskSecrets(settings: ReturnType<typeof getRuntimeSettings>) {
   for (const provider of Object.values(copy.ai.providers)) if (provider) provider.apiKey = RUNTIME_CONFIG_SECRET_MASK;
   for (const mcp of Object.values(copy.mcpConfig)) {
     if (mcp.auth) mcp.auth = RUNTIME_CONFIG_SECRET_MASK;
+    if (mcp.oauth?.clientSecret) mcp.oauth.clientSecret = RUNTIME_CONFIG_SECRET_MASK;
     for (const name of Object.keys(mcp.headers)) mcp.headers[name] = RUNTIME_CONFIG_SECRET_MASK;
   }
   return copy;
@@ -27,6 +28,7 @@ function restoreMaskedSecrets(next: any): void {
     const previous = current.mcpConfig[name];
     if (!previous || !mcp || typeof mcp !== 'object') continue;
     if (mcp.auth === RUNTIME_CONFIG_SECRET_MASK) mcp.auth = previous.auth;
+    if (mcp.oauth?.clientSecret === RUNTIME_CONFIG_SECRET_MASK) mcp.oauth.clientSecret = previous.oauth?.clientSecret;
     if (mcp.headers && typeof mcp.headers === 'object') {
       for (const header of Object.keys(mcp.headers)) if (mcp.headers[header] === RUNTIME_CONFIG_SECRET_MASK) mcp.headers[header] = previous.headers[header];
     }

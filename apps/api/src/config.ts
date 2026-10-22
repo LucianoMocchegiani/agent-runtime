@@ -78,11 +78,16 @@ export type AuthMapping = {
   name: string | null;
 };
 
+/** Credenciales de cliente OAuth configuradas por servidor MCP en Runtime. */
+export type McpOAuthConfig = { clientId: string; clientSecret?: string; scopes: string[] };
+
 /** Configuración de conexión, autenticación y obligatoriedad de un servidor MCP. */
 export type McpServerConfig = {
   url: string;
   auth: string | null;
   headers: Record<string, string>;
+  /** OAuth del servidor: el secreto nunca se entrega a la UI ni al cliente. */
+  oauth?: McpOAuthConfig;
   /** Si no conecta, el turno sigue sin sus tools (default false: falla con 502). */
   optional: boolean;
 };

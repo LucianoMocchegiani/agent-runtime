@@ -14,7 +14,7 @@ const delegationLabels = {
   running: 'Conversación delegada',
 };
 
-export default function ConversationList({ isSidebarOpen = false, hasActiveChat = false, activeId, activityByConversation = {}, delegationByConversation = {}, onSelect, onArchive, onOpenAdmin, onOpenMemory, onOpenIdentity, refreshKey }) {
+export default function ConversationList({ isSidebarOpen = false, hasActiveChat = false, activeId, activityByConversation = {}, delegationByConversation = {}, onSelect, onArchive, onOpenAdmin, onOpenMemory, onOpenIdentity, onOpenMcpConnections, refreshKey }) {
   const [showArchived, setShowArchived] = useState(false);
   const [actionError, setActionError] = useState('');
   const [actionNotice, setActionNotice] = useState('');
@@ -98,6 +98,7 @@ export default function ConversationList({ isSidebarOpen = false, hasActiveChat 
       <div className={styles.sidebarToolbar}>
         <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={onOpenIdentity} aria-label="Identidad de acceso" title="Configurar Bearer de acceso"><Icon name="key" /><span>Acceso</span></button>
         <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={onOpenMemory} aria-label="Preferencias" title="Ver y administrar preferencias guardadas"><Icon name="memory" /><span>Preferencias</span></button>
+        <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={onOpenMcpConnections} aria-label="Conexiones MCP" title="Conectar servidores MCP con OAuth"><span aria-hidden="true">↔</span><span>MCP</span></button>
         <button className={`${styles.sidebarAction} ${styles.sidebarToolbarAction}`} onClick={onOpenAdmin} aria-label="Configuración" title="Configuración del runtime"><Icon name="settings" /><span>Configuración</span></button>
       </div>
       <div className={styles.conversationHeadingRow}>

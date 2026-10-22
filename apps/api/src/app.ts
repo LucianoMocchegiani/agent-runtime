@@ -16,6 +16,7 @@ import { mountUi } from './ui.js';
 import { delegationRoutes } from './delegations/routes.js';
 import { voiceRoutes } from './voice/routes.js';
 import { preferenceRoutes } from './preferences/routes.js';
+import { mcpConnectionRoutes, mcpOAuthCallbackRoutes } from './mcp-oauth/routes.js';
 
 type DependencyStatus = 'up' | 'down';
 
@@ -83,6 +84,8 @@ export function createApp(): Hono<AppEnv> {
     );
   });
 
+  app.route('/oauth', mcpOAuthCallbackRoutes);
+
   app.route('/admin/runtime-config', runtimeConfigRoutes);
   app.route('/admin/agent-profiles', agentProfileAdminRoutes);
 
@@ -95,6 +98,7 @@ export function createApp(): Hono<AppEnv> {
   v1.route('/agent-profiles', agentProfileListRoutes);
   v1.route('/delegations', delegationRoutes);
   v1.route('/preferences', preferenceRoutes);
+  v1.route('/mcp-connections', mcpConnectionRoutes);
   app.route('/v1', v1);
 
   mountUi(app);

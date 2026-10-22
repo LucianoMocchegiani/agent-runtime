@@ -55,6 +55,28 @@ test('cancelar la consulta MCP de tools interrumpe getAllTools', async () => {
   await registry.close();
 });
 
+test('usa la conexión OAuth del MCP como Bearer y no filtra el token global', async () => {
+  const oauthConfig: McpConfig = {
+    secure: { url: 'https://mcp.example/mcp', auth: null, headers: {}, optional: false, oauth: { clientId: 'id', clientSecret: 'secret', scopes: [] } },
+  };
+  let headers: Record<string, string> | undefined;
+  const registry = new McpRegistry(oauthConfig, (clientConfig) => {
+    headers = (clientConfig.transport as { headers?: Record<string, string> }).headers;
+    return Promise.resolve(fakeClient());
+  });
+  await registry.connect('runtime-service-token', { secure: 'user-oauth-token' });
+  assert.equal(headers?.Authorization, 'Bearer user-oauth-token');
+  await registry.close();
+});
+
+test('no conecta un MCP OAuth sin credencial de usuario', async () => {
+  const oauthConfig: McpConfig = {
+    secure: { url: 'https://mcp.example/mcp', auth: null, headers: {}, optional: false, oauth: { clientId: 'id', clientSecret: 'secret', scopes: [] } },
+  };
+  const registry = new McpRegistry(oauthConfig, async () => fakeClient());
+  await assert.rejects(registry.connect('runtime-service-token'), /requires a user OAuth connection/);
+});
+
 test('close no espera indefinidamente a un cliente MCP', async () => {
   const client = fakeClient({ close: () => new Promise<void>(() => undefined) });
   const registry = new McpRegistry(config, async () => client);

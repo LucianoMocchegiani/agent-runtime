@@ -31,6 +31,23 @@ test('valida, normaliza y no muta el objeto recibido', () => {
   assert.equal(result.mcpConfig.local?.optional, false);
 });
 
+test('normaliza OAuth por servidor MCP sin restringir nombres de proveedor', () => {
+  const value = validSettings();
+  value.mcpConfig = {
+    workspace: { url: 'https://workspace.example/mcp', oauth: { clientId: ' client ', clientSecret: ' secret ', scopes: ['tools:read', 'tools:read'] } },
+    custom_server: { url: 'https://custom.example/mcp', oauth: { clientId: 'id' } },
+  };
+  const result = validateRuntimeSettings(value);
+  assert.deepEqual(result.mcpConfig.workspace?.oauth, { clientId: 'client', clientSecret: 'secret', scopes: ['tools:read'] });
+  assert.deepEqual(result.mcpConfig.custom_server?.oauth, { clientId: 'id', scopes: [] });
+});
+
+test('rechaza credenciales OAuth incompletas en MCP', () => {
+  const value = validSettings();
+  value.mcpConfig.local.oauth = { clientId: 'id', clientSecret: '' };
+  assert.throws(() => validateRuntimeSettings(value), /Invalid MCP OAuth client configuration/);
+});
+
 test('la configuración AI normalizada contiene únicamente proveedores', () => {
   const value = validSettings();
   value.ai.unusedSetting = 'ignored';

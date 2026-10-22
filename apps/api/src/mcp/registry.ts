@@ -44,9 +44,11 @@ export class McpRegistry {
     signal?.throwIfAborted();
     const names = [...this.mcps.keys()];
     const results = await Promise.allSettled(
-      names.map((name) =>
-        this.connectOne(this.mcps.get(name)!, mcpTokens?.[name] ?? accessToken, signal),
-      ),
+      names.map((name) => {
+        const cfg = this.mcps.get(name)!;
+        const token = cfg.oauth ? (mcpTokens?.[name] ?? '') : (mcpTokens?.[name] ?? accessToken);
+        return this.connectOne(cfg, token, signal);
+      }),
     );
     for (let index = 0; index < results.length; index += 1) {
       const result = results[index];
@@ -136,7 +138,8 @@ export class McpRegistry {
 
   private async connectOne(cfg: McpServerConfig, token: string, signal?: AbortSignal): Promise<MCPClient> {
     const headers: Record<string, string> = { ...cfg.headers };
-    if (cfg.auth) {
+    if (cfg.oauth && !token) throw new Error(`MCP ${cfg.url} requires a user OAuth connection`);
+    if (cfg.auth || cfg.oauth) {
       headers.Authorization = `Bearer ${token}`;
     }
     return this.createClient({

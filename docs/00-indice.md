@@ -24,6 +24,7 @@ Setup y variables de entorno: [`../README.md`](../README.md). Esta documentació
 | [07-ejemplo-configuracion-runtime.md](./07-ejemplo-configuracion-runtime.md) | Ejemplos de los valores de cada pestaña de configuración |
 | [08-arquitectura.md](./08-arquitectura.md) | Concurrencia, persistencia, despliegue y límites actuales |
 | [10-despliegue-docker-compose.md](./10-despliegue-docker-compose.md) | Despliegue desde la imagen publicada con Docker Compose |
+| [11-mcp-oauth.md](./11-mcp-oauth.md) | OAuth genérico para servidores MCP configurados en Runtime |
 
 ## Desarrollo
 

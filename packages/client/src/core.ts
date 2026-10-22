@@ -3,11 +3,13 @@ import { createCatalogApi } from './catalog.js';
 import { createConversationsApi } from './conversations.js';
 import { createDelegationsApi } from './delegations.js';
 import { createMessagesApi } from './messages.js';
+import { createMcpConnectionsApi } from './mcp-connections.js';
 import { createPreferencesApi } from './preferences.js';
 import { createVoiceApi } from './voice.js';
 import type { ClientConfig } from './types.js';
 
 export { ClientError } from './client-error.js';
+export type { McpOAuthConnection } from './mcp-connections.js';
 export { isAbortError } from './abort.js';
 export { consumeUiMessageStream } from './stream.js';
 export type { AdminAgentProfile, AdminProfileList, AdminRuntimeConfig } from './admin.js';
@@ -49,5 +51,6 @@ export function createClient(config: ClientConfig) {
     delegations: createDelegationsApi(config),
     voice: createVoiceApi(config),
     messages: createMessagesApi(config),
+    mcpConnections: createMcpConnectionsApi(config),
   };
 }

@@ -94,7 +94,7 @@ La configuración de servidores MCP se guarda bajo `mcpConfig`. Sustituí la URL
 ```json
 {
   "mcpConfig": {
-    "pc_mcp": {
+    "workspace": {
       "url": "https://workspace-mcp.lucianomocchegiani.xyz/mcp",
       "auth": null,
       "headers": {

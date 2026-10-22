@@ -1,5 +1,6 @@
 /** Punto de entrada público del SDK de agent-runtime. */
 export { createClient, consumeUiMessageStream, ClientError, isAbortError } from './core.js';
+export type { McpOAuthConnection } from './mcp-connections.js';
 export type {
   AdminAgentProfile,
   AdminProfileList,

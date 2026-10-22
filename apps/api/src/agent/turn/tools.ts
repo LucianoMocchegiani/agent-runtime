@@ -3,6 +3,7 @@ import { HTTPException } from 'hono/http-exception';
 import type { Principal } from '../../auth/contracts.js';
 import type { McpConfig } from '../../config.js';
 import { McpRegistry } from '../../mcp/registry.js';
+import { getMcpOAuthAccessToken } from '../../mcp-oauth/service.js';
 import { AgentToolNameConflictError, buildAgentTools } from '../tools/index.js';
 
 const failMessage = 'El asistente no está disponible.';
@@ -19,10 +20,17 @@ export async function prepareAgentTurnTools(params: {
 }): Promise<{ registry: McpRegistry; tools: Record<string, Tool> }> {
   const { mcpConfig, accessToken, mcpTokens, principal, conversationId, delegationEnabled, signal } = params;
 
+  const effectiveMcpTokens = { ...mcpTokens };
+  for (const [name, mcp] of Object.entries(mcpConfig)) {
+    if (!mcp.oauth) continue;
+    const oauthToken = await getMcpOAuthAccessToken(principal.userId, name, mcpConfig);
+    if (oauthToken) effectiveMcpTokens[name] = oauthToken;
+  }
+
   let registry: McpRegistry;
   try {
     registry = new McpRegistry(mcpConfig);
-    await registry.connect(accessToken, mcpTokens, signal);
+    await registry.connect(accessToken, effectiveMcpTokens, signal);
   } catch (error) {
     if (signal?.aborted) signal.throwIfAborted();
     console.error(error);
@@ -35,7 +43,7 @@ export async function prepareAgentTurnTools(params: {
       principal,
       conversationId,
       accessToken,
-      mcpTokens,
+      mcpTokens: effectiveMcpTokens,
       delegationEnabled,
     });
     return { registry, tools };

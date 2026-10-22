@@ -63,10 +63,11 @@ const guides = {
       ['<nombre>.url', 'Pedí al administrador del MCP la URL HTTP(S) de su endpoint. Docker Desktop y un MCP en tu PC: http://host.docker.internal:PUERTO/mcp. En Compose, usá el nombre del servicio y su puerto interno.'],
       ['<nombre>.auth', 'null no reenvía el token de usuario. Un string no vacío reenvía el Bearer de la sesión al MCP, por ejemplo "forward-user-token"; no es la URL ni un secreto.'],
       ['<nombre>.headers', 'Headers fijos enviados desde el servidor, como Authorization con un token/API key; pedí el nombre y formato al administrador del MCP. Se enmascaran: ******** conserva el valor. Si auth está activo, el Bearer del usuario reemplaza Authorization.'],
+      ['<nombre>.oauth', 'Opcional. Credenciales de cliente OAuth registradas para este servidor: {clientId, clientSecret?, scopes}; clientSecret es opcional para clientes públicos. Runtime descubre los metadatos OAuth del endpoint MCP, usa Authorization Code + PKCE y guarda tokens cifrados por usuario y MCP.'],
       ['<nombre>.optional', 'true deja continuar el turno si el MCP no conecta; false hace fallar el turno. Usá true si el servidor es auxiliar.'],
     ],
-    example: '{\n  "mi_mcp": {\n    "url": "http://host.docker.internal:3020/mcp",\n    "auth": null,\n    "headers": {},\n    "optional": true\n  }\n}',
-    note: 'Todavía no hay prueba de conexión desde la UI. Después de guardar, revisá logs y probá una conversación. No incluyas tokens reales en capturas.',
+    example: '{\n  "mi_mcp": {\n    "url": "https://mcp.example.com/mcp",\n    "auth": null,\n    "headers": {},\n    "oauth": {\n      "clientId": "CLIENT_ID",\n      "clientSecret": "CLIENT_SECRET",\n      "scopes": ["tools:read"]\n    },\n    "optional": true\n  }\n}',
+    note: 'El servidor debe publicar OAuth Protected Resource Metadata y el authorization server debe ofrecer endpoints OAuth estándar. No se implementa Dynamic Client Registration: registrá cliente y callback en el servidor. Client secret se enmascara; no incluyas tokens reales en capturas.',
   },
   Auth: {
     intro: 'La introspección permite que Runtime consulte el sistema de autenticación del huésped para validar cada Bearer opaco y obtener la identidad de usuario. Se hace un GET al endpoint configurado con Authorization: Bearer <token>; Runtime no valida firmas JWT por sí mismo.',

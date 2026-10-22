@@ -7,6 +7,7 @@ import Icon from './Icon.jsx';
 import AdminConfig from './AdminConfig.jsx';
 import MemoryManager from './MemoryManager.jsx';
 import IdentitySettings from './IdentitySettings.jsx';
+import McpConnections from './McpConnections.jsx';
 import useDelegationTracking from './useDelegationTracking.js';
 
 export default function App() {
@@ -17,6 +18,7 @@ export default function App() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [showMemory, setShowMemory] = useState(false);
   const [showIdentity, setShowIdentity] = useState(false);
+  const [showMcpConnections, setShowMcpConnections] = useState(() => Boolean(new URLSearchParams(window.location.search).get('mcp-oauth')));
   const [identityRevision, setIdentityRevision] = useState(0);
   const [conversationRefreshKey, setConversationRefreshKey] = useState(0);
   const refreshConversations = useCallback(() => setConversationRefreshKey(key => key + 1), []);
@@ -40,6 +42,7 @@ export default function App() {
     setShowAdmin(false);
     setShowMemory(false);
     setShowIdentity(false);
+    setShowMcpConnections(false);
     setIsSidebarOpen(false);
   }
 
@@ -67,6 +70,7 @@ export default function App() {
     setShowAdmin(true);
     setShowMemory(false);
     setShowIdentity(false);
+    setShowMcpConnections(false);
     setIsSidebarOpen(false);
   }
 
@@ -74,6 +78,7 @@ export default function App() {
     setShowMemory(true);
     setShowAdmin(false);
     setShowIdentity(false);
+    setShowMcpConnections(false);
     setIsSidebarOpen(false);
   }
 
@@ -81,6 +86,15 @@ export default function App() {
     setShowIdentity(true);
     setShowAdmin(false);
     setShowMemory(false);
+    setShowMcpConnections(false);
+    setIsSidebarOpen(false);
+  }
+
+  function openMcpConnections() {
+    setShowMcpConnections(true);
+    setShowAdmin(false);
+    setShowMemory(false);
+    setShowIdentity(false);
     setIsSidebarOpen(false);
   }
 
@@ -88,7 +102,7 @@ export default function App() {
     <div className={ChatStyles.appShell}>
       <ConversationList
         isSidebarOpen={isSidebarOpen}
-        hasActiveChat={Boolean(activeConv || showAdmin || showMemory || showIdentity)}
+        hasActiveChat={Boolean(activeConv || showAdmin || showMemory || showIdentity || showMcpConnections)}
         activeId={activeConv}
         activityByConversation={conversationActivity}
         delegationByConversation={delegationByConversation}
@@ -97,6 +111,7 @@ export default function App() {
         onOpenAdmin={openAdmin}
         onOpenMemory={openMemory}
         onOpenIdentity={openIdentity}
+        onOpenMcpConnections={openMcpConnections}
         refreshKey={conversationRefreshKey}
       />
       {isSidebarOpen && (
@@ -107,12 +122,12 @@ export default function App() {
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
-      <div className={ChatStyles.chatInstances} hidden={showAdmin || showMemory || showIdentity || !activeConv}>
+      <div className={ChatStyles.chatInstances} hidden={showAdmin || showMemory || showIdentity || showMcpConnections || !activeConv}>
         {mountedConversations.map(id => (
-          <div key={`${id}:${identityRevision}`} className={ChatStyles.chatInstance} hidden={showAdmin || showMemory || showIdentity || id !== activeConv}>
+          <div key={`${id}:${identityRevision}`} className={ChatStyles.chatInstance} hidden={showAdmin || showMemory || showIdentity || showMcpConnections || id !== activeConv}>
             <Chat
               conversationId={id}
-              isVisible={!showAdmin && !showMemory && !showIdentity && id === activeConv}
+              isVisible={!showAdmin && !showMemory && !showIdentity && !showMcpConnections && id === activeConv}
               delegationStatus={delegationByConversation[id]?.status}
               onOpenSidebar={() => setIsSidebarOpen(true)}
               onConversationUpdated={handleConversationUpdated}
@@ -128,6 +143,8 @@ export default function App() {
         <MemoryManager onBack={() => setShowMemory(false)} />
       ) : showIdentity ? (
         <IdentitySettings onBack={() => setShowIdentity(false)} onBearerChange={handleIdentityChanged} />
+      ) : showMcpConnections ? (
+        <McpConnections onBack={() => setShowMcpConnections(false)} />
       ) : !activeConv ? (
         <div className={ChatStyles.emptyState}>
           <div>Seleccioná un chat o creá uno nuevo</div>

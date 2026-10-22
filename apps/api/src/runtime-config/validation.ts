@@ -76,6 +76,17 @@ export function validateRuntimeSettings(value: unknown): RuntimeSettings {
     if (mcp.headers !== undefined && (!mcp.headers || typeof mcp.headers !== 'object' || Array.isArray(mcp.headers) || Object.values(mcp.headers).some((header) => typeof header !== 'string'))) throw new Error('Invalid MCP headers: ' + name);
     if (mcp.auth != null && typeof mcp.auth !== 'string') throw new Error('Invalid MCP auth: ' + name);
     if (mcp.optional !== undefined && typeof mcp.optional !== 'boolean') throw new Error('Invalid MCP optional flag: ' + name);
+    if (mcp.oauth !== undefined && mcp.oauth !== null) {
+      if (!mcp.oauth || typeof mcp.oauth !== 'object' || Array.isArray(mcp.oauth)
+        || typeof mcp.oauth.clientId !== 'string' || !mcp.oauth.clientId.trim()
+        || (mcp.oauth.clientSecret !== undefined && (typeof mcp.oauth.clientSecret !== 'string' || !mcp.oauth.clientSecret.trim()))
+        || (mcp.oauth.scopes !== undefined && (!Array.isArray(mcp.oauth.scopes) || mcp.oauth.scopes.some((scope: unknown) => typeof scope !== 'string')))) {
+        throw new Error('Invalid MCP OAuth client configuration: ' + name);
+      }
+      mcp.oauth = { clientId: mcp.oauth.clientId.trim(), ...(mcp.oauth.clientSecret ? { clientSecret: mcp.oauth.clientSecret.trim() } : {}), scopes: [...new Set((mcp.oauth.scopes ?? []).map((scope: string) => scope.trim()).filter(Boolean))] };
+    } else {
+      delete mcp.oauth;
+    }
     mcp.url = mcp.url.trim();
     mcp.headers ??= {};
     mcp.auth ??= null;
