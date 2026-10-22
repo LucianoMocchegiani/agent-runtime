@@ -1,3 +1,4 @@
+import { createAdminApi } from './admin.js';
 import { createCatalogApi } from './catalog.js';
 import { createConversationsApi } from './conversations.js';
 import { createDelegationsApi } from './delegations.js';
@@ -9,6 +10,7 @@ import type { ClientConfig } from './types.js';
 export { ClientError } from './client-error.js';
 export { isAbortError } from './abort.js';
 export { consumeUiMessageStream } from './stream.js';
+export type { AdminAgentProfile, AdminProfileList, AdminRuntimeConfig } from './admin.js';
 export type {
   AgentProfileInfo,
   ClientConfig,
@@ -40,6 +42,7 @@ export type {
 export function createClient(config: ClientConfig) {
   const catalog = createCatalogApi(config);
   return {
+    admin: createAdminApi(config),
     conversations: createConversationsApi(config),
     preferences: createPreferencesApi(config),
     ...catalog,

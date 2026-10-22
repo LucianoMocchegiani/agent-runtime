@@ -38,6 +38,21 @@ const result = await client.messages.send(
 
 El cliente no crea ni conserva automáticamente una sesión anónima. Si se usa el modo anónimo del runtime, la aplicación anfitriona debe generar y conservar un identificador estable y enviar `anon:<uuid>` mediante `getBearer` en todas las solicitudes. Sin un Bearer persistente, las solicitudes no comparten identidad.
 
+### Administración y voz Realtime
+
+Las operaciones administrativas usan `client.admin` y reciben el encabezado de autorización de administración en cada llamada; no reutilizan el Bearer de identidad ni las credenciales MCP configuradas en el cliente:
+
+```ts
+const config = await client.admin.getRuntimeConfig(adminAuthorization);
+await client.admin.saveRuntimeConfig(adminAuthorization, {
+  version: config.version,
+  settings: config.settings,
+});
+const profiles = await client.admin.listAgentProfiles(adminAuthorization);
+```
+
+`client.voice.negotiateRealtime({ realtimeUrl, token, offerSdp })` encapsula el POST SDP al proveedor Realtime. La aplicación sigue siendo responsable de WebRTC, el micrófono y el estado de la interfaz.
+
 ### Navegador
 
 `agent-runtime-client/browser` es el bundle ESM generado por `npm run bundle -w packages/client`. Lo consume la UI nativa (`apps/ui`).
@@ -62,5 +77,14 @@ Los turnos usan UI Message Stream (AI SDK). El seguimiento de delegaciones usa S
 | `GET` | `/v1/delegations` | Lista delegaciones del usuario. |
 | `GET` | `/v1/delegations/:id` | Consulta estado de delegación. |
 | `GET` | `/v1/delegations/:id/events` | Sigue eventos de delegación vía SSE recuperable. |
+| `GET` | `/admin/runtime-config` | `client.admin.getRuntimeConfig(authorization)` lee configuración administrativa. |
+| `PUT` | `/admin/runtime-config` | `client.admin.saveRuntimeConfig(authorization, input)` guarda configuración versionada. |
+| `POST` | `/admin/runtime-config/test-auth` | `client.admin.testAuth(authorization, input)` prueba introspección de identidad. |
+| `GET` | `/admin/agent-profiles` | `client.admin.listAgentProfiles(authorization)` lista perfiles y su default. |
+| `POST` | `/admin/agent-profiles` | `client.admin.createAgentProfile(authorization, profile)` crea perfil. |
+| `PUT` | `/admin/agent-profiles/:id` | `client.admin.updateAgentProfile(authorization, id, profile)` actualiza perfil. |
+| `DELETE` | `/admin/agent-profiles/:id` | `client.admin.archiveAgentProfile(authorization, id)` archiva perfil. |
+| `PUT` | `/admin/agent-profiles/default-for-new-chats` | `client.admin.setDefaultForNewChats(authorization, profileId)` cambia el default. |
+| `POST` | Proveedor Realtime | `client.voice.negotiateRealtime(input)` envía la oferta SDP al proveedor. |
 
 Para mantener una identidad entre solicitudes `/v1`, enviá un Bearer estable; sin Bearer el servidor crea una identidad nueva para cada solicitud. `X-MCP-Auth` es opcional.

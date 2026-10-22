@@ -132,13 +132,12 @@ export default function useChatVoice({ conversationId, agentProfileId, isVisible
       session.stream.getTracks().forEach(track => pc.addTrack(track, session.stream));
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
-      const answer = await fetch(token.realtimeUrl, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token.value}`, 'Content-Type': 'application/sdp' },
-        body: pc.localDescription?.sdp,
+      const answerSdp = await client.voice.negotiateRealtime({
+        realtimeUrl: token.realtimeUrl,
+        token: token.value,
+        offerSdp: pc.localDescription?.sdp ?? '',
       });
-      if (!answer.ok) throw new Error(`OpenAI rechazó la sesión de voz (HTTP ${answer.status}).`);
-      await pc.setRemoteDescription({ type: 'answer', sdp: await answer.text() });
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
       pendingAudio = null;
       if (startId === voiceStartIdRef.current) setHandsFreeStatus('listening');
     } catch (error) {

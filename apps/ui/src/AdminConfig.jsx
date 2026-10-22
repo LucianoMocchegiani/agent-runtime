@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import client from './client.js';
 import AdminConfigHelp from './AdminConfigHelp.jsx';
 import sharedStyles from './admin-memory.module.css';
 import styles from './AdminConfig.module.css';
@@ -10,13 +11,6 @@ const TABS = [
   { id: 'MCP', label: 'MCP' },
   { id: 'Auth', label: 'Auth' },
 ];
-const API = import.meta.env.VITE_BASE_URL || '';
-
-async function errorText(res) {
-  try { return (await res.json()).error || `HTTP ${res.status}`; }
-  catch { return `HTTP ${res.status}`; }
-}
-
 function editableProfile(profile) {
   return { name: profile.name, model: profile.model, config: profile.config };
 }
@@ -68,15 +62,10 @@ export default function AdminConfig({ onBack }) {
     setBusy(true);
     setError('');
     try {
-      const headers = { Authorization: overrideHeader };
-      const [res, profileRes] = await Promise.all([
-        fetch(`${API}/admin/runtime-config`, { headers }),
-        fetch(`${API}/admin/agent-profiles`, { headers }),
+      const [data, profileData] = await Promise.all([
+        client.admin.getRuntimeConfig(overrideHeader),
+        client.admin.listAgentProfiles(overrideHeader),
       ]);
-      if (!res.ok) throw new Error(await errorText(res));
-      if (!profileRes.ok) throw new Error(await errorText(profileRes));
-      const data = await res.json();
-      const profileData = await profileRes.json();
       const nextProfiles = profileData.items ?? [];
       setAuthHeader(overrideHeader);
       loadData(data);
@@ -128,13 +117,7 @@ export default function AdminConfig({ onBack }) {
     try {
       const next = structuredClone(config);
       applyValue(next, tab, JSON.parse(draft));
-      const res = await fetch(`${API}/admin/runtime-config`, {
-        method: 'PUT',
-        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version, settings: next }),
-      });
-      if (!res.ok) throw new Error(await errorText(res));
-      loadData(await res.json());
+      loadData(await client.admin.saveRuntimeConfig(authHeader, { version, settings: next }));
       setNotice('Cambios guardados correctamente.');
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -146,13 +129,7 @@ export default function AdminConfig({ onBack }) {
     setNotice('');
     try {
       const settings = JSON.parse(draft);
-      const res = await fetch(`${API}/admin/runtime-config/test-auth`, {
-        method: 'POST',
-        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ settings, token: authTestToken }),
-      });
-      if (!res.ok) throw new Error(await errorText(res));
-      const { identity } = await res.json();
+      const { identity } = await client.admin.testAuth(authHeader, { settings, token: authTestToken });
       setNotice(`Introspección correcta · userId: ${identity.userId}${identity.email ? ` · email: ${identity.email}` : ''}${identity.name ? ` · name: ${identity.name}` : ''}`);
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -164,12 +141,7 @@ export default function AdminConfig({ onBack }) {
     setError('');
     setNotice('');
     try {
-      const res = await fetch(`${API}/admin/agent-profiles/default-for-new-chats`, {
-        method: 'PUT',
-        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profileId: defaultForNewChatsId }),
-      });
-      if (!res.ok) throw new Error(await errorText(res));
+      await client.admin.setDefaultForNewChats(authHeader, defaultForNewChatsId);
       setNotice('Perfil predeterminado para nuevos chats guardado.');
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
@@ -181,12 +153,7 @@ export default function AdminConfig({ onBack }) {
     setNotice('');
     try {
       const value = JSON.parse(profileDraft);
-      const res = await fetch(`${API}/admin/agent-profiles/${encodeURIComponent(selectedProfileId)}`, {
-        method: 'PUT',
-        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify(value),
-      });
-      if (!res.ok) throw new Error(await errorText(res));
+      await client.admin.updateAgentProfile(authHeader, selectedProfileId, value);
       await load();
       setNotice('Perfil guardado. Se aplicará en los próximos turnos de las conversaciones que lo tengan asignado.');
     } catch (e) { setError(e.message); }
@@ -202,13 +169,7 @@ export default function AdminConfig({ onBack }) {
         ? { ...editableProfile(source), name: 'Nuevo perfil' }
         : null;
       if (!profile) throw new Error('No hay perfil base para copiar.');
-      const res = await fetch(`${API}/admin/agent-profiles`, {
-        method: 'POST',
-        headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile),
-      });
-      if (!res.ok) throw new Error(await errorText(res));
-      const created = await res.json();
+      const created = await client.admin.createAgentProfile(authHeader, profile);
       await load();
       setSelectedProfileId(created.id);
       setProfileDraft(JSON.stringify(editableProfile(created), null, 2));
@@ -223,10 +184,7 @@ export default function AdminConfig({ onBack }) {
     setBusy(true);
     setError('');
     try {
-      const res = await fetch(`${API}/admin/agent-profiles/${encodeURIComponent(selectedProfileId)}`, {
-        method: 'DELETE', headers: { Authorization: authHeader },
-      });
-      if (!res.ok) throw new Error(await errorText(res));
+      await client.admin.archiveAgentProfile(authHeader, selectedProfileId);
       await load();
       setNotice('Perfil archivado. Las conversaciones existentes conservan su asignación.');
     } catch (e) { setError(e.message); }

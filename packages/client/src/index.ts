@@ -1,6 +1,9 @@
 /** Punto de entrada público del SDK de agent-runtime. */
 export { createClient, consumeUiMessageStream, ClientError, isAbortError } from './core.js';
 export type {
+  AdminAgentProfile,
+  AdminProfileList,
+  AdminRuntimeConfig,
   AgentProfileInfo,
   ClientConfig,
   Conversation,

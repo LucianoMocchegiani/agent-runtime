@@ -27,6 +27,17 @@ export function createVoiceApi(config: ClientConfig) {
       return parseJson<{ value: string; expiresAt: number | null; realtimeUrl: string }>(res);
     },
 
+    /** Negocia una sesión WebRTC directamente con el proveedor Realtime externo. */
+    negotiateRealtime: async (input: { realtimeUrl: string; token: string; offerSdp: string }): Promise<string> => {
+      const res = await fetch(input.realtimeUrl, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${input.token}`, 'Content-Type': 'application/sdp' },
+        body: input.offerSdp,
+      });
+      if (!res.ok) throw new ClientError(res.status, `El proveedor Realtime rechazó la sesión de voz (HTTP ${res.status}).`);
+      return res.text();
+    },
+
     /** Envía una llamada Realtime al puente de herramientas autenticado de Runtime. */
     executeTool: async (conversationId: string, name: string, callId: string, args: string): Promise<unknown> => {
       const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/tools/${encodeURIComponent(name)}`, {
