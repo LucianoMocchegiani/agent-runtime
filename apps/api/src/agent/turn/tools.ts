@@ -15,20 +15,22 @@ export async function prepareAgentTurnTools(params: {
   principal: Principal;
   conversationId: string;
   delegationEnabled: boolean;
+  signal?: AbortSignal;
 }): Promise<{ registry: McpRegistry; tools: Record<string, Tool> }> {
-  const { mcpConfig, accessToken, mcpTokens, principal, conversationId, delegationEnabled } = params;
+  const { mcpConfig, accessToken, mcpTokens, principal, conversationId, delegationEnabled, signal } = params;
 
   let registry: McpRegistry;
   try {
     registry = new McpRegistry(mcpConfig);
-    await registry.connect(accessToken, mcpTokens);
+    await registry.connect(accessToken, mcpTokens, signal);
   } catch (error) {
+    if (signal?.aborted) signal.throwIfAborted();
     console.error(error);
     throw new HTTPException(502, { message: failMessage });
   }
 
   try {
-    const mcpTools = await registry.getAllTools() as Record<string, Tool>;
+    const mcpTools = await registry.getAllTools(signal) as Record<string, Tool>;
     const tools = buildAgentTools(mcpTools, {
       principal,
       conversationId,
@@ -39,6 +41,7 @@ export async function prepareAgentTurnTools(params: {
     return { registry, tools };
   } catch (error) {
     await registry.close().catch(() => undefined);
+    if (signal?.aborted) signal.throwIfAborted();
     if (!(error instanceof AgentToolNameConflictError)) {
       console.error(error);
     }

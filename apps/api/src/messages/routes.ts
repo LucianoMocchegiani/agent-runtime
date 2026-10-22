@@ -111,11 +111,11 @@ async function releaseTurnWhenResponseEnds(response: Response, release: () => Pr
       }
     },
     async cancel(reason) {
-      try {
-        await reader.cancel(reason);
-      } finally {
-        await release();
-      }
+      // No dejar que un reader aguas abajo demore la liberación del lease.
+      void reader.cancel(reason).catch((error: unknown) => {
+        console.error('No se pudo cancelar el stream del turno.', error);
+      });
+      await release();
     },
   });
 

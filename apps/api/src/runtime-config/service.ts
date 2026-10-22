@@ -90,7 +90,6 @@ export async function startRuntimeConfigStore(): Promise<void> {
 export function getRuntimeSettings(profile?: Pick<AgentProfile, 'model' | 'config'>): RuntimeSettings {
   const current = structuredClone(currentSettings());
   if (profile) {
-    current.ai.defaultModel = profile.model.chat;
     const profileConfig = structuredClone(profile.config);
     current.chatSystemPrompt = profileConfig.systemPrompt;
     Object.assign(current, profileConfig.chat);
@@ -115,8 +114,7 @@ export class RuntimeConfigConflictError extends Error {
 /** Valida y guarda configuración de infraestructura con control optimista de versión. */
 export async function saveRuntimeSettings(value: unknown, expectedVersion?: number): Promise<number> {
   const validated = validateRuntimeSettings(value);
-  // Legacy chat/model fields remain readable only for migrations; profiles own them after startup.
-  validated.ai.defaultModel = config.ai.defaultModel;
+  // Legacy chat fields remain readable only for profile bootstrap; profiles own them after startup.
   validated.chatSystemPrompt = config.chatSystemPrompt;
   validated.contextTokenBudget = config.contextTokenBudget;
   validated.maxContextMessages = config.maxContextMessages;

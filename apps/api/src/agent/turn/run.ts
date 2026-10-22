@@ -34,6 +34,7 @@ export async function streamAgentTurn(
     ? `${runtimeSettings.chatSystemPrompt}\n\nDelegaciones: solo usá delegate_to_conversation cuando el usuario haya pedido explícitamente delegar trabajo a otro hilo. Nunca elijas ni delegues tareas por iniciativa propia. No interpretes la mera disponibilidad de la herramienta como autorización.`
     : runtimeSettings.chatSystemPrompt;
 
+  abortSignal?.throwIfAborted();
   const { registry, tools } = await prepareAgentTurnTools({
     mcpConfig: runtimeSettings.mcpConfig,
     accessToken,
@@ -41,56 +42,63 @@ export async function streamAgentTurn(
     principal,
     conversationId,
     delegationEnabled: delegationEncryptionEnabled(),
+    signal: abortSignal,
   });
 
-  if (!options.userMessageAlreadySaved) {
-    await saveMessage({
-      conversationId,
-      userId: principal.userId,
-      role: 'user',
-      content: userText,
-    });
-  }
-  await applyAutomaticTitle({
-    conversationId,
-    userId: principal.userId,
-    userText,
-  });
-
-  let context;
   try {
-    context = await getContext({
+    abortSignal?.throwIfAborted();
+    if (!options.userMessageAlreadySaved) {
+      await saveMessage({
+        conversationId,
+        userId: principal.userId,
+        role: 'user',
+        content: userText,
+      });
+    }
+    abortSignal?.throwIfAborted();
+    await applyAutomaticTitle({
       conversationId,
       userId: principal.userId,
+      userText,
+    });
+
+    abortSignal?.throwIfAborted();
+    const context = await getContext({
+      conversationId,
+      userId: principal.userId,
+    });
+    abortSignal?.throwIfAborted();
+
+    const preparedContext = await prepareTurnContext({
+      saveSummary,
+      searchPreferences,
+      model,
+      conversationId,
+      userId: principal.userId,
+      userText,
+      context,
+      runtimeSettings,
+      systemPrompt: turnSystemPrompt,
+      tools,
+      images,
+    });
+    abortSignal?.throwIfAborted();
+
+    return await streamPreparedAgentTurn({
+      conversationId,
+      userId: principal.userId,
+      model,
+      registry,
+      runtimeSettings,
+      tools,
+      abortSignal,
+      ...preparedContext,
     });
   } catch (error) {
     await registry.close().catch(() => undefined);
+    if (abortSignal?.aborted) abortSignal.throwIfAborted();
+    if (error instanceof HTTPException) throw error;
     console.error(error);
     throw new HTTPException(502, { message: failMessage });
   }
-
-  const preparedContext = await prepareTurnContext({
-    saveSummary,
-    searchPreferences,
-    model,
-    conversationId,
-    userId: principal.userId,
-    userText,
-    context,
-    runtimeSettings,
-    systemPrompt: turnSystemPrompt,
-    tools,
-    images,
-  });
-
-  return streamPreparedAgentTurn({
-    conversationId,
-    userId: principal.userId,
-    model,
-    registry,
-    runtimeSettings,
-    tools,
-    abortSignal,
-    ...preparedContext,
-  });
 }

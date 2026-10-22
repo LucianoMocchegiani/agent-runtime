@@ -1,4 +1,4 @@
-import { config } from '../config.js';
+import { AI_PROVIDERS, config } from '../config.js';
 import type { AgentProfile, AgentProfileConfig } from './contracts.js';
 import {
   archiveAgentProfileRecord,
@@ -85,5 +85,8 @@ export async function seedDefaultAgentProfile(): Promise<void> {
       summaryTokenBudget: config.summaryTokenBudget,
     },
   };
-  await seedLegacyAgentProfile(config.ai.defaultModel, legacyConfig);
+  const initialChatModel = AI_PROVIDERS.flatMap((provider) =>
+    (config.ai.providers[provider]?.models.chat ?? []).map((model) => `${provider}/${model}`),
+  )[0] ?? '';
+  await seedLegacyAgentProfile(initialChatModel, legacyConfig);
 }

@@ -1,0 +1,561 @@
+{
+  "info": {
+    "_postman_id": "8cc7c2e9-f740-4af8-a5df-a95af18d320e",
+    "name": "Agent Runtime API",
+    "description": "Importá también el environment local. Modo público usa userToken anon persistente. Admin requiere adminToken. Voz/delegaciones dependen de configuración.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{userToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health",
+            "description": "Comprueba que el API responde y que sus dependencias de salud (incluida la base de datos) están disponibles. No requiere autenticación."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Runtime config",
+      "item": [
+        {
+          "name": "Get runtime config",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/runtime-config",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Requiere token administrativo. Devuelve la versión y la configuración global; los secretos se muestran enmascarados. Usá el resultado para revisar la configuración antes de actualizarla."
+          }
+        },
+        {
+          "name": "Update runtime config (example)",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/admin/runtime-config",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"version\": 1,\n  \"settings\": {\n    \"ai\": {\n      \"providers\": {\n        \"openrouter\": {\n          \"apiKey\": \"replace-with-real-api-key\",\n          \"models\": {\n            \"chat\": [\n              \"openai/gpt-4o-mini\"\n            ]\n          }\n        }\n      }\n    },\n    \"mcpConfig\": {},\n    \"authIntrospectUrl\": null,\n    \"authMapping\": {\n      \"userId\": \"userId\",\n      \"email\": null,\n      \"name\": null\n    },\n    \"chatSystemPrompt\": \"Sos un asistente útil.\",\n    \"contextTokenBudget\": 10000,\n    \"maxContextMessages\": 20,\n    \"maxOutputTokens\": 4096,\n    \"reserveOutputTokens\": 4096,\n    \"contextSafetyTokens\": 512,\n    \"maxToolSteps\": 8,\n    \"llmTraceRequests\": false,\n    \"summariesEnabled\": true,\n    \"summaryTokenBudget\": 300,\n    \"embeddingConfig\": null\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requiere token administrativo. Reemplaza la configuración global enviada, no hace una actualización parcial. Hacé GET primero y conservá los valores existentes que necesites. Reemplazá la API key y la versión de configuración antes de enviar. El modelo de chat se selecciona en cada perfil."
+          }
+        },
+        {
+          "name": "Test auth introspection",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/admin/runtime-config/test-auth",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{authTestBearer}}\",\n  \"settings\": {\n    \"authIntrospectUrl\": \"https://auth.example.com/userinfo\",\n    \"authMapping\": {\n      \"userId\": \"sub\",\n      \"email\": \"email\",\n      \"name\": \"name\"\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requiere token administrativo. Prueba la introspección usando el token y los ajustes de auth incluidos en el body, sin guardar esos ajustes. Cambiá URL y nombres de campos para que coincidan con tu proveedor de identidad."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Agent profiles",
+      "item": [
+        {
+          "name": "List profiles",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/admin/agent-profiles",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Requiere token administrativo. Lista los perfiles de agente configurados y el perfil predeterminado para conversaciones nuevas."
+          }
+        },
+        {
+          "name": "Set default profile",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/admin/agent-profiles/default-for-new-chats",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"profileId\": \"{{profileId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requiere token administrativo. Define qué perfil se asigna por defecto a conversaciones nuevas. Body: profileId debe ser el ID de un perfil válido."
+          }
+        },
+        {
+          "name": "Create profile",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/admin/agent-profiles",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman test profile\",\n  \"model\": {\n    \"chat\": \"{{modelId}}\"\n  },\n  \"config\": {\n    \"systemPrompt\": \"Sos un asistente útil.\",\n    \"chat\": {\n      \"contextTokenBudget\": 10000,\n      \"maxContextMessages\": 20,\n      \"maxOutputTokens\": 4096,\n      \"reserveOutputTokens\": 4096,\n      \"contextSafetyTokens\": 512,\n      \"maxToolSteps\": 8,\n      \"llmTraceRequests\": false,\n      \"summariesEnabled\": true,\n      \"summaryTokenBudget\": 300\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requiere token administrativo. Crea un perfil con nombre, modelo y configuración de chat. Reemplazá model.chat por un modelo habilitado (consultá GET /v1/models)."
+          }
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/admin/agent-profiles/{{profileId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Postman test profile\",\n  \"model\": {\n    \"chat\": \"{{modelId}}\"\n  },\n  \"config\": {\n    \"systemPrompt\": \"Sos un asistente útil.\",\n    \"chat\": {\n      \"contextTokenBudget\": 10000,\n      \"maxContextMessages\": 20,\n      \"maxOutputTokens\": 4096,\n      \"reserveOutputTokens\": 4096,\n      \"contextSafetyTokens\": 512,\n      \"maxToolSteps\": 8,\n      \"llmTraceRequests\": false,\n      \"summariesEnabled\": true,\n      \"summaryTokenBudget\": 300\n    }\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Requiere token administrativo. Actualiza el perfil identificado por profileId. El body de ejemplo muestra la forma del perfil; ajustalo a los valores que querés conservar."
+          }
+        },
+        {
+          "name": "Archive profile",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/admin/agent-profiles/{{profileId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{adminToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "description": "Requiere token administrativo. Archiva el perfil identificado por profileId; no lo elimina físicamente. Confirmá que no sea el perfil predeterminado antes de archivarlo."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API v1 - Conversations",
+      "item": [
+        {
+          "name": "List active",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/conversations?limit=20",
+            "description": "Lista conversaciones no archivadas del usuario autenticado. Query: limit (1–100), cursor para continuar la paginación y archived=false para filtrar explícitamente las activas."
+          }
+        },
+        {
+          "name": "List archived",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/conversations?archived=true&limit=20",
+            "description": "Lista conversaciones archivadas del usuario autenticado. Query: archived=true; limit controla el tamaño de página y cursor permite continuarla."
+          }
+        },
+        {
+          "name": "Create",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/conversations",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Conversación de prueba\",\n  \"agentProfileId\": \"{{profileId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Crea una conversación para el usuario autenticado. Body: title (opcional) y agentProfileId (opcional/null; si se omite se usa el perfil predeterminado). Guardá el ID de la respuesta en conversationId."
+          }
+        },
+        {
+          "name": "Get",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}",
+            "description": "Obtiene los datos de una conversación propia. Path: conversationId es el ID devuelto al crearla o al listarla."
+          }
+        },
+        {
+          "name": "Update",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Título actualizado\",\n  \"archived\": false,\n  \"agentProfileId\": \"{{profileId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Actualiza propiedades de una conversación propia. Body de ejemplo: title, archived y agentProfileId; enviá únicamente los campos que quieras cambiar. Para archivar también existe DELETE."
+          }
+        },
+        {
+          "name": "Archive",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}",
+            "description": "Archiva la conversación propia indicada por conversationId. Es una acción lógica, no una eliminación física."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API v1 - Messages",
+      "item": [
+        {
+          "name": "List messages",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}/messages?limit=50",
+            "description": "Lista mensajes de la conversación indicada por conversationId. Query: limit (1–100); para paginar hacia atrás, enviá beforeCreatedAt (ISO 8601) y beforeId (UUID) juntos."
+          }
+        },
+        {
+          "name": "Send message (stream)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}/messages",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Hola, ¿podés resumir qué puede hacer este agente?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Envía un mensaje y recibe la respuesta del agente en un stream. Body: text. Admite image o images con data URL base64; máximo 10 imágenes de 5 MiB cada una. En Postman el stream puede mostrarse como respuesta en curso."
+          }
+        },
+        {
+          "name": "Edit and regenerate (stream)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}/messages/{{messageId}}/edit",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Texto editado para regenerar la respuesta.\",\n  \"expectedLaterMessages\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Edita el mensaje indicado por messageId y regenera la respuesta desde ese punto. Body: text y expectedLaterMessages, que debe coincidir con la cantidad actual de mensajes posteriores. No admite adjuntos."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API v1 - Models and profiles",
+      "item": [
+        {
+          "name": "List models",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/models",
+            "description": "Lista los modelos habilitados para el usuario y el modelo predeterminado. Usá sus identificadores en los perfiles y en otros requests."
+          }
+        },
+        {
+          "name": "List profiles available",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/agent-profiles",
+            "description": "Lista los perfiles activos disponibles para el usuario autenticado; no requiere permisos administrativos."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API v1 - Preferences",
+      "item": [
+        {
+          "name": "List preferences",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/preferences?limit=20",
+            "description": "Lista las preferencias guardadas por el usuario autenticado. Query: limit (1–100) y cursor para paginación."
+          }
+        },
+        {
+          "name": "Save preference",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/preferences",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preference\": \"Prefiero respuestas concisas y ejemplos prácticos.\",\n  \"activationCondition\": \"Cuando pida explicaciones técnicas.\",\n  \"category\": \"estilo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Guarda una preferencia para el usuario autenticado. Body: preference (texto), activationCondition (cuándo aplicarla) y category (clasificación breve)."
+          }
+        },
+        {
+          "name": "Delete preference",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/v1/preferences/{{preferenceId}}",
+            "description": "Elimina la preferencia propia indicada por preferenceId. Usá el ID obtenido al listar o guardar preferencias."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API v1 - Delegations (conditional)",
+      "item": [
+        {
+          "name": "List delegations",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/delegations",
+            "description": "Lista las delegaciones asociadas al usuario autenticado. Esta función solo está disponible si el servidor tiene habilitadas las delegaciones."
+          }
+        },
+        {
+          "name": "Get delegation",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/delegations/{{delegationId}}",
+            "description": "Obtiene el estado y los datos de una delegación propia. Path: delegationId. Requiere que las delegaciones estén habilitadas."
+          }
+        },
+        {
+          "name": "Events SSE",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/delegations/{{delegationId}}/events?after={{afterCursor}}",
+            "description": "Abre el stream SSE de eventos de una delegación. Path: delegationId. Reanudación opcional: query after o header Last-Event-ID con el cursor del último evento recibido. Requiere delegaciones habilitadas."
+          }
+        }
+      ]
+    },
+    {
+      "name": "API v1 - Voice (conditional)",
+      "item": [
+        {
+          "name": "Voice status",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}/voice/status",
+            "description": "Consulta si la voz Realtime está disponible para esta conversación y configuración. Path: conversationId. La disponibilidad depende del proveedor y del perfil."
+          }
+        },
+        {
+          "name": "Create realtime session",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}/voice/session",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Crea una sesión Realtime de voz para conversationId. El body vacío es un ejemplo; la respuesta incluye los datos necesarios para conectar el cliente de voz. Requiere voz habilitada."
+          }
+        },
+        {
+          "name": "Call voice tool",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/v1/conversations/{{conversationId}}/voice/tools/{{toolName}}",
+            "header": [
+              {
+                "key": "x-voice-call-id",
+                "value": "{{voiceCallId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"arguments\": \"{}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Invoca la herramienta indicada por toolName durante una llamada de voz. Header x-voice-call-id identifica la llamada; body.arguments es una cadena que contiene JSON (por ejemplo, \"{}\"), no un objeto JSON directo. Requiere una sesión válida y voz habilitada."
+          }
+        }
+      ]
+    }
+  ]
+}

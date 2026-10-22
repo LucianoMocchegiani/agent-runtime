@@ -115,10 +115,8 @@ export type AiProviderConfig = {
   realtime?: AiProviderRealtimeConfig;
 };
 
-/** Proveedores habilitados y modelo seleccionado como valor de compatibilidad. */
+/** Proveedores habilitados para los perfiles de agente. */
 export type AiConfig = {
-  /** Id completo `proveedor/modelo`; vacío hasta configurar el primer proveedor. */
-  defaultModel: string;
   /** Solo proveedores habilitados (con apiKey real). */
   providers: Partial<Record<AiProvider, AiProviderConfig>>;
 };
@@ -158,7 +156,7 @@ export const config: ChatConfig = {
   mcpConfig: {},
   authIntrospectUrl: null,
   authMapping: { userId: 'userId', email: null, name: null },
-  ai: { defaultModel: '', providers: {} },
+  ai: { providers: {} },
   corsOrigins: parseOrigins(process.env.CORS_ORIGIN),
   corsAppDomain: process.env.CORS_APP_DOMAIN?.trim().toLowerCase() || null,
   chatSystemPrompt: DEFAULT_SYSTEM_PROMPT,

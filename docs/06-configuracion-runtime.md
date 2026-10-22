@@ -14,7 +14,7 @@ La selección de embeddings se guarda en `runtime.config` como `embeddingConfig:
 
 ## Proveedores y modelos
 
-Los proveedores se configuran desde Administración → Provider. `models.chat` contiene los modelos que pueden seleccionarse en perfiles; `models.embeddings` declara los modelos disponibles para la búsqueda semántica; los modelos de conversación hablada son un catálogo separado (`models.realtime`) y solo se admite actualmente para OpenAI. La pestaña Embedding selecciona un modelo con el ID completo `proveedor/modelo`; Runtime usa las credenciales y URL base de ese proveedor. Las ventanas de contexto no se mantienen por modelo: cada perfil aplica `contextTokenBudget` como límite de contexto.
+Los proveedores se configuran desde Administración → Provider. `models.chat` contiene los modelos que pueden seleccionarse en perfiles; `models.embeddings` declara los modelos disponibles para la búsqueda semántica; los modelos de conversación hablada son un catálogo separado (`models.realtime`) y solo se admite actualmente para OpenAI. No hay un modelo de chat global en la configuración runtime: cada perfil selecciona el suyo. La pestaña Embedding selecciona un modelo con el ID completo `proveedor/modelo`; Runtime usa las credenciales y URL base de ese proveedor. Las ventanas de contexto no se mantienen por modelo: cada perfil aplica `contextTokenBudget` como límite de contexto.
 
 En OpenAI, `baseUrl` está al nivel del proveedor y se comparte entre el SDK de chat y las llamadas Realtime del backend. También determina el endpoint Realtime al que se conecta el navegador; un proxy personalizado debe ser compatible con ambas APIs.
 

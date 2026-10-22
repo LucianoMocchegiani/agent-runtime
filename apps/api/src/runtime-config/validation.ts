@@ -66,7 +66,7 @@ export function validateRuntimeSettings(value: unknown): RuntimeSettings {
   const v = structuredClone(value) as Record<string, any>;
   Object.assign(v, validateAuthSettings(v));
   if (!v.ai || typeof v.ai !== 'object' || Array.isArray(v.ai) || !v.ai.providers || typeof v.ai.providers !== 'object' || Array.isArray(v.ai.providers)) throw new Error('ai.providers is required');
-  if (typeof v.ai.defaultModel !== 'string') throw new Error('ai.defaultModel is required');
+  v.ai = { providers: v.ai.providers };
   for (const [name, provider] of Object.entries(v.ai.providers) as [string, any][]) normalizeProvider(name, provider);
   if (!v.mcpConfig || typeof v.mcpConfig !== 'object' || Array.isArray(v.mcpConfig)) throw new Error('mcpConfig must be an object');
   for (const [name, mcp] of Object.entries(v.mcpConfig) as [string, any][]) {

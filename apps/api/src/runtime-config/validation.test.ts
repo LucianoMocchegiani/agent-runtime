@@ -4,7 +4,7 @@ import { validateRuntimeSettings } from './validation.js';
 
 function validSettings(): Record<string, any> {
   return {
-    ai: { defaultModel: 'openai/gpt-test', providers: { openai: {
+    ai: { providers: { openai: {
       apiKey: 'secret', baseUrl: 'https://api.openai.com/v1/',
       models: { chat: ['gpt-test', ' gpt-test '], embeddings: ['text-embedding-3-small'], realtime: ['gpt-realtime'] },
       realtime: { voices: ['alloy', 'alloy'] },
@@ -29,6 +29,13 @@ test('valida, normaliza y no muta el objeto recibido', () => {
   assert.deepEqual(result.embeddingConfig, { model: 'openai/text-embedding-3-small' });
   assert.equal(result.mcpConfig.local?.auth, null);
   assert.equal(result.mcpConfig.local?.optional, false);
+});
+
+test('la configuración AI normalizada contiene únicamente proveedores', () => {
+  const value = validSettings();
+  value.ai.unusedSetting = 'ignored';
+  const normalized = validateRuntimeSettings(value);
+  assert.deepEqual(Object.keys(normalized.ai), ['providers']);
 });
 
 test('rechaza el formato anterior del proveedor en lugar de migrarlo', () => {
