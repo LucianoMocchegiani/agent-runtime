@@ -63,8 +63,13 @@ export const requirePrincipal = createMiddleware<AppEnv>(async (c, next) => {
     return;
   }
 
-  // Sin servicio de introspección, no se puede autenticar un Bearer opaco:
-  // la API funciona pública y asigna una identidad anónima a cada solicitud.
+  // Sin introspección, un Bearer opaco no se puede validar. Rechazarlo explícitamente
+  // evita que la petición continúe con una identidad anónima distinta a la esperada.
+  if (!config.authIntrospectUrl && token) {
+    throw new HTTPException(401, { message: 'Bearer authentication is not configured' });
+  }
+
+  // En modo público se permiten solicitudes sin Bearer, con identidad anónima por petición.
   if (!config.authIntrospectUrl) {
     const sessionId = randomUUID();
     c.set('principal', { userId: sessionId, email: null, name: null });

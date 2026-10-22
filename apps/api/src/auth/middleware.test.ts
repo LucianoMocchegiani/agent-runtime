@@ -16,13 +16,26 @@ app.get('/protected', (c) =>
   c.json({ principal: c.get('principal'), accessToken: c.get('accessToken') }),
 );
 
-test('without introspection, opaque Bearer requests are served anonymously', async () => {
+test('without introspection, opaque Bearer requests are rejected', async () => {
   const previousUrl = config.authIntrospectUrl;
   config.authIntrospectUrl = null;
   try {
     const response = await app.request('/protected', {
       headers: { Authorization: 'Bearer opaque-host-token' },
     });
+
+    assert.equal(response.status, 401);
+    assert.equal(await response.text(), 'Bearer authentication is not configured');
+  } finally {
+    config.authIntrospectUrl = previousUrl;
+  }
+});
+
+test('without introspection, requests without Bearer remain public', async () => {
+  const previousUrl = config.authIntrospectUrl;
+  config.authIntrospectUrl = null;
+  try {
+    const response = await app.request('/protected');
     const body = (await response.json()) as ResponseBody;
 
     assert.equal(response.status, 200);

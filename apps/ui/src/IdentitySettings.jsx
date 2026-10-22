@@ -77,6 +77,7 @@ export default function IdentitySettings({ onBack, onBearerChange }) {
             />
           </label>
           <p id="identity-token-help" className={styles.help}>El valor no se envía a pc-mcp desde esta pantalla ni se valida al guardarlo. Runtime lo validará al atender las solicitudes del chat.</p>
+          <p className={styles.help}>Los Bearer opacos solo se aceptan si hay una URL de introspección configurada en Administración → Auth. Sin esa configuración, las solicitudes con este token responden 401; para usar el modo público, borrá el Bearer y usá el acceso anónimo.</p>
           <div className={styles.actions}>
             {isConfigured && <button type="button" className={styles.clearButton} onClick={clearToken}>Borrar Bearer y usar anónimo</button>}
             <button type="submit" className={sharedStyles.primaryButton} disabled={!tokenDraft.trim()}>Guardar Bearer</button>
