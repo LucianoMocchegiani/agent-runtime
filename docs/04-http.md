@@ -22,7 +22,7 @@ Sin URL de introspección, la API funciona en modo público: las solicitudes sin
 
 Un endpoint de introspección que rechace el token con HTTP 401/403 causa respuesta 401. Fallos de conexión, timeout (8 segundos), otros estados HTTP, JSON inválido o ausencia del campo configurado como `userId` causan 502. Las identidades válidas se almacenan en caché hasta 30 segundos; un cambio de URL o mapeo invalida esa caché.
 
-El acceso administrativo basado en `RUNTIME_CONFIG_ADMIN_USERS` también requiere que la identidad pueda resolverse mediante introspección. `RUNTIME_CONFIG_ADMIN_TOKEN` y el acceso bootstrap, mientras esté habilitado, son vías administrativas independientes. La pestaña Auth permite probar la URL y el mapeo con un Bearer suministrado para la prueba; no guarda ese token. Se aceptan URL HTTP y HTTPS: quien despliega es responsable de elegir un transporte apropiado para su red.
+El acceso a todas las rutas `/admin` admite dos métodos independientes: (1) cuenta local de recuperación con HTTP Basic (`admin/admin` por defecto, configurable mediante `RUNTIME_ADMIN_USERNAME` y `RUNTIME_ADMIN_PASSWORD`), que sigue funcionando si falla o no está configurado el auth externo; y (2) Bearer validado por introspección cuya identidad figure en `runtime_admins`. La lista dinámica se guarda en PostgreSQL y se administra desde Administradores; la API impide revocar al último administrador. Los emails no otorgan acceso. Para inicializar la autenticación externa y dar de alta su primer usuario habitual, usá `npm run admin:bootstrap -w apps/api -- <verified-user-id> --introspect-url <url>`. La pestaña Auth permite probar la URL y el mapeo con un Bearer suministrado para la prueba; no guarda ese token. Se aceptan URL HTTP y HTTPS: quien despliega es responsable de elegir un transporte apropiado para su red. **Cambiá admin/admin antes de exponer Runtime y usá TLS**, porque las credenciales locales no dependen del proveedor externo.
 
 El modo público no configura CORS automáticamente: para permitir llamadas desde una UI alojada en otro origen, configurá `CORS_ORIGIN` o `CORS_APP_DOMAIN`.
 
@@ -56,7 +56,13 @@ El texto puede tener hasta 100.000 caracteres. Enviar `model` en el body no est�
 | `GET` | `/v1/agent-profiles` | Lista perfiles activos disponibles para el usuario. |
 | `GET` | `/v1/models` | Lista modelos habilitados y el modelo predeterminado. |
 
-Las operaciones administrativas de perfiles están bajo `/admin/agent-profiles`.
+Las operaciones administrativas de perfiles están bajo `/admin/agent-profiles`. La administración de la allowlist persistida usa:
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| `GET` | `/admin/runtime-admins` | Lista los IDs administradores y metadatos de alta. |
+| `POST` | `/admin/runtime-admins` | Agrega `{ "userId": "…" }` (debe coincidir exactamente con un ID devuelto por introspección). |
+| `DELETE` | `/admin/runtime-admins/:userId` | Revoca un ID; devuelve 409 si es el último administrador. |
 
 ## Delegaciones
 

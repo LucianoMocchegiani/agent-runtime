@@ -4,6 +4,7 @@ import { HTTPException } from 'hono/http-exception';
 import { AuthServiceError, resolvePrincipal } from './service.js';
 import { ACCESS_COOKIE_NAME } from './constants.js';
 import { config } from '../config.js';
+import { isTrustedBrowserRequest } from './csrf.js';
 
 export { ACCESS_COOKIE_NAME } from './constants.js';
 const COOKIE_PATH = '/';
@@ -30,6 +31,9 @@ function raiseAuthError(error: unknown): never {
 export const authSessionRoutes = new Hono();
 authSessionRoutes.use('*', async (c, next) => {
   c.header('Cache-Control', 'no-store');
+  if (!isTrustedBrowserRequest(c.req.raw)) {
+    return c.json({ error: 'Untrusted origin for session request' }, 403);
+  }
   await next();
 });
 

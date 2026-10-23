@@ -28,12 +28,13 @@ openssl rand -hex 32
 
 Copiá el valor generado en `RUNTIME_CONFIG_ENCRYPTION_KEY` dentro de `.env` antes del primer inicio. Es obligatorio y debe conservarse: sin la misma clave no se puede descifrar la configuración persistida. En PowerShell podés usar `Copy-Item .env.example .env` y generar la clave con OpenSSL o una herramienta equivalente.
 
-Al primer inicio, Runtime crea `runtime.config` con valores mínimos. Los proveedores, credenciales, herramientas MCP, embeddings y límites se configuran desde Administración. La configuración inicial de administración usa `admin/admin` mientras `RUNTIME_CONFIG_ADMIN_USERS` esté vacío; cambiá las credenciales bootstrap o configurá una lista de administradores antes de exponer el servicio a una red no confiable. El usuario y password de PostgreSQL del Compose predeterminado también son solo para desarrollo local.
+Al primer inicio, Runtime crea `runtime.config` con valores mínimos. Los proveedores, credenciales, herramientas MCP, embeddings y límites se configuran desde Administración. El acceso a `/admin` admite tanto la cuenta local de recuperación (`admin/admin` por defecto, configurable con `RUNTIME_ADMIN_USERNAME` y `RUNTIME_ADMIN_PASSWORD`) como identidades verificadas por introspección y registradas en `runtime_admins`. La cuenta de recuperación es independiente del proveedor de auth y de la lista dinámica; usala para configurar o recuperar el acceso si el auth externo falla. Para la primera alta de usuarios habituales, usá `npm run admin:bootstrap -w apps/api -- <verified-user-id> --introspect-url <url>` (ver [operación y despliegue](./docs/10-despliegue-docker-compose.md)). Cambiá las credenciales predeterminadas antes de exponer Runtime; el usuario y password de PostgreSQL del Compose predeterminado también son solo para desarrollo local.
 
 | Variable | Uso |
 |---|---|
 | `DATABASE_URL` | PostgreSQL compartido por Memory y configuración de Runtime; Compose apunta al servicio `postgres` |
 | `RUNTIME_CONFIG_ENCRYPTION_KEY` | Obligatoria para cifrar `runtime.config`; generar con `openssl rand -hex 32` y conservarla |
+| `RUNTIME_ADMIN_USERNAME` / `RUNTIME_ADMIN_PASSWORD` | Credenciales Basic de recuperación administrativa; por defecto `admin` / `admin`. Cambiarlas antes de exponer Runtime |
 | `DELEGATION_PAYLOAD_ENCRYPTION_KEY` | Opcional; habilita delegaciones. Clave hex de 32 bytes distinta a la anterior, compartida por todas las réplicas |
 | `UI_ENABLED` | Desactivar la UI nativa con `false` (por defecto está habilitada) |
 | `CORS_ORIGIN` / `CORS_APP_DOMAIN` | Orígenes de UIs externas; vacíos, no se habilita acceso CORS desde otros orígenes |

@@ -28,9 +28,6 @@ export const DEFAULT_PROFILE_PREFERENCE_ID = 'default';
 /** Marcador que oculta credenciales en las respuestas administrativas. */
 export const RUNTIME_CONFIG_SECRET_MASK = '********';
 
-/** Nombre de usuario reservado como fallback para el acceso bootstrap inicial. */
-export const RUNTIME_CONFIG_BOOTSTRAP_ADMIN_USER = 'admin';
-
 /** Proveedores admitidos por el formato de configuración persistida. */
 export const RUNTIME_CONFIG_PROVIDER_NAMES = ['openai', 'openrouter'] as const;
 

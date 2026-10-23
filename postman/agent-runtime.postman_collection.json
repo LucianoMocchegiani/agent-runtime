@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "8cc7c2e9-f740-4af8-a5df-a95af18d320e",
     "name": "Agent Runtime API",
-    "description": "Importá también el environment local. Modo público usa userToken anon persistente. Admin requiere adminToken. Voz/delegaciones dependen de configuración.",
+    "description": "Importá también el environment local. Modo público usa userToken anon persistente. Admin acepta Bearer verificado registrado en runtime_admins o Basic Auth de recuperación (admin/admin por defecto, configurable por entorno). Voz/delegaciones dependen de configuración.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {

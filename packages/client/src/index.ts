@@ -6,6 +6,8 @@ export type {
   AdminAgentProfile,
   AdminProfileList,
   AdminRuntimeConfig,
+  RuntimeAdmin,
+  RuntimeAdminList,
   AgentProfileInfo,
   ClientConfig,
   Conversation,

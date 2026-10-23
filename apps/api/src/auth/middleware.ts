@@ -6,6 +6,7 @@ import type { AppEnv, Principal } from './contracts.js';
 import { AuthServiceError, resolvePrincipal } from './service.js';
 import { ANONYMOUS_TOKEN_PREFIX, ACCESS_COOKIE_NAME } from './constants.js';
 import { config } from '../config.js';
+import { isTrustedBrowserRequest } from './csrf.js';
 
 function readBearer(header: string | undefined): string | null {
   if (!header) {
@@ -53,6 +54,10 @@ export const requirePrincipal = createMiddleware<AppEnv>(async (c, next) => {
   // La cookie segura de sesión reemplaza el UUID anónimo del cliente, pero un Bearer
   // explícito no anónimo sigue teniendo precedencia para integraciones/API clients.
   const token = bearer && !isAnonToken(bearer) ? bearer : cookieToken ?? bearer;
+  const usesCookieToken = cookieToken !== null && (!bearer || isAnonToken(bearer));
+  if (usesCookieToken && !isTrustedBrowserRequest(c.req.raw)) {
+    throw new HTTPException(403, { message: 'Untrusted origin for cookie-authenticated request' });
+  }
 
   if (token && isAnonToken(token)) {
     const sessionId = stripAnonPrefix(token);

@@ -45,3 +45,12 @@ model Message {
   @@index([conversationId, createdAt])
   @@map("messages")
 }
+
+/// Identidades verificadas autorizadas a administrar la configuración del runtime.
+model RuntimeAdmin {
+  userId          String   @id @map("user_id")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdByUserId String?  @map("created_by_user_id")
+
+  @@map("runtime_admins")
+}

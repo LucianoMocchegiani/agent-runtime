@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/contracts.js';
-import { authorized } from './authorization.js';
+import { authorizedAdminRequest } from './authorization.js';
 import { AuthServiceError, testAuthIntrospection } from '../auth/service.js';
 import { validateAuthSettings } from '../auth/settings.js';
 import { getRuntimeConfigVersion, getRuntimeSettings, isRuntimeConfigStoreEnabled, RuntimeConfigConflictError, saveRuntimeSettings } from './service.js';
@@ -38,7 +38,7 @@ function restoreMaskedSecrets(next: any): void {
 runtimeConfigRoutes.use('*', async (c, next) => {
   if (!isRuntimeConfigStoreEnabled()) return c.json({ error: 'Not Found' }, 404);
   try {
-    if (!(await authorized(c.req.header('Authorization')))) return c.json({ error: 'Not authorized to manage runtime configuration' }, 403);
+    if (!(await authorizedAdminRequest(c))) return c.json({ error: 'Not authorized to manage runtime configuration' }, 403);
   } catch (error) {
     if (error instanceof AuthServiceError) throw new HTTPException(error.status, { message: error.message });
     throw error;

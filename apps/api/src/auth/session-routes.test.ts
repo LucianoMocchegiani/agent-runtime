@@ -25,7 +25,7 @@ test('session endpoint sets an HttpOnly cookie and cookie auth overrides anonymo
   try {
     const login = await app.request('/auth/session', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', Origin: 'http://localhost' },
       body: JSON.stringify({ token: 'opaque-token' }),
     });
     assert.equal(login.status, 200);
@@ -40,6 +40,7 @@ test('session endpoint sets an HttpOnly cookie and cookie auth overrides anonymo
       headers: {
         Authorization: 'Bearer anon:stable-anonymous-id',
         Cookie: `${ACCESS_COOKIE_NAME}=opaque-token`,
+        Origin: 'http://localhost',
       },
     });
     assert.equal(protectedResponse.status, 200);
@@ -47,9 +48,19 @@ test('session endpoint sets an HttpOnly cookie and cookie auth overrides anonymo
     assert.equal(protectedBody.principal.userId, 'user-123');
     assert.equal(protectedBody.accessToken, 'opaque-token');
 
+    const csrfAttempt = await app.request('/protected', {
+      headers: { Cookie: `${ACCESS_COOKIE_NAME}=opaque-token`, Origin: 'https://attacker.example' },
+    });
+    assert.equal(csrfAttempt.status, 403);
+
+    const missingOrigin = await app.request('/protected', {
+      headers: { Cookie: `${ACCESS_COOKIE_NAME}=opaque-token` },
+    });
+    assert.equal(missingOrigin.status, 403);
+
     const logout = await app.request('/auth/session', {
       method: 'DELETE',
-      headers: { Cookie: `${ACCESS_COOKIE_NAME}=opaque-token` },
+      headers: { Cookie: `${ACCESS_COOKIE_NAME}=opaque-token`, Origin: 'http://localhost' },
     });
     assert.equal(logout.status, 200);
     assert.match(logout.headers.get('set-cookie') ?? '', /Max-Age=0/i);

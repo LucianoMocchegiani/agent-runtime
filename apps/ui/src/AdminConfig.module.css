@@ -39,6 +39,7 @@
   font: 13px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace !important;
   tab-size: 2;
 }
+.prompt { min-height: 280px !important; resize: vertical; font: 14px/1.6 ui-monospace, SFMono-Regular, Consolas, monospace !important; }
 .actions { display: flex; justify-content: flex-end; gap: 8px; }
 .profileControls {
   display: flex;
@@ -53,6 +54,10 @@
 .profileField { flex: 1; min-width: 220px; margin: 0; }
 .profileButtons { display: flex; flex-wrap: wrap; gap: 8px; }
 .profileButtons button { min-width: 120px; }
+.adminList { display: grid; gap: 8px; margin-top: 18px; }
+.adminRow { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.adminRow strong { overflow-wrap: anywhere; }
+.adminRow p { margin: 4px 0 0; font-size: 12px; }
 .notice,
 .error { max-width: var(--content-width); margin: 14px auto 0; }
 .notice { display: block; }

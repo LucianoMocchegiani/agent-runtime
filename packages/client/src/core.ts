@@ -14,7 +14,7 @@ export type { AuthSession } from './auth-session.js';
 export type { McpOAuthConnection } from './mcp-connections.js';
 export { isAbortError } from './abort.js';
 export { consumeUiMessageStream } from './stream.js';
-export type { AdminAgentProfile, AdminProfileList, AdminRuntimeConfig } from './admin.js';
+export type { AdminAgentProfile, AdminProfileList, AdminRuntimeConfig, RuntimeAdmin, RuntimeAdminList } from './admin.js';
 export type {
   AgentProfileInfo,
   ClientConfig,

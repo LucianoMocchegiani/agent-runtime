@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import client from './client.js';
 import AdminConfigHelp from './AdminConfigHelp.jsx';
 import sharedStyles from './admin-memory.module.css';
@@ -10,9 +10,11 @@ const TABS = [
   { id: 'Embeddings', label: 'Embedding' },
   { id: 'MCP', label: 'MCP' },
   { id: 'Auth', label: 'Auth' },
+  { id: 'Admins', label: 'Administradores' },
 ];
 function editableProfile(profile) {
-  return { name: profile.name, model: profile.model, config: profile.config };
+  const { systemPrompt, ...config } = profile.config;
+  return { name: profile.name, model: profile.model, config };
 }
 
 function tabValue(config, tab) {
@@ -24,13 +26,16 @@ function tabValue(config, tab) {
 
 export default function AdminConfig({ onBack }) {
   const [token, setToken] = useState('');
-  const [username, setUsername] = useState('admin');
+  const [loginMode, setLoginMode] = useState('recovery');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authHeader, setAuthHeader] = useState('');
-  const [loginMode, setLoginMode] = useState('bootstrap');
   const [config, setConfig] = useState(null);
   const [profiles, setProfiles] = useState([]);
+  const [runtimeAdmins, setRuntimeAdmins] = useState([]);
+  const [newAdminUserId, setNewAdminUserId] = useState('');
   const [profileDraft, setProfileDraft] = useState('');
+  const [systemPromptDraft, setSystemPromptDraft] = useState('');
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [defaultForNewChatsId, setDefaultForNewChatsId] = useState('');
   const [version, setVersion] = useState(0);
@@ -47,47 +52,52 @@ export default function AdminConfig({ onBack }) {
     setConfig(data.settings);
     setVersion(data.version);
     setTab(nextTab);
-    setDraft(JSON.stringify(tabValue(data.settings, nextTab === 'Profiles' ? 'Providers' : nextTab), null, 2));
+    if (nextTab !== 'Admins') setDraft(JSON.stringify(tabValue(data.settings, nextTab === 'Profiles' ? 'Providers' : nextTab), null, 2));
     setNotice(`Configuración activa · versión ${data.version}`);
   }
 
-  function makeBasicHeader(user, secret) {
-    const bytes = new TextEncoder().encode(`${user}:${secret}`);
-    const binary = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
-    return `Basic ${btoa(binary)}`;
-  }
-
   async function load(overrideHeader = authHeader) {
-    if (!overrideHeader) return;
     setBusy(true);
     setError('');
     try {
-      const [data, profileData] = await Promise.all([
+      const [data, profileData, adminData] = await Promise.all([
         client.admin.getRuntimeConfig(overrideHeader),
         client.admin.listAgentProfiles(overrideHeader),
+        client.admin.listRuntimeAdmins(overrideHeader),
       ]);
       const nextProfiles = profileData.items ?? [];
       setAuthHeader(overrideHeader);
       loadData(data);
       setProfiles(nextProfiles);
+      setRuntimeAdmins(adminData.items ?? []);
       setDefaultForNewChatsId(profileData.defaultForNewChatsId ?? nextProfiles[0]?.id ?? '');
       const selected = nextProfiles.find((item) => item.id === selectedProfileId) ?? nextProfiles[0];
       if (selected) {
         setSelectedProfileId(selected.id);
         setProfileDraft(JSON.stringify(editableProfile(selected), null, 2));
+        setSystemPromptDraft(selected.config.systemPrompt);
       } else {
         setSelectedProfileId('');
         setProfileDraft('');
+        setSystemPromptDraft('');
       }
     } catch (e) { setError(e.message); }
     finally { setBusy(false); }
   }
 
+  useEffect(() => {
+    void load(''); // Intenta reutilizar la sesión HttpOnly antes de pedir credenciales manuales.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   function signIn() {
-    const header = loginMode === 'bootstrap'
-      ? makeBasicHeader(username, password)
-      : `Bearer ${token.trim()}`;
-    load(header);
+    if (loginMode === 'bearer') {
+      load(`Bearer ${token.trim()}`);
+      return;
+    }
+    const bytes = new TextEncoder().encode(`${username}:${password}`);
+    const encoded = btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(''));
+    load(`Basic ${encoded}`);
   }
 
   function applyValue(target, name, value) {
@@ -102,9 +112,9 @@ export default function AdminConfig({ onBack }) {
   function changeTab(nextTab) {
     try {
       const next = structuredClone(config);
-      if (tab !== 'Profiles') applyValue(next, tab, JSON.parse(draft));
+      if (tab !== 'Profiles' && tab !== 'Admins') applyValue(next, tab, JSON.parse(draft));
       setConfig(next);
-      if (nextTab !== 'Profiles') setDraft(JSON.stringify(tabValue(next, nextTab), null, 2));
+      if (nextTab !== 'Profiles' && nextTab !== 'Admins') setDraft(JSON.stringify(tabValue(next, nextTab), null, 2));
     } catch (e) { setError(e.message); return; }
     setError('');
     setTab(nextTab);
@@ -147,12 +157,41 @@ export default function AdminConfig({ onBack }) {
     finally { setBusy(false); }
   }
 
+  async function addAdmin() {
+    const userId = newAdminUserId.trim();
+    if (!userId) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await client.admin.addRuntimeAdmin(authHeader, userId);
+      setNewAdminUserId('');
+      setRuntimeAdmins((await client.admin.listRuntimeAdmins(authHeader)).items ?? []);
+      setNotice(`Acceso administrativo concedido a ${userId}.`);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
+  async function removeAdmin(userId) {
+    if (runtimeAdmins.length < 2 || !confirm(`¿Revocar el acceso administrativo de ${userId}?`)) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      await client.admin.removeRuntimeAdmin(authHeader, userId);
+      setRuntimeAdmins((await client.admin.listRuntimeAdmins(authHeader)).items ?? []);
+      setNotice(`Acceso administrativo revocado para ${userId}.`);
+    } catch (e) { setError(e.message); }
+    finally { setBusy(false); }
+  }
+
   async function saveProfile() {
     setBusy(true);
     setError('');
     setNotice('');
     try {
       const value = JSON.parse(profileDraft);
+      value.config.systemPrompt = systemPromptDraft;
       await client.admin.updateAgentProfile(authHeader, selectedProfileId, value);
       await load();
       setNotice('Perfil guardado. Se aplicará en los próximos turnos de las conversaciones que lo tengan asignado.');
@@ -166,13 +205,14 @@ export default function AdminConfig({ onBack }) {
     try {
       const source = profiles[0];
       const profile = source
-        ? { ...editableProfile(source), name: 'Nuevo perfil' }
+        ? { name: 'Nuevo perfil', model: source.model, config: source.config }
         : null;
       if (!profile) throw new Error('No hay perfil base para copiar.');
       const created = await client.admin.createAgentProfile(authHeader, profile);
       await load();
       setSelectedProfileId(created.id);
       setProfileDraft(JSON.stringify(editableProfile(created), null, 2));
+      setSystemPromptDraft(created.config.systemPrompt);
       setTab('Profiles');
       setNotice('Perfil creado. Revisá sus datos y guardá los cambios si hace falta.');
     } catch (e) { setError(e.message); }
@@ -195,6 +235,7 @@ export default function AdminConfig({ onBack }) {
     const profile = profiles.find((item) => item.id === id);
     setSelectedProfileId(id);
     setProfileDraft(profile ? JSON.stringify(editableProfile(profile), null, 2) : '');
+    setSystemPromptDraft(profile?.config.systemPrompt ?? '');
     setError('');
   }
 
@@ -205,20 +246,18 @@ export default function AdminConfig({ onBack }) {
     </header>
     {!config ? <section className={`${sharedStyles.surface} ${styles.card} ${styles.authCard}`}>
       <h2>Acceso administrativo</h2>
-      <div className={styles.tabs}>
-        <button className={loginMode === 'bootstrap' ? styles.active : ''} onClick={() => setLoginMode('bootstrap')}>Admin inicial</button>
-        <button className={loginMode === 'user' ? styles.active : ''} onClick={() => setLoginMode('user')}>Usuario autenticado</button>
-      </div>
-      {loginMode === 'bootstrap' ? <>
-        <p className={styles.bootstrapWarning}><strong>Acceso inicial con credenciales predeterminadas</strong><span> Usuario y contraseña: <code>admin</code> / <code>admin</code>. Creá una cuenta administradora propia para desactivar este acceso cuanto antes.</span></p>
-        <label className={sharedStyles.field}>Usuario<input autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
+      <p>La cuenta local de recuperación funciona aunque no esté configurada la autenticación externa: por defecto es <code>admin/admin</code>. Cambiala con <code>RUNTIME_ADMIN_USERNAME</code> y <code>RUNTIME_ADMIN_PASSWORD</code>. También podés entrar con un Bearer verificado que figure entre los administradores del runtime.</p>
+      <label className={sharedStyles.field}>Método de acceso<select value={loginMode} onChange={(e) => setLoginMode(e.target.value)}>
+        <option value="recovery">Cuenta local de recuperación</option>
+        <option value="bearer">Bearer del proveedor de autenticación</option>
+      </select></label>
+      {loginMode === 'recovery' ? <>
+        <label className={sharedStyles.field}>Usuario<input type="text" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></label>
         <label className={sharedStyles.field}>Contraseña<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-      </> : <>
-        <p>Ingresá el access token de una cuenta autenticada incluida en <code>RUNTIME_CONFIG_ADMIN_USERS</code>. No uses el token administrativo del runtime.</p>
-        <label className={sharedStyles.field}>Access token del usuario<input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></label>
-      </>}
-      <button className={sharedStyles.primaryButton} disabled={busy || (loginMode === 'bootstrap' ? !username.trim() || !password : !token.trim())} onClick={signIn}>{busy ? 'Verificando…' : 'Continuar'}</button>
-      {!busy && ((loginMode === 'bootstrap' && (!username.trim() || !password)) || (loginMode === 'user' && !token.trim())) && <p className={styles.loginHint} role="status">{loginMode === 'bootstrap' ? 'Ingresá el usuario y la contraseña para continuar.' : 'Ingresá el access token para continuar.'}</p>}
+      </> : <label className={sharedStyles.field}>Access token<input type="password" autoComplete="off" value={token} onChange={(e) => setToken(e.target.value)} /></label>}
+      <button className={sharedStyles.primaryButton} disabled={busy || (loginMode === 'recovery' ? !username || !password : !token.trim())} onClick={signIn}>{busy ? 'Verificando…' : 'Continuar'}</button>
+      {!busy && loginMode === 'recovery' && (!username || !password) && <p className={styles.loginHint} role="status">Ingresá el usuario y la contraseña de recuperación.</p>}
+      {!busy && loginMode === 'bearer' && !token.trim() && <p className={styles.loginHint} role="status">Ingresá el access token para continuar.</p>}
     </section> : <>
       {Object.keys(config.ai?.providers ?? {}).length === 0 && <p className={`${sharedStyles.notice} ${styles.notice}`} role="status">Instalación nueva: no hay proveedores de IA configurados. Agregá una clave y modelos habilitados en Provider. Después elegí el modelo en el perfil predeterminado.</p>}
       <nav className={styles.tabs} role="tablist" aria-label="Configuración del runtime">
@@ -253,9 +292,24 @@ export default function AdminConfig({ onBack }) {
           </div>
         </div>
         {selectedProfileId && <>
-          <label className={sharedStyles.field}>Perfil JSON · name, model y config<textarea className={styles.json} spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
+          <label className={sharedStyles.field}>System prompt<textarea className={styles.prompt} maxLength={100000} value={systemPromptDraft} onChange={(e) => setSystemPromptDraft(e.target.value)} /></label>
+          <label className={sharedStyles.field}>Perfil JSON · name, model y config (sin systemPrompt)<textarea className={styles.json} spellCheck="false" value={profileDraft} onChange={(e) => setProfileDraft(e.target.value)} /></label>
           <div className={styles.actions}><button className={sharedStyles.primaryButton} disabled={busy} onClick={saveProfile}>{busy ? 'Guardando…' : 'Validar y guardar perfil'}</button></div>
         </>}
+      </section> : tab === 'Admins' ? <section className={`${sharedStyles.surface} ${styles.card}`} role="tabpanel">
+        <h2>Administradores del runtime</h2>
+        <p>Solo se admiten IDs exactos devueltos por el endpoint de introspección. La autorización se consulta en la base de datos; no se usa una allowlist de entorno.</p>
+        <form className={styles.profileControls} onSubmit={(event) => { event.preventDefault(); void addAdmin(); }}>
+          <label className={`${sharedStyles.field} ${styles.profileField}`}>User ID verificado<input value={newAdminUserId} onChange={(event) => setNewAdminUserId(event.target.value)} autoComplete="off" /></label>
+          <div className={styles.profileButtons}><button className={sharedStyles.primaryButton} type="submit" disabled={busy || !newAdminUserId.trim()}>Agregar administrador</button></div>
+        </form>
+        <div className={styles.adminList}>
+          {runtimeAdmins.map((admin) => <div className={styles.adminRow} key={admin.userId}>
+            <div><strong>{admin.userId}</strong><p>Agregado {new Date(admin.createdAt).toLocaleString()}{admin.createdByUserId ? ` · por ${admin.createdByUserId}` : ' · bootstrap CLI'}</p></div>
+            <button className={sharedStyles.secondaryButton} type="button" disabled={busy || runtimeAdmins.length < 2} onClick={() => removeAdmin(admin.userId)}>Revocar</button>
+          </div>)}
+        </div>
+        {runtimeAdmins.length === 1 && <p className={styles.subtitle}>No se puede revocar al último administrador.</p>}
       </section> : <>
         <section className={`${sharedStyles.surface} ${styles.card}`} role="tabpanel">
           <h2>{TABS.find((item) => item.id === tab)?.label}</h2>

@@ -21,6 +21,14 @@ export type AdminProfileList = {
   defaultForNewChatsId: string | null;
 };
 
+export type RuntimeAdmin = {
+  userId: string;
+  createdAt: string;
+  createdByUserId: string | null;
+};
+
+export type RuntimeAdminList = { items: RuntimeAdmin[] };
+
 async function adminRequest<T>(
   config: ClientConfig,
   authorization: string,
@@ -71,6 +79,20 @@ export function createAdminApi(config: ClientConfig) {
     /** Lista perfiles administrativos activos y el predeterminado para chats nuevos. */
     listAgentProfiles: (authorization: string): Promise<AdminProfileList> =>
       adminRequest(config, authorization, '/admin/agent-profiles'),
+
+    /** Lista las identidades autorizadas a administrar el runtime. */
+    listRuntimeAdmins: (authorization: string): Promise<RuntimeAdminList> =>
+      adminRequest(config, authorization, '/admin/runtime-admins'),
+
+    /** Autoriza una identidad verificada para administrar el runtime. */
+    addRuntimeAdmin: (authorization: string, userId: string): Promise<{ item: RuntimeAdmin }> =>
+      adminRequest(config, authorization, '/admin/runtime-admins', {
+        method: 'POST', body: JSON.stringify({ userId }),
+      }),
+
+    /** Revoca el acceso administrativo de una identidad. */
+    removeRuntimeAdmin: (authorization: string, userId: string): Promise<{ ok: true }> =>
+      adminRequest(config, authorization, `/admin/runtime-admins/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
 
     /** Cambia el perfil predeterminado para conversaciones nuevas. */
     setDefaultForNewChats: (

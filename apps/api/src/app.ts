@@ -13,6 +13,7 @@ import { messageRoutes } from './messages/routes.js';
 import { runtimeConfigRoutes } from './runtime-config/runtime-config-routes.js';
 import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';
 import { agentProfileListRoutes } from './runtime-config/agent-profile-list-routes.js';
+import { runtimeAdminRoutes } from './runtime-config/runtime-admin-routes.js';
 import { mountUi } from './ui.js';
 import { delegationRoutes } from './delegations/routes.js';
 import { voiceRoutes } from './voice/routes.js';
@@ -88,6 +89,7 @@ export function createApp(): Hono<AppEnv> {
   app.route('/auth', authSessionRoutes);
 
   app.route('/admin/runtime-config', runtimeConfigRoutes);
+  app.route('/admin/runtime-admins', runtimeAdminRoutes);
   app.route('/admin/agent-profiles', agentProfileAdminRoutes);
 
   const v1 = new Hono<AppEnv>();
