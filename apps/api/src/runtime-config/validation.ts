@@ -77,13 +77,21 @@ export function validateRuntimeSettings(value: unknown): RuntimeSettings {
     if (mcp.auth != null && typeof mcp.auth !== 'string') throw new Error('Invalid MCP auth: ' + name);
     if (mcp.optional !== undefined && typeof mcp.optional !== 'boolean') throw new Error('Invalid MCP optional flag: ' + name);
     if (mcp.oauth !== undefined && mcp.oauth !== null) {
+      const dynamic = mcp.oauth?.registration === 'dynamic';
       if (!mcp.oauth || typeof mcp.oauth !== 'object' || Array.isArray(mcp.oauth)
-        || typeof mcp.oauth.clientId !== 'string' || !mcp.oauth.clientId.trim()
+        || (mcp.oauth.registration !== undefined && !dynamic)
+        || (dynamic
+          ? (mcp.oauth.clientId !== undefined || mcp.oauth.clientSecret !== undefined)
+          : (typeof mcp.oauth.clientId !== 'string' || !mcp.oauth.clientId.trim()))
         || (mcp.oauth.clientSecret !== undefined && (typeof mcp.oauth.clientSecret !== 'string' || !mcp.oauth.clientSecret.trim()))
         || (mcp.oauth.scopes !== undefined && (!Array.isArray(mcp.oauth.scopes) || mcp.oauth.scopes.some((scope: unknown) => typeof scope !== 'string')))) {
         throw new Error('Invalid MCP OAuth client configuration: ' + name);
       }
-      mcp.oauth = { clientId: mcp.oauth.clientId.trim(), ...(mcp.oauth.clientSecret ? { clientSecret: mcp.oauth.clientSecret.trim() } : {}), scopes: [...new Set((mcp.oauth.scopes ?? []).map((scope: string) => scope.trim()).filter(Boolean))] };
+      mcp.oauth = {
+        ...(dynamic ? { registration: 'dynamic' as const } : { clientId: mcp.oauth.clientId.trim() }),
+        ...(mcp.oauth.clientSecret ? { clientSecret: mcp.oauth.clientSecret.trim() } : {}),
+        scopes: [...new Set((mcp.oauth.scopes ?? []).map((scope: string) => scope.trim()).filter(Boolean))],
+      };
     } else {
       delete mcp.oauth;
     }

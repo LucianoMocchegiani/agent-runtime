@@ -6,6 +6,7 @@ import type { AppEnv } from '../auth/contracts.js';
 import { getRuntimeSettings } from '../runtime-config/service.js';
 import { createOAuthState, consumeOAuthState, deleteMcpOAuthConnection, getMcpOAuthConnection, saveMcpOAuthConnection } from './persistence.js';
 import { discoverOAuthMetadata, exchangeAuthorizationCode } from './oauth-client.js';
+import { resolveOAuthClient } from './client-registration.js';
 
 const CALLBACK_PATH = '/oauth/mcp/callback';
 const MCP_NAME_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -53,7 +54,8 @@ mcpConnectionRoutes.post('/:name/authorize', async (c) => {
   const { mcp } = getOAuthMcp(name);
   const redirectUri = callbackUri();
   try { assertOAuthEncryptionConfigured(); } catch { throw new HTTPException(503, { message: 'MCP_OAUTH_ENCRYPTION_KEY no está configurada correctamente.' }); }
-  const metadata = await discoverOAuthMetadata(mcp);
+  const discovered = await discoverOAuthMetadata(mcp);
+  const { metadata, client } = await resolveOAuthClient(name, mcp, discovered, redirectUri);
   const state = randomBytes(32).toString('base64url');
   const verifier = randomBytes(32).toString('base64url');
   const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -61,12 +63,12 @@ mcpConnectionRoutes.post('/:name/authorize', async (c) => {
 
   const authorizationUrl = new URL(metadata.authorizationEndpoint);
   authorizationUrl.searchParams.set('response_type', 'code');
-  authorizationUrl.searchParams.set('client_id', mcp.oauth!.clientId);
+  authorizationUrl.searchParams.set('client_id', client.clientId!);
   authorizationUrl.searchParams.set('redirect_uri', redirectUri);
   authorizationUrl.searchParams.set('state', state);
   authorizationUrl.searchParams.set('code_challenge', challenge);
   authorizationUrl.searchParams.set('code_challenge_method', 'S256');
-  if (mcp.oauth!.scopes.length) authorizationUrl.searchParams.set('scope', mcp.oauth!.scopes.join(' '));
+  if (client.scopes.length) authorizationUrl.searchParams.set('scope', client.scopes.join(' '));
   if (metadata.resource) authorizationUrl.searchParams.set('resource', metadata.resource);
   return c.json({ authorizationUrl: authorizationUrl.toString() }, 201);
 });
@@ -83,17 +85,22 @@ export const mcpOAuthCallbackRoutes = new Hono();
 mcpOAuthCallbackRoutes.get('/mcp/callback', async (c) => {
   const callbackUrl = process.env.MCP_OAUTH_REDIRECT_URI?.trim();
   const state = c.req.query('state');
+  const code = c.req.query('code');
+  const oauthError = c.req.query('error');
+  const codeLength = code?.length ?? 0;
+
   if (!state || state.length > 256) return c.redirect(uiRedirect('error', 'mcp', callbackUrl).toString(), 302);
   const savedState = await consumeOAuthState(state);
   if (!savedState) return c.redirect(uiRedirect('error', 'mcp', callbackUrl).toString(), 302);
 
   try {
-    if (c.req.query('error')) throw new Error('MCP OAuth authorization was denied');
-    const code = c.req.query('code');
-    if (!code || code.length > 2048) throw new Error('Missing authorization code');
+    if (oauthError) throw new Error('MCP OAuth authorization was denied');
+    if (!code || codeLength > 8192) throw new Error('Missing authorization code');
     const { mcp } = getOAuthMcp(savedState.mcpName);
-    const metadata = await discoverOAuthMetadata(mcp);
-    const tokens = await exchangeAuthorizationCode(metadata, mcp.oauth!, { code, redirectUri: callbackUri(), verifier: savedState.codeVerifier });
+    const redirectUri = callbackUri();
+    const discovered = await discoverOAuthMetadata(mcp);
+    const { metadata, client } = await resolveOAuthClient(savedState.mcpName, mcp, discovered, redirectUri);
+    const tokens = await exchangeAuthorizationCode(metadata, client, { code, redirectUri, verifier: savedState.codeVerifier });
     await saveMcpOAuthConnection({ userId: savedState.userId, mcpName: savedState.mcpName, account: null, tokens });
     return c.redirect(uiRedirect('connected', savedState.mcpName, callbackUrl).toString(), 302);
   } catch (error) {

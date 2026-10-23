@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { prisma } from '../db/prisma.js';
 import { openOAuthToken, sealOAuthToken } from './crypto.js';
+import type { RegisteredOAuthClient } from './oauth-client.js';
 
 export type OAuthState = { userId: string; mcpName: string; codeVerifier: string };
 export type StoredOAuthTokens = { accessToken: string; refreshToken: string | null; tokenType: string; expiresAt: Date | null };
@@ -67,4 +68,53 @@ export async function getMcpOAuthTokens(userId: string, mcpName: string): Promis
 
 export async function deleteMcpOAuthConnection(userId: string, mcpName: string): Promise<void> {
   await prisma.$executeRaw`DELETE FROM runtime.mcp_oauth_connections WHERE user_id = ${userId} AND mcp_name = ${mcpName}`;
+}
+
+/** Serializa DCR entre réplicas: una única instancia registra por nombre de MCP e issuer. */
+export async function getOrRegisterOAuthClient(
+  mcpName: string,
+  issuer: string,
+  redirectUri: string,
+  register: () => Promise<RegisteredOAuthClient>,
+): Promise<RegisteredOAuthClient> {
+  return prisma.$transaction(async (tx) => {
+    const lockKey = `${mcpName}\n${issuer}`;
+    // pg_advisory_xact_lock returns PostgreSQL `void`, which Prisma cannot deserialize.
+    // Cast it to a supported scalar type; the lock remains held until this transaction ends.
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))::text AS lock_acquired`;
+    const rows = await tx.$queryRaw<Array<{ ciphertext: Buffer; nonce: Buffer; tag: Buffer }>>`
+      SELECT client_ciphertext AS "ciphertext", client_nonce AS "nonce", client_tag AS "tag"
+      FROM runtime.mcp_oauth_clients WHERE mcp_name = ${mcpName} AND issuer = ${issuer}
+    `;
+    const row = rows[0];
+    if (row) {
+      try {
+        const saved = JSON.parse(openOAuthToken(row)) as Partial<RegisteredOAuthClient> & { expiresAt?: string | Date | null; redirectUri?: string };
+        const expiresAt = saved.expiresAt ? new Date(saved.expiresAt) : null;
+        if (saved.redirectUri === redirectUri && typeof saved.clientId === 'string' && saved.clientId &&
+          (saved.tokenEndpointAuthMethod === 'none' || saved.tokenEndpointAuthMethod === 'client_secret_basic' || saved.tokenEndpointAuthMethod === 'client_secret_post') &&
+          (!saved.clientSecret || typeof saved.clientSecret === 'string') &&
+          (!expiresAt || (Number.isFinite(expiresAt.getTime()) && expiresAt.getTime() > Date.now()))) {
+          return {
+            clientId: saved.clientId,
+            ...(saved.clientSecret ? { clientSecret: saved.clientSecret } : {}),
+            tokenEndpointAuthMethod: saved.tokenEndpointAuthMethod,
+            expiresAt,
+          };
+        }
+      } catch { /* Replace invalid ciphertext or expired registration below. */ }
+    }
+
+    const registered = await register();
+    const sealed = sealOAuthToken(JSON.stringify({ ...registered, redirectUri }));
+    await tx.$executeRaw`
+      INSERT INTO runtime.mcp_oauth_clients
+        (mcp_name, issuer, client_ciphertext, client_nonce, client_tag, updated_at)
+      VALUES (${mcpName}, ${issuer}, ${sealed.ciphertext}, ${sealed.nonce}, ${sealed.tag}, clock_timestamp())
+      ON CONFLICT (mcp_name, issuer) DO UPDATE SET
+        client_ciphertext = EXCLUDED.client_ciphertext, client_nonce = EXCLUDED.client_nonce,
+        client_tag = EXCLUDED.client_tag, updated_at = clock_timestamp()
+    `;
+    return registered;
+  }, { maxWait: 10_000, timeout: 30_000 });
 }

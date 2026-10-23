@@ -4,6 +4,8 @@ export type OAuthMetadata = {
   authorizationEndpoint: string;
   tokenEndpoint: string;
   tokenEndpointAuthMethod: 'client_secret_basic' | 'client_secret_post' | 'none';
+  registrationEndpoint?: string;
+  issuer: string;
   resource?: string;
 };
 type JsonObject = Record<string, unknown>;
@@ -57,26 +59,77 @@ export async function discoverOAuthMetadata(mcp: McpServerConfig): Promise<OAuth
   if (!Array.isArray(authorizationServers) || typeof authorizationServers[0] !== 'string') {
     throw new Error('MCP server did not publish OAuth Protected Resource Metadata with authorization_servers');
   }
-  const issuer = new URL(authorizationServers[0]);
-  if (issuer.protocol !== 'https:' && issuer.hostname !== 'localhost' && issuer.hostname !== '127.0.0.1') throw new Error('OAuth issuer must use HTTPS');
+  const issuerUrl = new URL(authorizationServers[0]);
+  if (issuerUrl.protocol !== 'https:' && issuerUrl.hostname !== 'localhost' && issuerUrl.hostname !== '127.0.0.1') throw new Error('OAuth issuer must use HTTPS');
+  const issuer = issuerUrl.toString();
   let serverMetadata: JsonObject;
-  try { serverMetadata = await getJson(metadataUrl(issuer.toString(), 'oauth-authorization-server')); }
-  catch { serverMetadata = await getJson(openIdConfigurationUrl(issuer.toString())); }
+  try { serverMetadata = await getJson(metadataUrl(issuer, 'oauth-authorization-server')); }
+  catch { serverMetadata = await getJson(openIdConfigurationUrl(issuer)); }
   const advertisedMethods = Array.isArray(serverMetadata.token_endpoint_auth_methods_supported)
     ? serverMetadata.token_endpoint_auth_methods_supported.filter((method): method is string => typeof method === 'string')
     : [];
-  const tokenEndpointAuthMethod = advertisedMethods.length === 0
-    ? (mcp.oauth?.clientSecret ? 'client_secret_basic' : 'none')
-    : !mcp.oauth?.clientSecret && advertisedMethods.includes('none') ? 'none'
-      : mcp.oauth?.clientSecret && advertisedMethods.includes('client_secret_basic') ? 'client_secret_basic'
-        : mcp.oauth?.clientSecret && advertisedMethods.includes('client_secret_post') ? 'client_secret_post' : null;
-  if (tokenEndpointAuthMethod === null) throw new Error('OAuth token endpoint has no supported authentication method for this client');
+  const tokenEndpointAuthMethod = mcp.oauth?.registration === 'dynamic'
+    ? (advertisedMethods.length === 0 || advertisedMethods.includes('client_secret_basic') ? 'client_secret_basic'
+      : advertisedMethods.includes('client_secret_post') ? 'client_secret_post' : 'none')
+    : advertisedMethods.length === 0
+      ? (mcp.oauth?.clientSecret ? 'client_secret_basic' : 'none')
+      : !mcp.oauth?.clientSecret && advertisedMethods.includes('none') ? 'none'
+        : mcp.oauth?.clientSecret && advertisedMethods.includes('client_secret_basic') ? 'client_secret_basic'
+          : mcp.oauth?.clientSecret && advertisedMethods.includes('client_secret_post') ? 'client_secret_post' : null;
+  if (tokenEndpointAuthMethod === null) {
+    throw new Error('OAuth token endpoint has no supported authentication method for this client');
+  }
   return {
     authorizationEndpoint: validEndpoint(serverMetadata.authorization_endpoint, 'authorization_endpoint'),
     tokenEndpoint: validEndpoint(serverMetadata.token_endpoint, 'token_endpoint'),
-    tokenEndpointAuthMethod,
+    tokenEndpointAuthMethod: tokenEndpointAuthMethod ?? 'none',
+    ...(typeof serverMetadata.registration_endpoint === 'string' ? { registrationEndpoint: validEndpoint(serverMetadata.registration_endpoint, 'registration_endpoint') } : {}),
+    issuer,
     ...(typeof protectedResource.resource === 'string' ? { resource: protectedResource.resource } : {}),
   };
+}
+
+export type RegisteredOAuthClient = { clientId: string; clientSecret?: string; tokenEndpointAuthMethod: OAuthMetadata['tokenEndpointAuthMethod']; expiresAt: Date | null };
+
+/** Registra un cliente RFC 7591 para la URL de callback de Runtime. */
+export async function registerDynamicOAuthClient(metadata: OAuthMetadata, redirectUri: string): Promise<RegisteredOAuthClient> {
+  if (!metadata.registrationEndpoint) throw new Error('OAuth authorization server does not support Dynamic Client Registration');
+  const response = await fetch(metadata.registrationEndpoint, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_name: 'agent-runtime',
+      redirect_uris: [redirectUri],
+      grant_types: ['authorization_code', 'refresh_token'],
+      response_types: ['code'],
+      token_endpoint_auth_method: metadata.tokenEndpointAuthMethod,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  let data: JsonObject;
+  try {
+    const parsed: unknown = await response.json();
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('invalid JSON');
+    data = parsed as JsonObject;
+  } catch {
+    throw new Error(`OAuth client registration returned invalid JSON (${response.status})`);
+  }
+  if (!response.ok || typeof data.client_id !== 'string' || !data.client_id.trim()) {
+    const description = typeof data.error_description === 'string' ? data.error_description : typeof data.error === 'string' ? data.error : `HTTP ${response.status}`;
+    throw new Error(`OAuth client registration failed: ${description}`);
+  }
+  const clientSecret = typeof data.client_secret === 'string' && data.client_secret ? data.client_secret : undefined;
+  const expiresSeconds = data.client_secret_expires_at;
+  const expiresAt = typeof expiresSeconds === 'number' && Number.isFinite(expiresSeconds) && expiresSeconds > 0
+    ? new Date(expiresSeconds * 1000)
+    : null;
+  const registeredMethod = data.token_endpoint_auth_method;
+  const tokenEndpointAuthMethod = registeredMethod === 'client_secret_basic' || registeredMethod === 'client_secret_post' || registeredMethod === 'none'
+    ? registeredMethod : metadata.tokenEndpointAuthMethod;
+  if (tokenEndpointAuthMethod !== 'none' && !clientSecret) {
+    throw new Error('OAuth client registration requires a client_secret but did not return one');
+  }
+  return { clientId: data.client_id.trim(), ...(clientSecret ? { clientSecret } : {}), tokenEndpointAuthMethod, expiresAt };
 }
 
 export type OAuthTokenResponse = { access_token?: string; refresh_token?: string; token_type?: string; expires_in?: number; error?: string; error_description?: string };
@@ -86,6 +139,7 @@ function tokenExpiry(expiresIn: unknown): Date | null {
 }
 
 async function postToken(endpoint: string, body: Record<string, string>, client: McpOAuthConfig, authMethod: OAuthMetadata['tokenEndpointAuthMethod']): Promise<OAuthTokenResponse> {
+  if (!client.clientId) throw new Error('OAuth client_id is missing');
   const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' };
   const form = new URLSearchParams({ ...body, client_id: client.clientId });
   if (authMethod === 'client_secret_basic' && client.clientSecret) {

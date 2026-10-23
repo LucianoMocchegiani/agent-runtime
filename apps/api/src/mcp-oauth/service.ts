@@ -1,5 +1,6 @@
 import type { McpConfig } from '../config.js';
 import { discoverOAuthMetadata, refreshOAuthToken } from './oauth-client.js';
+import { resolveOAuthClient } from './client-registration.js';
 import { getMcpOAuthTokens, saveMcpOAuthConnection, type StoredOAuthTokens } from './persistence.js';
 
 export async function getMcpOAuthAccessToken(userId: string, name: string, config: McpConfig): Promise<string | null> {
@@ -10,8 +11,11 @@ export async function getMcpOAuthAccessToken(userId: string, name: string, confi
   if (!stored.expiresAt || stored.expiresAt.getTime() > Date.now() + 30_000) return stored.accessToken;
   if (!stored.refreshToken) return null;
   try {
-    const metadata = await discoverOAuthMetadata(mcp);
-    const refreshed = await refreshOAuthToken(metadata, mcp.oauth, stored.refreshToken);
+    const discovered = await discoverOAuthMetadata(mcp);
+    const redirectUri = process.env.MCP_OAUTH_REDIRECT_URI?.trim();
+    if (mcp.oauth.registration === 'dynamic' && !redirectUri) return null;
+    const { metadata, client } = await resolveOAuthClient(name, mcp, discovered, redirectUri ?? '');
+    const refreshed = await refreshOAuthToken(metadata, client, stored.refreshToken);
     const tokens: StoredOAuthTokens = { ...refreshed };
     await saveMcpOAuthConnection({ userId, mcpName: name, account: null, tokens });
     return tokens.accessToken;

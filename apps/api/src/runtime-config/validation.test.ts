@@ -42,10 +42,24 @@ test('normaliza OAuth por servidor MCP sin restringir nombres de proveedor', () 
   assert.deepEqual(result.mcpConfig.custom_server?.oauth, { clientId: 'id', scopes: [] });
 });
 
-test('rechaza credenciales OAuth incompletas en MCP', () => {
+test('acepta DCR por servidor MCP y omite las credenciales hasta registrar el cliente', () => {
+  const value = validSettings();
+  value.mcpConfig = { workspace: { url: 'https://workspace.example/mcp', oauth: { registration: 'dynamic', scopes: ['read'] } } };
+  assert.deepEqual(validateRuntimeSettings(value).mcpConfig.workspace?.oauth, { registration: 'dynamic', scopes: ['read'] });
+});
+
+test('rechaza credenciales OAuth incompletas o combinaciones inválidas en MCP', () => {
   const value = validSettings();
   value.mcpConfig.local.oauth = { clientId: 'id', clientSecret: '' };
   assert.throws(() => validateRuntimeSettings(value), /Invalid MCP OAuth client configuration/);
+
+  const dynamicWithId = validSettings();
+  dynamicWithId.mcpConfig.local.oauth = { registration: 'dynamic', clientId: 'id' };
+  assert.throws(() => validateRuntimeSettings(dynamicWithId), /Invalid MCP OAuth client configuration/);
+
+  const missingId = validSettings();
+  missingId.mcpConfig.local.oauth = { scopes: [] };
+  assert.throws(() => validateRuntimeSettings(missingId), /Invalid MCP OAuth client configuration/);
 });
 
 test('la configuración AI normalizada contiene únicamente proveedores', () => {
