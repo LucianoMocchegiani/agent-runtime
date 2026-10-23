@@ -1,9 +1,10 @@
 import { createMiddleware } from 'hono/factory';
 import { HTTPException } from 'hono/http-exception';
+import { getCookie } from 'hono/cookie';
 import { randomUUID } from 'node:crypto';
 import type { AppEnv, Principal } from './contracts.js';
 import { AuthServiceError, resolvePrincipal } from './service.js';
-import { ANONYMOUS_TOKEN_PREFIX } from './constants.js';
+import { ANONYMOUS_TOKEN_PREFIX, ACCESS_COOKIE_NAME } from './constants.js';
 import { config } from '../config.js';
 
 function readBearer(header: string | undefined): string | null {
@@ -47,7 +48,11 @@ export const requirePrincipal = createMiddleware<AppEnv>(async (c, next) => {
     await next();
     return;
   }
-  const token = readBearer(c.req.header('Authorization'));
+  const bearer = readBearer(c.req.header('Authorization'));
+  const cookieToken = getCookie(c, ACCESS_COOKIE_NAME) ?? null;
+  // La cookie segura de sesión reemplaza el UUID anónimo del cliente, pero un Bearer
+  // explícito no anónimo sigue teniendo precedencia para integraciones/API clients.
+  const token = bearer && !isAnonToken(bearer) ? bearer : cookieToken ?? bearer;
 
   if (token && isAnonToken(token)) {
     const sessionId = stripAnonPrefix(token);

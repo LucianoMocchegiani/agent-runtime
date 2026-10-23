@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'chat_bearer_token';
+import client from './client.js';
 
 export function normalizeBearerToken(value) {
   const input = String(value ?? '').trim();
@@ -8,38 +8,26 @@ export function normalizeBearerToken(value) {
   return token;
 }
 
-export function getStoredBearerToken() {
+async function requestSession(request) {
   try {
-    return globalThis.sessionStorage?.getItem(STORAGE_KEY) || null;
-  } catch {
-    return null;
+    return await request();
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error('No se pudo conectar con Agent Runtime para actualizar la sesión.');
+    }
+    throw error;
   }
 }
 
-export function hasStoredBearerToken() {
-  return Boolean(getStoredBearerToken());
+export async function getAuthSession() {
+  return requestSession(() => client.authSession.get());
 }
 
-export function setStoredBearerToken(value) {
+export async function setStoredBearerToken(value) {
   const token = normalizeBearerToken(value);
-  let storage;
-  try {
-    storage = globalThis.sessionStorage;
-  } catch {
-    throw new Error('El almacenamiento de sesión no está disponible en este navegador.');
-  }
-  if (!storage) throw new Error('El almacenamiento de sesión no está disponible en este navegador.');
-  try {
-    storage.setItem(STORAGE_KEY, token);
-  } catch {
-    throw new Error('No se pudo guardar el token en el almacenamiento de sesión del navegador.');
-  }
+  return requestSession(() => client.authSession.set(token));
 }
 
-export function clearStoredBearerToken() {
-  try {
-    globalThis.sessionStorage?.removeItem(STORAGE_KEY);
-  } catch {
-    throw new Error('No se pudo borrar el token del almacenamiento de sesión del navegador.');
-  }
+export async function clearStoredBearerToken() {
+  return requestSession(() => client.authSession.clear());
 }

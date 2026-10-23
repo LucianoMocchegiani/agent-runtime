@@ -1,5 +1,5 @@
 import { ClientError } from './client-error.js';
-import { apiBaseUrl, apiHeaders, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, apiHeaders, parseJson } from './http.js';
 import type { ClientConfig, CursorPage, CursorPageOptions, SavePreferenceOptions, UserPreference } from './types.js';
 
 function cursorQuery(options: CursorPageOptions = {}): string {
@@ -11,7 +11,7 @@ function cursorQuery(options: CursorPageOptions = {}): string {
 
 async function fetchPreferencePage(config: ClientConfig, options: CursorPageOptions = {}): Promise<CursorPage<UserPreference>> {
   const suffix = cursorQuery(options);
-  const res = await fetch(`${apiBaseUrl(config)}/v1/preferences${suffix}`, {
+  const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/preferences${suffix}`, {
     headers: apiHeaders(config, { Accept: 'application/json' }),
   });
   if (!res.ok) throw new ClientError(res.status, `No se pudieron cargar las preferencias (HTTP ${res.status}).`);
@@ -45,7 +45,7 @@ export function createPreferencesApi(config: ClientConfig) {
 
     /** Guarda una preferencia persistente. @throws {ClientError} Si falla la solicitud. */
     save: async (preference: SavePreferenceOptions): Promise<UserPreference> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/preferences`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/preferences`, {
         method: 'POST',
         headers: apiHeaders(config, { 'Content-Type': 'application/json', Accept: 'application/json' }),
         body: JSON.stringify(preference),
@@ -59,7 +59,7 @@ export function createPreferencesApi(config: ClientConfig) {
      * @throws {ClientError} Si falla la solicitud.
      */
     delete: async (id: string): Promise<void> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/preferences/${encodeURIComponent(id)}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/preferences/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: apiHeaders(config),
       });

@@ -1,5 +1,5 @@
 import { ClientError } from './client-error.js';
-import { apiBaseUrl, apiHeaders, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, apiHeaders, parseJson } from './http.js';
 import type { ClientConfig, Conversation, CursorPage, CursorPageOptions } from './types.js';
 
 function cursorQuery(options: CursorPageOptions & { archived?: boolean } = {}): string {
@@ -15,7 +15,7 @@ async function fetchConversationPage(
   options: { archived?: boolean } & CursorPageOptions = {},
 ): Promise<CursorPage<Conversation>> {
   const suffix = cursorQuery(options);
-  const res = await fetch(`${apiBaseUrl(config)}/v1/conversations${suffix}`, {
+  const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations${suffix}`, {
     headers: apiHeaders(config, { Accept: 'application/json' }),
   });
   if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
@@ -50,7 +50,7 @@ export function createConversationsApi(config: ClientConfig) {
 
     /** Crea una conversación, opcionalmente asignándole un perfil inicial. @throws {ClientError} Si falla la solicitud. */
     create: async (options: { agentProfileId?: string } = {}): Promise<Conversation> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations`, {
         method: 'POST',
         headers: apiHeaders(config, { 'Content-Type': 'application/json', Accept: 'application/json' }),
         body: JSON.stringify(options),
@@ -61,7 +61,7 @@ export function createConversationsApi(config: ClientConfig) {
 
     /** Obtiene una conversación por identificador. @throws {ClientError} Si falla la solicitud. */
     get: async (id: string): Promise<Conversation> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${id}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${id}`, {
         headers: apiHeaders(config, { Accept: 'application/json' }),
       });
       if (!res.ok) throw new ClientError(res.status, `HTTP ${res.status}`);
@@ -70,7 +70,7 @@ export function createConversationsApi(config: ClientConfig) {
 
     /** Archiva una conversación. @throws {ClientError} Si falla la solicitud. */
     archive: async (id: string): Promise<Conversation> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${id}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${id}`, {
         method: 'DELETE',
         headers: apiHeaders(config),
       });
@@ -86,7 +86,7 @@ export function createConversationsApi(config: ClientConfig) {
       id: string,
       patch: { title?: string | null; archived?: boolean; agentProfileId?: string | null },
     ): Promise<Conversation> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${id}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${id}`, {
         method: 'PATCH',
         headers: apiHeaders(config, { 'Content-Type': 'application/json', Accept: 'application/json' }),
         body: JSON.stringify(patch),

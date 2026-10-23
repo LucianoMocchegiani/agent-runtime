@@ -1,5 +1,4 @@
 import { createClient } from 'agent-runtime-client/browser';
-import { getStoredBearerToken } from './authToken.js';
 
 function getSessionId() {
   const key = 'chat_session_id';
@@ -11,8 +10,10 @@ function getSessionId() {
   return id;
 }
 
+// The stable anonymous id is kept separately; the authenticated identity is carried
+// only by the HttpOnly cookie and is never exposed to JavaScript.
 function getBearer() {
-  return getStoredBearerToken() || `anon:${getSessionId()}`;
+  return `anon:${getSessionId()}`;
 }
 
 function getMcpAuth() {
@@ -30,7 +31,7 @@ function getMcpAuth() {
 }
 
 // Vacío = mismo origen: la UI la sirve agent-runtime (o el proxy de Vite en dev).
-const BASE_URL = import.meta.env.VITE_BASE_URL || '';
+const BASE_URL = import.meta.env?.VITE_BASE_URL || '';
 
 const client = createClient({
   baseUrl: BASE_URL,

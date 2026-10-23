@@ -8,6 +8,16 @@ Header opcional para credenciales MCP por servidor: `X-MCP-Auth` (JSON, por ejem
 
 Las rutas `/v1` asocian cada solicitud a una identidad. La URL de introspección y el mapeo del JSON de identidad se configuran de forma persistente y cifrada desde Administración → Auth (`runtime.config`), no mediante variables de entorno. Cuando hay URL, Runtime reenvía el Bearer opaco a ese endpoint con una solicitud GET y asigna la respuesta a `userId`, `email` y `name` según el mapeo configurado. Runtime no valida localmente firmas JWT. También acepta un token anónimo `anon:<uuid>` sin consultar el endpoint.
 
+La UI ofrece `/auth/session` para administrar una sesión de navegador:
+
+| Método | Ruta | Body | Respuesta |
+|---|---|---|---|
+| `GET` | `/auth/session` | — | `{ authenticated: boolean }` |
+| `POST` | `/auth/session` | `{ token: "<Bearer opaco>" }` | Valida por introspección y establece cookie HttpOnly. |
+| `DELETE` | `/auth/session` | — | Elimina la cookie y vuelve al acceso anónimo. |
+
+La cookie `agent_runtime_access` es `HttpOnly`, `SameSite=Lax`, `Path=/` y `Secure` en `NODE_ENV=production`; no expone el Bearer a JavaScript ni lo persiste en Web Storage. Es una cookie de sesión del navegador. La UI la envía automáticamente y conserva por separado su UUID anónimo en `localStorage`, así que cerrar la sesión autenticada no elimina ni cambia la sesión anónima. Sirví la UI desde el mismo origen o desde otro origen del mismo sitio; para orígenes separados, permitilos mediante `CORS_ORIGIN` o `CORS_APP_DOMAIN`.
+
 Sin URL de introspección, la API funciona en modo público: las solicitudes sin Bearer pueden acceder a `/v1` y reciben una identidad anónima aleatoria. Un Bearer opaco se rechaza con HTTP 401 (`Bearer authentication is not configured`), porque no puede validarse sin introspección. El Bearer `anon:<uuid>` sigue permitido y mantiene una identidad anónima estable; la UI nativa conserva ese valor en `localStorage`. Por tanto, dejar la URL vacía cambia la autenticación de todas las rutas `/v1`, no de una ruta aislada.
 
 Un endpoint de introspección que rechace el token con HTTP 401/403 causa respuesta 401. Fallos de conexión, timeout (8 segundos), otros estados HTTP, JSON inválido o ausencia del campo configurado como `userId` causan 502. Las identidades válidas se almacenan en caché hasta 30 segundos; un cambio de URL o mapeo invalida esa caché.

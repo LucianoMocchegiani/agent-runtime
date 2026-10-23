@@ -2,30 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   clearStoredBearerToken,
-  getStoredBearerToken,
-  hasStoredBearerToken,
+  getAuthSession,
   normalizeBearerToken,
   setStoredBearerToken,
 } from './authToken.js';
-
-function withSessionStorage(run) {
-  const previous = Object.getOwnPropertyDescriptor(globalThis, 'sessionStorage');
-  const data = new Map();
-  Object.defineProperty(globalThis, 'sessionStorage', {
-    configurable: true,
-    value: {
-      getItem: key => data.get(key) ?? null,
-      setItem: (key, value) => data.set(key, String(value)),
-      removeItem: key => data.delete(key),
-    },
-  });
-  try {
-    run();
-  } finally {
-    if (previous) Object.defineProperty(globalThis, 'sessionStorage', previous);
-    else delete globalThis.sessionStorage;
-  }
-}
 
 test('normaliza tokens pegados con o sin el prefijo Bearer', () => {
   assert.equal(normalizeBearerToken('  Bearer abc.def  '), 'abc.def');
@@ -34,13 +14,28 @@ test('normaliza tokens pegados con o sin el prefijo Bearer', () => {
   assert.throws(() => normalizeBearerToken('token en dos partes'), /no puede contener espacios/);
 });
 
-test('guarda y borra el Bearer en el almacenamiento de sesión', () => withSessionStorage(() => {
-  assert.equal(getStoredBearerToken(), null);
-  assert.equal(hasStoredBearerToken(), false);
-  setStoredBearerToken('Bearer test-token');
-  assert.equal(getStoredBearerToken(), 'test-token');
-  assert.equal(hasStoredBearerToken(), true);
-  clearStoredBearerToken();
-  assert.equal(getStoredBearerToken(), null);
-  assert.equal(hasStoredBearerToken(), false);
-}));
+test('guarda el token en el servidor con credenciales y consulta la sesión sin leer la cookie', async () => {
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options) => {
+    requests.push({ url, options });
+    return new Response(JSON.stringify({ authenticated: true }), { status: 200 });
+  };
+  try {
+    await setStoredBearerToken('Bearer test-token');
+    assert.deepEqual(await getAuthSession(), { authenticated: true });
+    await clearStoredBearerToken();
+
+    assert.equal(requests[0].url, '/auth/session');
+    assert.equal(requests[0].options.method, 'POST');
+    assert.equal(requests[0].options.credentials, 'include');
+    assert.deepEqual(JSON.parse(requests[0].options.body), { token: 'test-token' });
+    assert.equal(requests[0].options.headers.Authorization, undefined);
+    assert.equal(requests[1].options.method, 'GET');
+    assert.equal(requests[2].options.method, 'DELETE');
+    assert.equal(requests[2].options.credentials, 'include');
+    assert.equal(requests[2].options.headers.Authorization, undefined);
+  } finally {
+    globalThis.fetch = previousFetch;
+  }
+});

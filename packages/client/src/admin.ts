@@ -1,5 +1,5 @@
 import { ClientError } from './client-error.js';
-import { apiBaseUrl, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, parseJson } from './http.js';
 import type { ClientConfig } from './types.js';
 
 export type AdminRuntimeConfig = {
@@ -34,7 +34,7 @@ async function adminRequest<T>(
     headers.set('Content-Type', 'application/json');
   }
 
-  const res = await fetch(`${apiBaseUrl(config)}${path}`, { ...init, headers });
+  const res = await apiFetch(config, `${apiBaseUrl(config)}${path}`, { ...init, headers });
   if (!res.ok) {
     const data = await parseJson<{ error?: string; message?: string }>(res).catch(() => null);
     throw new ClientError(res.status, data?.error ?? data?.message ?? `HTTP ${res.status}`);

@@ -1,5 +1,5 @@
 import { ClientError } from './client-error.js';
-import { apiBaseUrl, apiHeaders, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, apiHeaders, parseJson } from './http.js';
 import type { ClientConfig } from './types.js';
 
 export type McpOAuthConnection = {
@@ -17,14 +17,14 @@ export function createMcpConnectionsApi(config: ClientConfig) {
   return {
     /** Devuelve solo estado/metadatos no secretos de los MCP que tengan OAuth configurado. */
     list: async (): Promise<McpOAuthConnection[]> => {
-      const res = await fetch(url, { headers: apiHeaders(config, { Accept: 'application/json' }) });
+      const res = await apiFetch(config, url, { headers: apiHeaders(config, { Accept: 'application/json' }) });
       if (!res.ok) throw new ClientError(res.status, `No se pudieron cargar las conexiones MCP (HTTP ${res.status}).`);
       const data = await parseJson<ConnectionList>(res);
       return data?.items ?? [];
     },
 
     authorize: async (name: string): Promise<string> => {
-      const res = await fetch(`${url}/${encodeURIComponent(name)}/authorize`, {
+      const res = await apiFetch(config, `${url}/${encodeURIComponent(name)}/authorize`, {
         method: 'POST', headers: apiHeaders(config, { Accept: 'application/json' }),
       });
       if (!res.ok) throw new ClientError(res.status, `No se pudo iniciar OAuth para ${name} (HTTP ${res.status}).`);
@@ -34,7 +34,7 @@ export function createMcpConnectionsApi(config: ClientConfig) {
     },
 
     disconnect: async (name: string): Promise<void> => {
-      const res = await fetch(`${url}/${encodeURIComponent(name)}`, { method: 'DELETE', headers: apiHeaders(config) });
+      const res = await apiFetch(config, `${url}/${encodeURIComponent(name)}`, { method: 'DELETE', headers: apiHeaders(config) });
       if (!res.ok) throw new ClientError(res.status, `No se pudo desconectar ${name} (HTTP ${res.status}).`);
     },
   };

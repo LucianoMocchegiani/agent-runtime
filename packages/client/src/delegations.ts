@@ -1,5 +1,5 @@
 import { ClientError } from './client-error.js';
-import { apiBaseUrl, apiHeaders, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, apiHeaders, parseJson } from './http.js';
 import type { ClientConfig, Delegation, DelegationEvent } from './types.js';
 
 /** Construye las consultas y el stream SSE de delegaciones. */
@@ -10,7 +10,7 @@ export function createDelegationsApi(config: ClientConfig) {
      * @throws {ClientError} Si falla la solicitud.
      */
     list: async (): Promise<Delegation[]> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/delegations`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/delegations`, {
         headers: apiHeaders(config, { Accept: 'application/json' }),
       });
       if (!res.ok) throw new ClientError(res.status, `No se pudieron listar las delegaciones (HTTP ${res.status}).`);
@@ -20,7 +20,7 @@ export function createDelegationsApi(config: ClientConfig) {
 
     /** Consulta una delegación propia por identificador. @throws {ClientError} Si falla la solicitud. */
     get: async (id: string): Promise<Delegation> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/delegations/${encodeURIComponent(id)}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/delegations/${encodeURIComponent(id)}`, {
         headers: apiHeaders(config, { Accept: 'application/json' }),
       });
       if (!res.ok) throw new ClientError(res.status, `No se pudo consultar la delegación (HTTP ${res.status}).`);
@@ -40,7 +40,7 @@ export function createDelegationsApi(config: ClientConfig) {
       options: { after?: string; signal?: AbortSignal; onEvent: (event: DelegationEvent) => void },
     ): Promise<void> => {
       const query = options.after ? `?after=${encodeURIComponent(options.after)}` : '';
-      const res = await fetch(`${apiBaseUrl(config)}/v1/delegations/${encodeURIComponent(id)}/events${query}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/delegations/${encodeURIComponent(id)}/events${query}`, {
         headers: apiHeaders(config, { Accept: 'text/event-stream' }),
         signal: options.signal,
       });

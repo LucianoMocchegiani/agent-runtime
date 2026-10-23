@@ -2,6 +2,10 @@ import type { ClientConfig } from './types.js';
 import { ClientError } from './client-error.js';
 
 /** Quita una barra final para evitar duplicarla al construir las rutas. */
+export function apiFetch(config: ClientConfig, input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  return fetch(input, { ...init, credentials: init.credentials ?? 'include' });
+}
+
 export function apiBaseUrl(config: ClientConfig): string {
   return config.baseUrl.replace(/\/$/, '');
 }

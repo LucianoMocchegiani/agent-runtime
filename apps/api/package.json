@@ -11,7 +11,7 @@
     "start": "node dist/index.js",
     "start:dev": "tsx watch --env-file=../../.env src/index.ts",
     "typecheck": "prisma generate && tsc --noEmit",
-    "test": "node --import tsx --test src/auth/middleware.test.ts src/agent/window/index.test.ts src/agent/turn/persistence.test.ts src/agent/turn/context.test.ts src/agent/turn/lock.test.ts src/conversations/cursor.test.ts src/agent/tools/tools.test.ts src/preferences/cursor.test.ts src/http/request-body.test.ts src/delegations/payload.test.ts src/runtime-config/validation.test.ts src/runtime-config/agent-profile-validation.test.ts src/voice/service.test.ts src/mcp/registry.test.ts src/mcp-oauth/crypto.test.ts src/mcp-oauth/oauth-client.test.ts",
+    "test": "node --import tsx --test src/auth/middleware.test.ts src/auth/session-routes.test.ts src/agent/window/index.test.ts src/agent/turn/persistence.test.ts src/agent/turn/context.test.ts src/agent/turn/lock.test.ts src/conversations/cursor.test.ts src/agent/tools/tools.test.ts src/preferences/cursor.test.ts src/http/request-body.test.ts src/delegations/payload.test.ts src/runtime-config/validation.test.ts src/runtime-config/agent-profile-validation.test.ts src/voice/service.test.ts src/mcp/registry.test.ts src/mcp-oauth/crypto.test.ts src/mcp-oauth/oauth-client.test.ts",
     "db:setup": "tsx --env-file=../../.env src/db/setup.ts",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",

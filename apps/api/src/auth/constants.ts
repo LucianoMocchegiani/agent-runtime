@@ -9,3 +9,4 @@ export const AUTH_INTROSPECT_TIMEOUT_MS = 8_000;
 
 /** Prefijo reservado para tokens de sesión anónima emitidos por la API. */
 export const ANONYMOUS_TOKEN_PREFIX = 'anon:';
+export const ACCESS_COOKIE_NAME = 'agent_runtime_access';

@@ -1,5 +1,5 @@
 import { ClientError } from './client-error.js';
-import { apiBaseUrl, apiHeaders, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, apiHeaders, parseJson } from './http.js';
 import type { ClientConfig } from './types.js';
 
 /** Construye las operaciones Realtime disponibles para una conversación. */
@@ -7,7 +7,7 @@ export function createVoiceApi(config: ClientConfig) {
   return {
     /** Consulta si hay un perfil Realtime habilitado para la conversación. */
     status: async (conversationId: string): Promise<{ available: boolean }> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/status`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/status`, {
         headers: apiHeaders(config, { Accept: 'application/json' }),
       });
       if (!res.ok) throw new ClientError(res.status, `No se pudo consultar la disponibilidad de voz (HTTP ${res.status}).`);
@@ -16,7 +16,7 @@ export function createVoiceApi(config: ClientConfig) {
 
     /** Solicita credencial efímera para conectar audio WebRTC con Realtime; la clave permanente no sale del backend. */
     createRealtimeSession: async (conversationId: string): Promise<{ value: string; expiresAt: number | null; realtimeUrl: string }> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/session`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/session`, {
         method: 'POST',
         headers: apiHeaders(config, { Accept: 'application/json' }),
       });
@@ -40,7 +40,7 @@ export function createVoiceApi(config: ClientConfig) {
 
     /** Envía una llamada Realtime al puente de herramientas autenticado de Runtime. */
     executeTool: async (conversationId: string, name: string, callId: string, args: string): Promise<unknown> => {
-      const res = await fetch(`${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/tools/${encodeURIComponent(name)}`, {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/voice/tools/${encodeURIComponent(name)}`, {
         method: 'POST',
         headers: apiHeaders(config, { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Voice-Call-Id': callId }),
         body: JSON.stringify({ arguments: args }),

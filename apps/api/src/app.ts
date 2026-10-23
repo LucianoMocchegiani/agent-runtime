@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { HTTPException } from 'hono/http-exception';
 import { requirePrincipal } from './auth/middleware.js';
+import { authSessionRoutes } from './auth/session-routes.js';
 import type { AppEnv } from './auth/contracts.js';
 import { config } from './config.js';
 import { allowCorsOrigin } from './cors.js';
@@ -46,9 +47,7 @@ export function createApp(): Hono<AppEnv> {
     '*',
     cors({
       origin: (origin) =>
-        origin
-          ? allowCorsOrigin(origin, config.corsOrigins, config.corsAppDomain)
-          : '*',
+        origin ? allowCorsOrigin(origin, config.corsOrigins, config.corsAppDomain) : undefined,
       allowHeaders: [
         'Authorization',
         'Content-Type',
@@ -59,6 +58,7 @@ export function createApp(): Hono<AppEnv> {
         'X-Voice-Call-Id',
       ],
       allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      credentials: true,
     }),
   );
 
@@ -85,6 +85,7 @@ export function createApp(): Hono<AppEnv> {
   });
 
   app.route('/oauth', mcpOAuthCallbackRoutes);
+  app.route('/auth', authSessionRoutes);
 
   app.route('/admin/runtime-config', runtimeConfigRoutes);
   app.route('/admin/agent-profiles', agentProfileAdminRoutes);

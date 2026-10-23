@@ -1,6 +1,6 @@
 import { ClientError } from './client-error.js';
 import { isAbortError } from './abort.js';
-import { apiBaseUrl, apiHeaders, parseJson } from './http.js';
+import { apiFetch, apiBaseUrl, apiHeaders, parseJson } from './http.js';
 import { consumeUiMessageStream } from './stream.js';
 import type { ClientConfig, MessageListOptions, MessagePage, SendOptions, StreamHandlers } from './types.js';
 
@@ -12,7 +12,7 @@ async function streamTurn(
   signal?: AbortSignal,
 ): Promise<'ok' | 'aborted'> {
   try {
-    const res = await fetch(`${apiBaseUrl(config)}${path}`, {
+    const res = await apiFetch(config, `${apiBaseUrl(config)}${path}`, {
       method: 'POST',
       headers: apiHeaders(config, { 'Content-Type': 'application/json', Accept: 'text/event-stream' }),
       body: JSON.stringify(body),
@@ -58,7 +58,7 @@ export function createMessagesApi(config: ClientConfig) {
         query.set('beforeId', options.before.id);
       }
       const suffix = query.size ? `?${query.toString()}` : '';
-      const res = await fetch(
+      const res = await apiFetch(config, 
         `${apiBaseUrl(config)}/v1/conversations/${conversationId}/messages${suffix}`,
         { headers: apiHeaders(config, { Accept: 'application/json' }) },
       );
