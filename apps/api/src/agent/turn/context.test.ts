@@ -22,42 +22,43 @@ const context: GetContextResult = {
   hasMore: false,
 };
 
+const common = {
+  saveSummary: async () => true,
+  searchPreferences: async () => [],
+  model: { contextWindowTokens: 8_000 } as ResolvedModel,
+  conversationId: 'conversation-1',
+  userId: 'user-1',
+  userText: 'Ayudame con este recibo',
+  context,
+  runtimeSettings: {
+    summariesEnabled: false,
+    summaryTokenBudget: 500,
+    maxOutputTokens: 1_000,
+    reserveOutputTokens: 1_200,
+    contextSafetyTokens: 100,
+    maxContextMessages: 20,
+  },
+  systemPrompt: 'Instrucciones del sistema',
+  tools: {},
+  images: [],
+};
+
 test('prepares prompt, token limits and multimodal messages with applicable preferences', async () => {
   let preferenceQuery = '';
-  const searchPreferences = async (params: { query: string }) => {
-    preferenceQuery = params.query;
-    return [{
-      id: 'preference-1',
-      preference: 'Usar respuestas concisas',
-      activationCondition: 'Al responder consultas',
-      category: 'estilo',
-      createdAt: '2025-01-01T00:00:00.000Z',
-    }];
-  };
-  const saveSummary = async () => true;
-  const model = {
-    contextWindowTokens: 8_000,
-  } as ResolvedModel;
   const imageData = new Uint8Array([1, 2, 3]);
-
   const prepared = await prepareTurnContext({
-    saveSummary,
-    searchPreferences,
-    model,
-    conversationId: 'conversation-1',
-    userId: 'user-1',
-    userText: 'Ayudame con este recibo',
-    context,
-    runtimeSettings: {
-      summariesEnabled: false,
-      summaryTokenBudget: 500,
-      maxOutputTokens: 1_000,
-      reserveOutputTokens: 1_200,
-      contextSafetyTokens: 100,
-      maxContextMessages: 20,
+    ...common,
+    searchPreferences: async (params: { query: string }) => {
+      preferenceQuery = params.query;
+      return [{
+        id: 'preference-1',
+        preference: 'Usar respuestas concisas',
+        activationCondition: 'Al responder consultas',
+        category: 'estilo',
+        createdAt: '2025-01-01T00:00:00.000Z',
+      }];
     },
-    systemPrompt: 'Instrucciones del sistema',
-    tools: {},
+    objective: null,
     images: [{ data: imageData, mediaType: 'image/png' }],
   });
 
@@ -65,6 +66,7 @@ test('prepares prompt, token limits and multimodal messages with applicable pref
   assert.equal(prepared.outputTokenLimits.maxOutputTokens, 1_000);
   assert.match(prepared.systemPrompt, /Instrucciones del sistema/);
   assert.match(prepared.systemPrompt, /Usar respuestas concisas/);
+  assert.doesNotMatch(prepared.systemPrompt, /Objetivo operativo persistente/);
   assert.equal(prepared.messages.length, 1);
   const userMessage = prepared.messages[0];
   assert.equal(userMessage.role, 'user');
@@ -73,4 +75,29 @@ test('prepares prompt, token limits and multimodal messages with applicable pref
     { type: 'text', text: 'Ayudame con este recibo' },
     { type: 'image', image: imageData, mediaType: 'image/png' },
   ]);
+});
+
+test('recovers the database objective even when compacted history only has a summary', async () => {
+  const prepared = await prepareTurnContext({
+    ...common,
+    context: { ...context, messages: [], summary: 'Resumen comprimido, sin la descripción operativa.' },
+    objective: {
+      id: 'objective-1',
+      conversationId: 'conversation-1',
+      title: 'Preparar propuesta',
+      description: 'Entregar versión revisada',
+      status: 'active',
+      steps: [{ id: 'draft', description: 'Revisar borrador', status: 'in_progress' }],
+      nextStep: 'Validar costos',
+      revision: 3,
+      createdAt: '2025-01-01T00:00:00.000Z',
+      updatedAt: '2025-01-02T00:00:00.000Z',
+    },
+  });
+
+  assert.match(prepared.systemPrompt, /Resumen comprimido/);
+  assert.match(prepared.systemPrompt, /Preparar propuesta/);
+  assert.match(prepared.systemPrompt, /Validar costos/);
+  assert.match(prepared.systemPrompt, /revision 3/);
+  assert.match(prepared.systemPrompt, /no reconstruyas ni reemplaces el estado desde el resumen/i);
 });

@@ -29,6 +29,7 @@ test('combines MCP tools with core agent tools without mutating the registry res
       'memory__savePreference',
       'memory__listPreferences',
       'memory__deletePreference',
+      'update_conversation_objective',
     ].sort(),
   );
 });
@@ -48,6 +49,7 @@ test('rejects MCP tools that collide with reserved agent tool names', () => {
     'memory__savePreference',
     'memory__listPreferences',
     'memory__deletePreference',
+    'update_conversation_objective',
   ];
   const delegationReserved = ['delegate_to_conversation', 'get_delegation_status'];
 

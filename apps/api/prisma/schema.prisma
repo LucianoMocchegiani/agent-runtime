@@ -25,9 +25,27 @@ model Conversation {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz
   messages   Message[]
+  objective  ConversationObjective?
 
   @@index([userId, updatedAt(sort: Desc)])
   @@map("conversations")
+}
+
+/// Estado operativo único por conversación; los pasos viven dentro de JSON.
+model ConversationObjective {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @unique @map("conversation_id") @db.Uuid
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  title          String       @db.VarChar(200)
+  description    String       @db.Text
+  status         String       @default("active") @db.VarChar(16)
+  steps          Json         @default("[]")
+  nextStep       String?      @map("next_step") @db.VarChar(500)
+  revision       Int          @default(0)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("conversation_objectives")
 }
 
 /// Turno persistido (user / assistant / tool). La ventana de contexto recorta el prompt, no las filas.
