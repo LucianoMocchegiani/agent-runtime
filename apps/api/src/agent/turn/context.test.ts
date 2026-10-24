@@ -77,9 +77,10 @@ test('prepares prompt, token limits and multimodal messages with applicable pref
   ]);
 });
 
-test('includes persisted objective independently of compacted history', async () => {
+test('recovers the database objective even when compacted history only has a summary', async () => {
   const prepared = await prepareTurnContext({
     ...common,
+    context: { ...context, messages: [], summary: 'Resumen comprimido, sin la descripción operativa.' },
     objective: {
       id: 'objective-1',
       conversationId: 'conversation-1',
@@ -94,6 +95,7 @@ test('includes persisted objective independently of compacted history', async ()
     },
   });
 
+  assert.match(prepared.systemPrompt, /Resumen comprimido/);
   assert.match(prepared.systemPrompt, /Preparar propuesta/);
   assert.match(prepared.systemPrompt, /Validar costos/);
   assert.match(prepared.systemPrompt, /revision 3/);
