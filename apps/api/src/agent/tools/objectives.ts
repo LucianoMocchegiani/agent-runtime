@@ -5,7 +5,7 @@ import type { AgentToolContext } from './context.js';
 export function buildObjectiveTools({ principal, conversationId }: AgentToolContext): Record<string, Tool> {
   return {
     update_conversation_objective: tool({
-      description: 'Crea o actualiza el único objetivo persistente de esta conversación. Usala solo ante una tarea concreta, al actualizar progreso/bloqueos/cambio claro de resultado o cuando haya evidencia para completarlo; no la uses para charla ni consultas independientes. Reemplazá los pasos obsoletos al cambiar de objetivo y enviá el estado completo. Para completarlo, exigí y citá en completionEvidence resultados concretos ya confirmados por el usuario o por herramientas; no infieras que terminó por intención o promesa. Usá expectedRevision null solo para crear; al actualizar, enviá la revisión recuperada en el contexto.',
+      description: 'Crea o actualiza el único objetivo persistente de esta conversación. Usala solo ante una tarea concreta, al actualizar progreso/bloqueos/cambio claro de resultado o cuando haya evidencia para completarlo; no la uses para charla ni consultas independientes. Reemplazá los pasos obsoletos al cambiar de objetivo y enviá el estado completo. No marques un paso ni objetivo como completed sin completionEvidence que cite resultados concretos ya confirmados por el usuario o por herramientas; no infieras que terminó por intención o promesa. Usá expectedRevision null solo para crear; al actualizar, enviá la revisión recuperada en el contexto.',
       inputSchema: jsonSchema<{
         title: string; description: string; status: 'active' | 'blocked' | 'completed';
         steps: { id: string; description: string; status: 'pending' | 'in_progress' | 'completed' }[];
