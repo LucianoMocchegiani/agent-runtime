@@ -44,7 +44,11 @@ export function validateObjectiveInput(input: ObjectiveInput): string | null {
   }
   if (input.nextStep !== null && (typeof input.nextStep !== 'string' || input.nextStep.trim().length > 500)) return 'El próximo paso debe tener hasta 500 caracteres.';
   if (input.expectedRevision !== null && (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 0)) return 'La revisión esperada no es válida.';
-  if (input.status === 'completed' && (typeof input.completionEvidence !== 'string' || input.completionEvidence.trim().length < 20)) return 'Para completar el objetivo se requiere evidencia concreta de finalización.';
+  const completionEvidence = input.completionEvidence?.trim() ?? '';
+  if (completionEvidence.length > 2_000) return 'La evidencia de finalización excede el límite permitido.';
+  if ((input.status === 'completed' || input.steps.some((step) => step.status === 'completed')) && completionEvidence.length < 20) {
+    return 'Para completar el objetivo o un paso se requiere evidencia concreta de finalización.';
+  }
   const normalizedLength = input.title.trim().length + input.description.trim().length
     + input.steps.reduce((length, step) => length + step.id.trim().length + step.description.trim().length, 0)
     + (input.nextStep?.trim().length ?? 0);
