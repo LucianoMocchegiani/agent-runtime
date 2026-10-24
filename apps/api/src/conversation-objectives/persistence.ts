@@ -36,14 +36,19 @@ export function validateObjectiveInput(input: ObjectiveInput): string | null {
   if (!Array.isArray(input.steps) || input.steps.length > 20) return 'Debe haber como máximo 20 pasos.';
   const ids = new Set<string>();
   for (const step of input.steps) {
-    if (!step || typeof step.id !== 'string' || !step.id.trim() || step.id.length > 80 || ids.has(step.id)) return 'Los identificadores de pasos deben ser únicos y válidos.';
+    const id = typeof step?.id === 'string' ? step.id.trim() : '';
+    if (!id || id.length > 80 || ids.has(id)) return 'Los identificadores de pasos deben ser únicos y válidos.';
     if (typeof step.description !== 'string' || !step.description.trim() || step.description.trim().length > 500) return 'La descripción de cada paso debe tener entre 1 y 500 caracteres.';
     if (!OBJECTIVE_STEP_STATES.includes(step.status)) return 'El estado de un paso no es válido.';
-    ids.add(step.id);
+    ids.add(id);
   }
   if (input.nextStep !== null && (typeof input.nextStep !== 'string' || input.nextStep.trim().length > 500)) return 'El próximo paso debe tener hasta 500 caracteres.';
   if (input.expectedRevision !== null && (!Number.isInteger(input.expectedRevision) || input.expectedRevision < 0)) return 'La revisión esperada no es válida.';
   if (input.status === 'completed' && (typeof input.completionEvidence !== 'string' || input.completionEvidence.trim().length < 20)) return 'Para completar el objetivo se requiere evidencia concreta de finalización.';
+  const normalizedLength = input.title.trim().length + input.description.trim().length
+    + input.steps.reduce((length, step) => length + step.id.trim().length + step.description.trim().length, 0)
+    + (input.nextStep?.trim().length ?? 0);
+  if (normalizedLength > 6_000) return 'El objetivo excede el límite de contexto permitido.';
   return null;
 }
 
