@@ -3,6 +3,7 @@ import { buildConversationTools } from './conversations.js';
 import type { AgentToolContext } from './context.js';
 import { buildDelegationTools } from './delegations.js';
 import { buildMemoryTools } from './memory.js';
+import { buildObjectiveTools } from './objectives.js';
 
 /** Error cuando una herramienta MCP usa un nombre reservado por las herramientas del agente. */
 export class AgentToolNameConflictError extends Error {
@@ -20,6 +21,7 @@ export function buildAgentTools(
   const agentTools = {
     ...buildConversationTools(context),
     ...buildMemoryTools(context),
+    ...buildObjectiveTools(context),
     ...(context.delegationEnabled ? buildDelegationTools(context) : {}),
   };
 
