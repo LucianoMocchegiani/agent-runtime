@@ -12,5 +12,7 @@ CREATE TABLE "conversation_objectives" (
   CONSTRAINT "conversation_objectives_pkey" PRIMARY KEY ("id"),
   CONSTRAINT "conversation_objectives_conversation_id_key" UNIQUE ("conversation_id"),
   CONSTRAINT "conversation_objectives_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE,
-  CONSTRAINT "conversation_objectives_status_check" CHECK ("status" IN ('active', 'blocked', 'completed'))
+  CONSTRAINT "conversation_objectives_status_check" CHECK ("status" IN ('active', 'blocked', 'completed')),
+  CONSTRAINT "conversation_objectives_revision_check" CHECK ("revision" >= 0),
+  CONSTRAINT "conversation_objectives_steps_check" CHECK (jsonb_typeof("steps") = 'array')
 );
