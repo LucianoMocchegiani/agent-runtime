@@ -3,6 +3,7 @@ import { getRuntimeSettings, type AgentProfile } from '../../runtime-config/serv
 import type { ResolvedModel } from '../../llm/provider.js';
 import { applyAutomaticTitle } from '../../conversations/persistence.js';
 import { getContext, saveMessage, saveSummary } from '../../messages/persistence.js';
+import { getConversationObjective } from '../../conversation-objectives/persistence.js';
 import { searchPreferences } from '../../preferences/persistence.js';
 import { prepareTurnContext, type IncomingImage } from './context.js';
 import type { Principal } from '../../auth/contracts.js';
@@ -63,10 +64,10 @@ export async function streamAgentTurn(
     });
 
     abortSignal?.throwIfAborted();
-    const context = await getContext({
-      conversationId,
-      userId: principal.userId,
-    });
+    const [context, objective] = await Promise.all([
+      getContext({ conversationId, userId: principal.userId }),
+      getConversationObjective(conversationId, principal.userId),
+    ]);
     abortSignal?.throwIfAborted();
 
     const preparedContext = await prepareTurnContext({
@@ -77,6 +78,7 @@ export async function streamAgentTurn(
       userId: principal.userId,
       userText,
       context,
+      objective,
       runtimeSettings,
       systemPrompt: turnSystemPrompt,
       tools,
