@@ -11,11 +11,13 @@ const valid: ObjectiveInput = {
   expectedRevision: null,
 };
 
-test('accepts a bounded objective and rejects invalid states, duplicate steps and unsupported completion', () => {
+test('validates bounded objective states, steps, evidence and revisions', () => {
   assert.equal(validateObjectiveInput(valid), null);
   assert.match(validateObjectiveInput({ ...valid, status: 'unknown' as ObjectiveInput['status'] })!, /estado/);
-  assert.match(validateObjectiveInput({ ...valid, steps: [valid.steps[0]!, valid.steps[0]!] })!, /únicos/);
+  assert.match(validateObjectiveInput({ ...valid, steps: [valid.steps[0]!, { ...valid.steps[0]!, id: ' draft ' }] })!, /únicos/);
+  assert.match(validateObjectiveInput({ ...valid, steps: [{ ...valid.steps[0]!, status: 'completed' }] })!, /evidencia/);
   assert.match(validateObjectiveInput({ ...valid, status: 'completed' })!, /evidencia/);
   assert.equal(validateObjectiveInput({ ...valid, status: 'completed', completionEvidence: 'El usuario confirmó el entregable final.' }), null);
   assert.match(validateObjectiveInput({ ...valid, expectedRevision: -1 })!, /revisión/);
+  assert.match(validateObjectiveInput({ ...valid, description: 'x'.repeat(2_001) })!, /descripción/);
 });
