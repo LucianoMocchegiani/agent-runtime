@@ -7,6 +7,9 @@ import { config } from '../config.js';
  */
 export function isTrustedBrowserRequest(request: Request): boolean {
   const requestUrl = new URL(request.url);
+  // Fetch Metadata remains reliable when a TLS proxy changes the scheme visible to the backend.
+  if (request.headers.get('Sec-Fetch-Site')?.toLowerCase() === 'same-origin') return true;
+
   const origin = request.headers.get('Origin');
   if (origin) {
     try {
@@ -18,8 +21,6 @@ export function isTrustedBrowserRequest(request: Request): boolean {
     }
   }
 
-  // Fetch Metadata sirve para peticiones same-origin, donde algunos navegadores omiten Origin.
-  if (request.headers.get('Sec-Fetch-Site')?.toLowerCase() === 'same-origin') return true;
   const referer = request.headers.get('Referer');
   if (referer) {
     try { return new URL(referer).origin === requestUrl.origin; } catch { return false; }

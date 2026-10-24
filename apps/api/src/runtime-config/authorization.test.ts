@@ -80,8 +80,21 @@ test('cookie session authorizes a registered admin only from a trusted browser o
 test('fallback admin works independently of dynamic auth and admin list', async () => {
   config.authIntrospectUrl = null;
   allowAdmin = false;
-  assert.equal(await authorized(`Basic ${Buffer.from('admin:admin').toString('base64')}`), true);
+  const authorization = `Basic ${Buffer.from('admin:admin').toString('base64')}`;
+  assert.equal(await authorized(authorization), true);
   assert.equal(await authorized(`Basic ${Buffer.from('wrong:credentials').toString('base64')}`), false);
+
+  const app = new Hono();
+  app.get('/admin', async (c) => c.json({ authorized: Boolean(await authorizedAdminRequest(c)) }));
+  const behindTlsProxy = await app.request('/admin', {
+    headers: { Authorization: authorization, Origin: 'https://runtime.example', 'Sec-Fetch-Site': 'same-origin' },
+  });
+  assert.deepEqual(await behindTlsProxy.json(), { authorized: true });
+
+  const crossSite = await app.request('/admin', {
+    headers: { Authorization: authorization, Origin: 'https://attacker.example', 'Sec-Fetch-Site': 'cross-site' },
+  });
+  assert.deepEqual(await crossSite.json(), { authorized: false });
 });
 
 test('fallback credentials can be overridden with environment variables', async () => {
