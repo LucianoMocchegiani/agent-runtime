@@ -98,16 +98,16 @@ test('detecta userOnly y lo ejecuta mediante el tool del cliente MCP al aprobar'
         _meta: { 'chat/userOnly': true },
       }],
     }),
-    toolsFromDefinitions: () => ({
+    toolsFromDefinitions: (() => ({
       change: {
         description: 'Change',
         inputSchema: {},
         execute: async (args: unknown) => {
           called = args;
-          return { content: [{ type: 'text', text: 'done' }] };
+          return { content: [{ type: 'text' as const, text: 'done' }] };
         },
       },
-    }),
+    })) as unknown as MCPClient['toolsFromDefinitions'],
   });
   const registry = new McpRegistry(config, async () => client);
   await registry.connect('token');
