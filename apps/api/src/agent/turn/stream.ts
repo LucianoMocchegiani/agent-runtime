@@ -16,6 +16,7 @@ export async function streamPreparedAgentTurn(params: {
   registry: Pick<McpRegistry, 'close'>;
   runtimeSettings: Pick<RuntimeSettings, 'maxToolSteps' | 'llmTraceRequests'>;
   tools: Record<string, Tool>;
+  userOnlyToolNames: ReadonlySet<string>;
   abortSignal?: AbortSignal;
   outputTokenLimits: { maxOutputTokens: number };
   systemPrompt: string;
@@ -28,6 +29,7 @@ export async function streamPreparedAgentTurn(params: {
     registry,
     runtimeSettings,
     tools,
+    userOnlyToolNames,
     abortSignal,
     outputTokenLimits,
     systemPrompt,
@@ -69,7 +71,7 @@ export async function streamPreparedAgentTurn(params: {
     saved = true;
     const loose = Array.isArray(steps) ? (steps as AgentTurnStep[]) : acc;
     try {
-      await persistAgentTurn(saveMessage, conversationId, userId, text, loose);
+      await persistAgentTurn(saveMessage, conversationId, userId, text, loose, userOnlyToolNames);
     } catch (error) {
       console.error(error);
     }

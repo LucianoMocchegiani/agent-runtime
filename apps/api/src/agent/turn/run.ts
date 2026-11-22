@@ -47,6 +47,9 @@ export async function streamAgentTurn(
     confirmUserOnlyTools: runtimeSettings.confirmUserOnlyTools === true && !isDelegation,
     signal: abortSignal,
   });
+  const userOnlyToolNames = runtimeSettings.confirmUserOnlyTools === true && !isDelegation
+    ? registry.userOnlyToolNames()
+    : new Set<string>();
 
   try {
     abortSignal?.throwIfAborted();
@@ -95,6 +98,7 @@ export async function streamAgentTurn(
       registry,
       runtimeSettings,
       tools,
+      userOnlyToolNames,
       abortSignal,
       ...preparedContext,
     });

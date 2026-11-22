@@ -61,6 +61,7 @@ export async function persistAgentTurn(
   userId: string,
   text: string | undefined,
   steps: AgentTurnStep[],
+  userOnlyToolNames: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   let savedStepText = false;
   for (const step of steps) {
@@ -84,7 +85,7 @@ export async function persistAgentTurn(
       const name = toolNameOf(result, toolNameOf(call));
       const args = toolArgsOf(call) ?? toolArgsOf(result);
       const output = toolOutputOf(result);
-      if (isApprovalRequest(output)) {
+      if (userOnlyToolNames.has(name) && isApprovalRequest(output)) {
         await saveMessage({
           conversationId,
           userId,
