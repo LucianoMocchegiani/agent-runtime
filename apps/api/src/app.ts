@@ -31,17 +31,31 @@ async function pingMemory(): Promise<DependencyStatus> {
       new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), HEALTH_TIMEOUT_MS)),
     ]);
     return 'up';
-  } catch { return 'down'; }
+  } catch {
+    return 'down';
+  }
 }
 
 export function createApp(): Hono<AppEnv> {
   const app = new Hono<AppEnv>();
-  app.use('*', cors({
-    origin: (origin) => origin ? allowCorsOrigin(origin, config.corsOrigins, config.corsAppDomain) : undefined,
-    allowHeaders: ['Authorization', 'Content-Type', 'x-vercel-ai-ui-message-stream', 'X-MCP-Auth', 'Last-Event-ID', 'X-Voice-Trace-Id', 'X-Voice-Call-Id'],
-    allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    credentials: true,
-  }));
+  app.use(
+    '*',
+    cors({
+      origin: (origin) =>
+        origin ? allowCorsOrigin(origin, config.corsOrigins, config.corsAppDomain) : undefined,
+      allowHeaders: [
+        'Authorization',
+        'Content-Type',
+        'x-vercel-ai-ui-message-stream',
+        'X-MCP-Auth',
+        'Last-Event-ID',
+        'X-Voice-Trace-Id',
+        'X-Voice-Call-Id',
+      ],
+      allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      credentials: true,
+    }),
+  );
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
       const status = err.status as 400 | 401 | 403 | 404 | 429 | 502 | 500 | 503;
@@ -52,13 +66,17 @@ export function createApp(): Hono<AppEnv> {
   });
   app.get('/health', async (c) => {
     const memory = await pingMemory();
-    return c.json({ status: memory === 'up' ? 'ok' : 'degraded', memory, checkedAt: new Date().toISOString() }, memory === 'up' ? 200 : 503);
+    return c.json(
+      { status: memory === 'up' ? 'ok' : 'degraded', memory, checkedAt: new Date().toISOString() },
+      memory === 'up' ? 200 : 503,
+    );
   });
   app.route('/oauth', mcpOAuthCallbackRoutes);
   app.route('/auth', authSessionRoutes);
   app.route('/admin/runtime-config', runtimeConfigRoutes);
   app.route('/admin/runtime-admins', runtimeAdminRoutes);
   app.route('/admin/agent-profiles', agentProfileAdminRoutes);
+
   const v1 = new Hono<AppEnv>();
   v1.use('*', requirePrincipal);
   v1.route('/conversations/:id/voice', voiceRoutes);

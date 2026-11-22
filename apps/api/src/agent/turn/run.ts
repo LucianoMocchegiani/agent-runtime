@@ -11,6 +11,11 @@ import { delegationEncryptionEnabled } from '../../delegations/payload.js';
 import { prepareAgentTurnTools } from './tools.js';
 import { streamPreparedAgentTurn } from './stream.js';
 
+/**
+ * Ejecuta un turno completo: prepara herramientas/contexto, invoca el modelo y devuelve el stream UI.
+ * @remarks La cancelación del cliente interrumpe el modelo y persiste lo generado hasta ese punto.
+ * @throws {HTTPException} 502 si no se puede preparar o ejecutar la dependencia requerida.
+ */
 export async function streamAgentTurn(
   conversationId: string,
   principal: Principal,
@@ -45,16 +50,27 @@ export async function streamAgentTurn(
   try {
     abortSignal?.throwIfAborted();
     if (!options.userMessageAlreadySaved) {
-      await saveMessage({ conversationId, userId: principal.userId, role: 'user', content: userText });
+      await saveMessage({
+        conversationId,
+        userId: principal.userId,
+        role: 'user',
+        content: userText,
+      });
     }
     abortSignal?.throwIfAborted();
-    await applyAutomaticTitle({ conversationId, userId: principal.userId, userText });
+    await applyAutomaticTitle({
+      conversationId,
+      userId: principal.userId,
+      userText,
+    });
+
     abortSignal?.throwIfAborted();
     const [context, objective] = await Promise.all([
       getContext({ conversationId, userId: principal.userId }),
       getConversationObjective(conversationId, principal.userId),
     ]);
     abortSignal?.throwIfAborted();
+
     const preparedContext = await prepareTurnContext({
       saveSummary,
       searchPreferences,
@@ -70,6 +86,7 @@ export async function streamAgentTurn(
       images,
     });
     abortSignal?.throwIfAborted();
+
     return await streamPreparedAgentTurn({
       conversationId,
       userId: principal.userId,
