@@ -28,6 +28,7 @@ async function prepareVoiceTools(c: Context<AppEnv>) {
     principal: c.get('principal'),
     conversationId,
     delegationEnabled: delegationEncryptionEnabled(),
+    confirmUserOnlyTools: false,
   });
   return { ...prepared, conversationId, userId: c.get('principal').userId };
 }

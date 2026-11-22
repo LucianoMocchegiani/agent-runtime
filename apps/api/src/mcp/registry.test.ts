@@ -88,7 +88,7 @@ test('close no espera indefinidamente a un cliente MCP', async () => {
   assert.equal(registry.size, 0);
 });
 
-test('detecta userOnly y permite invocarla solo a través del método explícito de aprobación', async () => {
+test('detecta userOnly y lo ejecuta mediante el tool del cliente MCP al aprobar', async () => {
   let called: unknown;
   const client = fakeClient({
     listTools: async () => ({
@@ -98,11 +98,16 @@ test('detecta userOnly y permite invocarla solo a través del método explícito
         _meta: { 'chat/userOnly': true },
       }],
     }),
-    toolsFromDefinitions: () => ({ change: { description: 'Change', inputSchema: {} } }),
-    callTool: async (params) => {
-      called = params;
-      return { content: [{ type: 'text', text: 'done' }] };
-    },
+    toolsFromDefinitions: () => ({
+      change: {
+        description: 'Change',
+        inputSchema: {},
+        execute: async (args: unknown) => {
+          called = args;
+          return { content: [{ type: 'text', text: 'done' }] };
+        },
+      },
+    }),
   });
   const registry = new McpRegistry(config, async () => client);
   await registry.connect('token');
@@ -111,10 +116,6 @@ test('detecta userOnly y permite invocarla solo a través del método explícito
   assert.equal(registry.isUserOnlyTool('example__change'), true);
   const output = await registry.callUserOnlyTool('example__change', { amount: 1 });
   assert.deepEqual(output, { content: [{ type: 'text', text: 'done' }] });
-  assert.deepEqual(called, {
-    name: 'change',
-    arguments: { amount: 1 },
-    options: { signal: undefined, timeout: 15_000 },
-  });
+  assert.deepEqual(called, { amount: 1 });
   await registry.close();
 });

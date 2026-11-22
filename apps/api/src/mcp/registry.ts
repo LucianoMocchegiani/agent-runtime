@@ -1,4 +1,5 @@
 import { createMCPClient, type MCPClient } from '@ai-sdk/mcp';
+import type { Tool } from 'ai';
 import { config, type McpConfig, type McpServerConfig } from '../config.js';
 
 /** OpenAI exige `^[a-zA-Z0-9_-]{1,64}$` en nombres de tools: sin puntos. */
@@ -12,12 +13,13 @@ export type McpClientEntry = {
 
 const MCP_OPERATION_TIMEOUT_MS = 15_000;
 const MCP_CLOSE_TIMEOUT_MS = 1_000;
+type ExecutableTool = { execute?: (args: unknown, options: { toolCallId: string; messages: never[]; abortSignal?: AbortSignal }) => Promise<unknown> };
 
 /** Administra las conexiones MCP de un turno y agrega sus herramientas con namespace. */
 export class McpRegistry {
   private mcps: Map<string, McpServerConfig> = new Map();
   private clients: Map<string, MCPClient> = new Map();
-  private userOnlyTools = new Map<string, { server: string; name: string }>();
+  private userOnlyTools = new Map<string, { server: string; name: string; tool: ExecutableTool }>();
 
   constructor(
     mcps: McpConfig,
@@ -32,20 +34,14 @@ export class McpRegistry {
   }
 
   /** Un MCP `optional` que no conecta se saltea; uno requerido que falla hace fallar el turno. */
-  async connect(
-    accessToken: string,
-    mcpTokens?: Record<string, string>,
-    signal?: AbortSignal,
-  ): Promise<void> {
+  async connect(accessToken: string, mcpTokens?: Record<string, string>, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted();
     const names = [...this.mcps.keys()];
-    const results = await Promise.allSettled(
-      names.map((name) => {
-        const cfg = this.mcps.get(name)!;
-        const token = cfg.oauth ? (mcpTokens?.[name] ?? '') : (mcpTokens?.[name] ?? accessToken);
-        return this.connectOne(cfg, token, signal);
-      }),
-    );
+    const results = await Promise.allSettled(names.map((name) => {
+      const cfg = this.mcps.get(name)!;
+      const token = cfg.oauth ? (mcpTokens?.[name] ?? '') : (mcpTokens?.[name] ?? accessToken);
+      return this.connectOne(cfg, token, signal);
+    }));
     for (let index = 0; index < results.length; index += 1) {
       const result = results[index];
       if (result.status === 'fulfilled') this.clients.set(names[index], result.value);
@@ -77,9 +73,7 @@ export class McpRegistry {
     for (const [name, client] of this.clients) {
       signal?.throwIfAborted();
       try {
-        let definitions = await client.listTools({
-          options: { signal, timeout: MCP_OPERATION_TIMEOUT_MS },
-        });
+        let definitions = await client.listTools({ options: { signal, timeout: MCP_OPERATION_TIMEOUT_MS } });
         const tools = [...definitions.tools];
         while (definitions.nextCursor != null) {
           signal?.throwIfAborted();
@@ -89,12 +83,14 @@ export class McpRegistry {
           });
           tools.push(...definitions.tools);
         }
-        const listed = client.toolsFromDefinitions({ ...definitions, tools }) as Record<string, unknown>;
+        const listed = client.toolsFromDefinitions({ ...definitions, tools }) as Record<string, Tool>;
         for (const definition of tools) {
+          const key = `${name}${TOOL_NAMESPACE_SEPARATOR}${definition.name}`;
           if (definition._meta?.['chat/userOnly'] === true) {
-            this.userOnlyTools.set(`${name}${TOOL_NAMESPACE_SEPARATOR}${definition.name}`, {
+            this.userOnlyTools.set(key, {
               server: name,
               name: definition.name,
+              tool: listed[definition.name] as ExecutableTool,
             });
           }
         }
@@ -119,29 +115,19 @@ export class McpRegistry {
   }
 
   async callUserOnlyTool(name: string, args: Record<string, unknown>, signal?: AbortSignal): Promise<unknown> {
-    const definition = this.userOnlyTools.get(name);
-    const client = definition && this.clients.get(definition.server);
-    if (!definition || !client) throw new Error('Tool is not marked chat/userOnly or its MCP server is unavailable');
-    return client.callTool({
-      name: definition.name,
-      arguments: args,
-      options: { signal, timeout: MCP_OPERATION_TIMEOUT_MS },
-    });
+    const tool = this.userOnlyTools.get(name)?.tool;
+    if (!tool?.execute) throw new Error('Tool is not marked chat/userOnly or its MCP server is unavailable');
+    return tool.execute(args, { toolCallId: 'user-only-approval', messages: [], abortSignal: signal });
   }
 
   /** Cierra conexiones abiertas con espera acotada y vacía siempre el registro. */
   async close(): Promise<void> {
-    const closing = Promise.all(
-      [...this.clients.values()].map((client) => client.close().catch(() => undefined)),
-    );
+    const closing = Promise.all([...this.clients.values()].map((client) => client.close().catch(() => undefined)));
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await Promise.race([
-        closing,
-        new Promise<void>((resolve) => {
-          timer = setTimeout(resolve, MCP_CLOSE_TIMEOUT_MS);
-        }),
-      ]);
+      await Promise.race([closing, new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, MCP_CLOSE_TIMEOUT_MS);
+      })]);
     } finally {
       if (timer) clearTimeout(timer);
       this.clients.clear();

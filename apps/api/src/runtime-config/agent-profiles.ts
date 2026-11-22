@@ -83,6 +83,7 @@ export async function seedDefaultAgentProfile(): Promise<void> {
       llmTraceRequests: config.llmTraceRequests,
       summariesEnabled: config.summariesEnabled,
       summaryTokenBudget: config.summaryTokenBudget,
+      confirmUserOnlyTools: true,
     },
   };
   const initialChatModel = AI_PROVIDERS.flatMap((provider) =>
