@@ -18,7 +18,11 @@ export default function ToolApprovalPanel({ conversationId, messages, onResolved
     } catch (e) {
       setError(e.message || 'No se pudo procesar la confirmación.');
     }
-    await onResolved?.();
+    try {
+      await onResolved?.();
+    } catch {
+      setError('La acción cambió. Actualizá el historial para ver su estado.');
+    }
     setBusyId(null);
   }
 

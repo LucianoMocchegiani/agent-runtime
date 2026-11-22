@@ -76,7 +76,7 @@ toolApprovalRoutes.post('/:messageId/approval', async (c) => {
         pending.toolArgs as Record<string, unknown>,
       );
       await finishPendingToolApproval(conversationId, messageId, result);
-      return c.json({ state: 'completed', result });
+      return c.json({ state: 'completed' });
     } catch (error) {
       await finishPendingToolApproval(conversationId, messageId, {
         error: 'La herramienta no pudo completarse.',
