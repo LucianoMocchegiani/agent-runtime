@@ -6,9 +6,9 @@ import { shrinkToolContent } from '../agent/window/index.js';
 
 export type PendingToolApproval = { id: string; toolName: string; toolArgs: unknown };
 
-function isPending(value: unknown, state: string): boolean {
+function isPending(value: unknown): boolean {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
-    && (value as { state?: unknown }).state === state;
+    && (value as { state?: unknown }).state === 'approval_pending';
 }
 
 export async function getPendingToolApproval(conversationId: string, userId: string, messageId: string): Promise<PendingToolApproval> {
@@ -17,7 +17,7 @@ export async function getPendingToolApproval(conversationId: string, userId: str
     where: { id: messageId, conversationId, role: 'tool' },
     select: { id: true, toolName: true, toolArgs: true, toolResult: true },
   });
-  if (!row || !row.toolName || !isPending(row.toolResult, 'approval_pending')) {
+  if (!row || !row.toolName || !isPending(row.toolResult)) {
     throw new HTTPException(409, { message: 'La aprobación ya no está pendiente.' });
   }
   return { id: row.id, toolName: row.toolName, toolArgs: row.toolArgs };
@@ -34,7 +34,7 @@ export async function claimPendingToolApproval(conversationId: string, messageId
 export async function cancelPendingToolApproval(conversationId: string, messageId: string): Promise<boolean> {
   const result = await prisma.message.updateMany({
     where: { id: messageId, conversationId, role: 'tool', toolResult: { equals: { state: 'approval_pending' } } },
-    data: { toolResult: { state: 'approval_cancelled' } as Prisma.InputJsonValue, content: 'El usuario canceló la acción.' },
+    data: { toolResult: 'El usuario canceló la acción.', content: 'El usuario canceló la acción.' },
   });
   return result.count === 1;
 }
@@ -42,7 +42,7 @@ export async function cancelPendingToolApproval(conversationId: string, messageI
 export async function finishPendingToolApproval(
   conversationId: string,
   messageId: string,
-  state: 'completed' | 'failed',
+  _state: 'completed' | 'failed',
   resultValue: unknown,
 ): Promise<void> {
   let result: Prisma.InputJsonValue | null;
@@ -55,7 +55,7 @@ export async function finishPendingToolApproval(
   const updated = await prisma.message.updateMany({
     where: { id: messageId, conversationId, role: 'tool', toolResult: { equals: { state: 'approval_executing' } } },
     data: {
-      toolResult: { state, result } as Prisma.InputJsonValue,
+      toolResult: result as Prisma.InputJsonValue,
       content: shrinkToolContent('tool approval', resultValue, true),
     },
   });
