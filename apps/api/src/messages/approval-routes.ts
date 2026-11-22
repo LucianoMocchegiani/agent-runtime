@@ -1,13 +1,13 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AppEnv } from '../auth/contracts.js';
-import { McpRegistry } from '../mcp/registry.js';
-import { getMcpOAuthAccessToken } from '../mcp-oauth/service.js';
-import { getConversation } from '../conversations/service.js';
 import { requireConversationId } from '../conversations/ids.js';
+import { getConversation } from '../conversations/service.js';
+import { readJsonBody } from '../http/request-body.js';
+import { getMcpOAuthAccessToken } from '../mcp-oauth/service.js';
+import { McpRegistry } from '../mcp/registry.js';
 import { getAgentProfile } from '../runtime-config/agent-profiles.js';
 import { getRuntimeSettings } from '../runtime-config/service.js';
-import { readJsonBody } from '../http/request-body.js';
 import {
   cancelPendingToolApproval,
   claimPendingToolApproval,
@@ -31,7 +31,9 @@ toolApprovalRoutes.post('/:messageId/approval', async (c) => {
     throw new HTTPException(400, { message: 'Identificador de mensaje inválido.' });
   }
   const body = asRecord(await readJsonBody(c.req.raw, 1_024));
-  if (typeof body.approved !== 'boolean') throw new HTTPException(400, { message: 'approved debe ser booleano.' });
+  if (typeof body.approved !== 'boolean') {
+    throw new HTTPException(400, { message: 'approved debe ser booleano.' });
+  }
   const principal = c.get('principal');
   const pending = await getPendingToolApproval(conversationId, principal.userId, messageId);
   if (!body.approved) {
@@ -50,10 +52,9 @@ toolApprovalRoutes.post('/:messageId/approval', async (c) => {
   const settings = getRuntimeSettings(profile);
   const tokens = { ...(c.get('mcpAuth') ?? {}) };
   for (const [name, mcp] of Object.entries(settings.mcpConfig)) {
-    if (mcp.oauth) {
-      const token = await getMcpOAuthAccessToken(principal.userId, name, settings.mcpConfig);
-      if (token) tokens[name] = token;
-    }
+    if (!mcp.oauth) continue;
+    const token = await getMcpOAuthAccessToken(principal.userId, name, settings.mcpConfig);
+    if (token) tokens[name] = token;
   }
 
   const registry = new McpRegistry(settings.mcpConfig);
@@ -70,11 +71,16 @@ toolApprovalRoutes.post('/:messageId/approval', async (c) => {
       throw new HTTPException(409, { message: 'La aprobación ya fue procesada.' });
     }
     try {
-      const result = await registry.callUserOnlyTool(pending.toolName, pending.toolArgs as Record<string, unknown>);
-      await finishPendingToolApproval(conversationId, messageId, 'completed', result);
+      const result = await registry.callUserOnlyTool(
+        pending.toolName,
+        pending.toolArgs as Record<string, unknown>,
+      );
+      await finishPendingToolApproval(conversationId, messageId, result);
       return c.json({ state: 'completed', result });
     } catch (error) {
-      await finishPendingToolApproval(conversationId, messageId, 'failed', { error: 'La herramienta no pudo completarse.' });
+      await finishPendingToolApproval(conversationId, messageId, {
+        error: 'La herramienta no pudo completarse.',
+      });
       console.error('Falló la ejecución aprobada de una herramienta MCP.', error);
       throw new HTTPException(502, { message: 'La herramienta no pudo completarse.' });
     }
