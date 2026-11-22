@@ -15,12 +15,11 @@ export default function ToolApprovalPanel({ conversationId, messages, onResolved
     setError('');
     try {
       await client.messages.resolveToolApproval(conversationId, message.id, approved);
-      await onResolved?.();
     } catch (e) {
       setError(e.message || 'No se pudo procesar la confirmación.');
-    } finally {
-      setBusyId(null);
     }
+    await onResolved?.();
+    setBusyId(null);
   }
 
   return (
