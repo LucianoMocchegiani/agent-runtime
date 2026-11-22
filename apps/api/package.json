@@ -3,25 +3,20 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "engines": {
-    "node": ">=24"
-  },
+  "engines": { "node": ">=24" },
   "scripts": {
     "build": "prisma generate && tsc",
     "start": "node dist/index.js",
     "start:dev": "tsx watch --env-file=../../.env src/index.ts",
     "typecheck": "prisma generate && tsc --noEmit",
-    "test": "node --import tsx --test src/auth/middleware.test.ts src/auth/session-routes.test.ts src/agent/window/index.test.ts src/agent/turn/persistence.test.ts src/agent/turn/context.test.ts src/agent/turn/lock.test.ts src/conversations/cursor.test.ts src/agent/tools/tools.test.ts src/conversation-objectives/persistence.test.ts src/conversation-objectives/persistence.integration.test.ts src/preferences/cursor.test.ts src/http/request-body.test.ts src/delegations/payload.test.ts src/runtime-config/validation.test.ts src/runtime-config/authorization.test.ts src/runtime-config/agent-profile-validation.test.ts src/voice/service.test.ts src/mcp/registry.test.ts src/mcp-oauth/crypto.test.ts src/mcp-oauth/oauth-client.test.ts",
+    "test": "node --import tsx --test src/auth/middleware.test.ts src/auth/session-routes.test.ts src/agent/window/index.test.ts src/agent/turn/persistence.test.ts src/agent/turn/context.test.ts src/agent/turn/lock.test.ts src/conversations/cursor.test.ts src/agent/tools/tools.test.ts src/agent/tools/index.test.ts src/conversation-objectives/persistence.test.ts src/conversation-objectives/persistence.integration.test.ts src/preferences/cursor.test.ts src/http/request-body.test.ts src/delegations/payload.test.ts src/runtime-config/validation.test.ts src/runtime-config/authorization.test.ts src/runtime-config/agent-profile-validation.test.ts src/voice/service.test.ts src/mcp/registry.test.ts src/mcp-oauth/crypto.test.ts src/mcp-oauth/oauth-client.test.ts",
     "db:setup": "tsx --env-file=../../.env src/db/setup.ts",
     "admin:bootstrap": "tsx --env-file=../../.env src/runtime-config/bootstrap-admin.ts",
-    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy"
   },
-  "prisma": {
-    "schema": "prisma/schema.prisma"
-  },
+  "prisma": { "schema": "prisma/schema.prisma" },
   "dependencies": {
     "@ai-sdk/mcp": "^1.0.78",
     "@ai-sdk/openai": "^3.0.124",

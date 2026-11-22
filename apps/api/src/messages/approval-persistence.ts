@@ -45,10 +45,10 @@ export async function finishPendingToolApproval(
   state: 'completed' | 'failed',
   resultValue: unknown,
 ): Promise<void> {
-  let result: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+  let result: Prisma.InputJsonValue | null;
   try {
     const serialized = JSON.stringify(resultValue);
-    result = serialized === undefined ? Prisma.JsonNull : JSON.parse(serialized) as Prisma.InputJsonValue;
+    result = serialized === undefined ? null : JSON.parse(serialized) as Prisma.InputJsonValue;
   } catch {
     result = String(resultValue);
   }
@@ -60,17 +60,4 @@ export async function finishPendingToolApproval(
     },
   });
   if (updated.count !== 1) throw new Error('Tool approval state changed while executing');
-}
-
-export async function resolvePendingToolApproval(
-  conversationId: string,
-  userId: string,
-  messageId: string,
-  approved: boolean,
-): Promise<void> {
-  await assertConversationOwner(conversationId, userId);
-  const changed = approved
-    ? await claimPendingToolApproval(conversationId, messageId)
-    : await cancelPendingToolApproval(conversationId, messageId);
-  if (!changed) throw new HTTPException(409, { message: 'La aprobación ya fue procesada.' });
 }
