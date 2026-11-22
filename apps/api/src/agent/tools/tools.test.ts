@@ -9,6 +9,7 @@ const context = {
   conversationId: 'conversation-1',
   accessToken: 'access-token',
   delegationEnabled: false,
+  confirmUserOnlyTools: true,
 };
 
 test('combines MCP tools with core agent tools without mutating the registry result', () => {
