@@ -70,6 +70,14 @@ function normalizeRealtime(value: Record<string, unknown>): NonNullable<AgentPro
   } as unknown as NonNullable<AgentProfileConfig['realtime']>;
 }
 
+function normalizeChat(value: Record<string, unknown>): AgentProfileConfig['chat'] {
+  return {
+    ...value,
+    ...Object.fromEntries(AGENT_PROFILE_CHAT_CONFIG_FIELDS.map((field) => [field, value[field]])),
+    confirmUserOnlyTools: value.confirmUserOnlyTools ?? true,
+  } as unknown as AgentProfileConfig['chat'];
+}
+
 function toDomain(row: any): AgentProfile {
   const storedConfig = row.config as Record<string, unknown>;
   let profileConfig: AgentProfileConfig;
@@ -80,6 +88,7 @@ function toDomain(row: any): AgentProfile {
       : undefined;
     profileConfig = {
       ...storedConfig,
+      chat: normalizeChat(storedConfig.chat as Record<string, unknown>),
       ...(realtime ? { realtime: normalizeRealtime(realtime) } : {}),
     } as AgentProfileConfig;
   } else {
@@ -94,7 +103,7 @@ function toDomain(row: any): AgentProfile {
     const chat = Object.fromEntries(AGENT_PROFILE_CHAT_CONFIG_FIELDS.map((field) => [field, storedConfig[field]]));
     profileConfig = {
       systemPrompt: typeof storedConfig.chatSystemPrompt === 'string' ? storedConfig.chatSystemPrompt : '',
-      chat: chat as AgentProfileConfig['chat'],
+      chat: normalizeChat(chat),
       ...(realtime && typeof realtime.voice === 'string' ? { realtime: normalizeRealtime(realtime) } : {}),
     };
   }

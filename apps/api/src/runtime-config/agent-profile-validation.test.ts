@@ -30,7 +30,18 @@ test('normaliza el nombre, los modelos y los ajustes separados de chat', () => {
   assert.equal(result.name, 'Perfil');
   assert.deepEqual(result.model, { chat: 'openai/gpt-test', realtime: 'gpt-realtime' });
   assert.equal(result.config.chat.contextTokenBudget, 10_000);
+  assert.equal(result.config.chat.confirmUserOnlyTools, true);
   assert.equal(result.config.systemPrompt, 'system');
+});
+
+test('userOnly approvals can be explicitly disabled per profile', () => {
+  const value = validProfileConfig();
+  (value.chat as Record<string, unknown>).confirmUserOnlyTools = false;
+  const result = validateAgentProfileInput('Perfil', chatModel, value);
+  assert.equal(result.config.chat.confirmUserOnlyTools, false);
+
+  (value.chat as Record<string, unknown>).confirmUserOnlyTools = 'false';
+  assert.throws(() => validateAgentProfileInput('Perfil', chatModel, value), /Configuración de chat inválida/);
 });
 
 test('realtime tiene límites dinámicos por perfil y aplica defaults si se omiten', () => {

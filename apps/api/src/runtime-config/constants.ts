@@ -35,6 +35,7 @@ export const RUNTIME_CONFIG_PROVIDER_NAMES = ['openai', 'openrouter'] as const;
 export const AGENT_PROFILE_CHAT_CONFIG_FIELDS = [
   'contextTokenBudget', 'maxContextMessages', 'maxOutputTokens', 'reserveOutputTokens',
   'contextSafetyTokens', 'maxToolSteps', 'llmTraceRequests', 'summariesEnabled', 'summaryTokenBudget',
+  'confirmUserOnlyTools',
 ] as const;
 
 /** Campos enteros de perfil que deben ser mayores que cero y respetar el límite máximo. */
