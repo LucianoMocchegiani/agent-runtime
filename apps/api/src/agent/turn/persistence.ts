@@ -31,6 +31,11 @@ function toolOutputOf(item: AgentTurnTool): unknown {
   return item.output ?? item.result;
 }
 
+function isApprovalRequest(value: unknown): boolean {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && (value as { userOnlyApproval?: unknown }).userOnlyApproval === true;
+}
+
 function assistantTextOf(text: string | undefined, steps: AgentTurnStep[]): string {
   if (text && text.trim()) {
     return text.trim();
@@ -56,6 +61,7 @@ export async function persistAgentTurn(
   userId: string,
   text: string | undefined,
   steps: AgentTurnStep[],
+  userOnlyToolNames: ReadonlySet<string> = new Set(),
 ): Promise<void> {
   let savedStepText = false;
   for (const step of steps) {
@@ -79,6 +85,18 @@ export async function persistAgentTurn(
       const name = toolNameOf(result, toolNameOf(call));
       const args = toolArgsOf(call) ?? toolArgsOf(result);
       const output = toolOutputOf(result);
+      if (userOnlyToolNames.has(name) && isApprovalRequest(output)) {
+        await saveMessage({
+          conversationId,
+          userId,
+          role: 'tool',
+          toolName: name,
+          toolArgs: toJsonValue(args),
+          toolResult: { state: 'approval_pending' },
+          content: `Esperando confirmación para ejecutar ${name}.`,
+        });
+        continue;
+      }
       await saveMessage({
         conversationId,
         userId,

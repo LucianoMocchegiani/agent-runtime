@@ -10,6 +10,7 @@ import { conversationRoutes } from './conversations/routes.js';
 import { modelRoutes } from './llm/routes.js';
 import { prisma } from './db/prisma.js';
 import { messageRoutes } from './messages/routes.js';
+import { toolApprovalRoutes } from './messages/approval-routes.js';
 import { runtimeConfigRoutes } from './runtime-config/runtime-config-routes.js';
 import { agentProfileAdminRoutes } from './runtime-config/agent-profile-routes.js';
 import { agentProfileListRoutes } from './runtime-config/agent-profile-list-routes.js';
@@ -65,7 +66,7 @@ export function createApp(): Hono<AppEnv> {
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) {
-      const status = err.status as 400 | 401 | 403 | 404 | 429 | 502 | 500 | 503;
+      const status = err.status as 400 | 401 | 403 | 404 | 409 | 429 | 502 | 500 | 503;
       return c.json({ error: err.message }, status);
     }
     console.error(err);
@@ -96,6 +97,7 @@ export function createApp(): Hono<AppEnv> {
   v1.use('*', requirePrincipal);
   v1.route('/conversations/:id/voice', voiceRoutes);
   v1.route('/conversations/:id/messages', messageRoutes);
+  v1.route('/conversations/:id/messages', toolApprovalRoutes);
   v1.route('/conversations', conversationRoutes);
   v1.route('/models', modelRoutes);
   v1.route('/agent-profiles', agentProfileListRoutes);

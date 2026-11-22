@@ -28,7 +28,7 @@ export type AgentProfileRealtimeConfig = {
   };
 };
 /** Ajustes de generación y contexto que pertenecen al chat. */
-export type AgentProfileChatConfig = Pick<ChatConfig, 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'>;
+export type AgentProfileChatConfig = Pick<ChatConfig, 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { confirmUserOnlyTools: boolean };
 /** Configuración de perfil: prompt compartido más límites específicos de cada modalidad. */
 export type AgentProfileConfig = {
   systemPrompt: string;
@@ -38,7 +38,7 @@ export type AgentProfileConfig = {
 /** Perfil persistido que fija modelos y parámetros de comportamiento para un hilo. */
 export type AgentProfile = { id: string; name: string; model: AgentProfileModelConfig; config: AgentProfileConfig; createdAt: string; updatedAt: string };
 /** Ajustes efectivos del runtime: infraestructura global y valores de chat heredados. */
-export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'authIntrospectUrl' | 'authMapping' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig };
+export type RuntimeSettings = Pick<ChatConfig, 'ai' | 'mcpConfig' | 'authIntrospectUrl' | 'authMapping' | 'chatSystemPrompt' | 'contextTokenBudget' | 'maxContextMessages' | 'maxOutputTokens' | 'reserveOutputTokens' | 'contextSafetyTokens' | 'maxToolSteps' | 'llmTraceRequests' | 'summariesEnabled' | 'summaryTokenBudget'> & { embeddingConfig: EmbeddingConfig; confirmUserOnlyTools?: boolean };
 
 /** Entrada normalizada lista para crear o actualizar un perfil persistido. */
 export type AgentProfileWrite = { name: string; model: AgentProfileModelConfig; config: AgentProfileConfig };

@@ -115,6 +115,7 @@ async function processJob(job: DelegationJob, workerId: string): Promise<void> {
       payload.mcpTokens ?? undefined,
       [],
       profile,
+      { isDelegation: true },
     );
     await consume(response);
     if (leaseLost || turnLease.signal.aborted) {

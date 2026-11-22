@@ -120,5 +120,22 @@ export function createMessagesApi(config: ClientConfig) {
       handlers,
       signal,
     ),
+
+    resolveToolApproval: async (conversationId: string, messageId: string, approved: boolean): Promise<void> => {
+      const res = await apiFetch(config, `${apiBaseUrl(config)}/v1/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(messageId)}/approval`, {
+        method: 'POST',
+        headers: apiHeaders(config, { 'Content-Type': 'application/json', Accept: 'application/json' }),
+        body: JSON.stringify({ approved }),
+      });
+      if (!res.ok) {
+        const parsed = await parseJson<unknown>(res);
+        const message = typeof parsed === 'object' && parsed !== null
+          ? (parsed as { error?: string; message?: string }).error
+            ?? (parsed as { error?: string; message?: string }).message
+            ?? `Error HTTP ${res.status}`
+          : `Error HTTP ${res.status}`;
+        throw new ClientError(res.status, message);
+      }
+    },
   };
 }

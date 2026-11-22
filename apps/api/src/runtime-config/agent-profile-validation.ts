@@ -62,7 +62,7 @@ export function validateAgentProfileInput(name: unknown, rawModel: unknown, rawC
   }
 
   if (!record(rawConfig.chat)) throw new Error('config.chat debe ser un objeto');
-  const chat = rawConfig.chat;
+  const chat: Record<string, unknown> = { ...rawConfig.chat, confirmUserOnlyTools: rawConfig.chat.confirmUserOnlyTools ?? true };
   const unsupportedChatFields = Object.keys(chat).filter((field) => !(AGENT_PROFILE_CHAT_CONFIG_FIELDS as readonly string[]).includes(field));
   if (unsupportedChatFields.length) throw new Error(`config.chat contiene campos no admitidos: ${unsupportedChatFields.join(', ')}`);
   for (const field of AGENT_PROFILE_CHAT_CONFIG_FIELDS) {
@@ -77,7 +77,8 @@ export function validateAgentProfileInput(name: unknown, rawModel: unknown, rawC
   if ((chat.reserveOutputTokens as number) < (chat.maxOutputTokens as number)) {
     throw new Error('config.chat.reserveOutputTokens debe ser mayor o igual que config.chat.maxOutputTokens');
   }
-  if (typeof chat.llmTraceRequests !== 'boolean' || typeof chat.summariesEnabled !== 'boolean') {
+  if (typeof chat.llmTraceRequests !== 'boolean' || typeof chat.summariesEnabled !== 'boolean'
+    || typeof chat.confirmUserOnlyTools !== 'boolean') {
     throw new Error('Configuración de chat inválida');
   }
 

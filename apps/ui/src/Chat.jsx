@@ -9,6 +9,7 @@ import useChatHistory from './useChatHistory.js';
 import useChatTurn, { DELEGATION_ACTIVE_STATUSES } from './useChatTurn.js';
 import useChatComposer from './useChatComposer.js';
 import ChatComposer from './ChatComposer.jsx';
+import ToolApprovalPanel from './ToolApprovalPanel.jsx';
 import Icon from './Icon.jsx';
 export default function Chat({ conversationId, isVisible, delegationStatus, onOpenSidebar, onConversationUpdated, onActivityChange, onOpenConversation }) {
   const [error, setError] = useState(null);
@@ -135,6 +136,11 @@ export default function Chat({ conversationId, isVisible, delegationStatus, onOp
         onScroll={handleMessagesScroll}
       >
         {isLoadingOlder && <div className={ChatStyles.historyLoading} role="status">Cargando mensajes anteriores…</div>}
+        <ToolApprovalPanel
+          conversationId={conversationId}
+          messages={messages}
+          onResolved={() => loadMessages({ preserveHistory: true })}
+        />
         <MessageList messages={messages} onOpenConversation={onOpenConversation} onEditMessage={!isLoading && !isDelegatedActive && !handsFreeMode && images.length === 0 ? startEditingMessage : null} />
         {isLoading && (
           <div className={ChatStyles.thinkingSlot}>

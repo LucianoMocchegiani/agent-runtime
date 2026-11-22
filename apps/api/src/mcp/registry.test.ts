@@ -87,3 +87,35 @@ test('close no espera indefinidamente a un cliente MCP', async () => {
   assert.ok(Date.now() - startedAt < 1_500);
   assert.equal(registry.size, 0);
 });
+
+test('detecta userOnly y lo ejecuta mediante el tool del cliente MCP al aprobar', async () => {
+  let called: unknown;
+  const client = fakeClient({
+    listTools: async () => ({
+      tools: [{
+        name: 'change',
+        inputSchema: { type: 'object', properties: {} },
+        _meta: { 'chat/userOnly': true },
+      }],
+    }),
+    toolsFromDefinitions: (() => ({
+      change: {
+        description: 'Change',
+        inputSchema: {},
+        execute: async (args: unknown) => {
+          called = args;
+          return { content: [{ type: 'text' as const, text: 'done' }] };
+        },
+      },
+    })) as unknown as MCPClient['toolsFromDefinitions'],
+  });
+  const registry = new McpRegistry(config, async () => client);
+  await registry.connect('token');
+  await registry.getAllTools();
+
+  assert.equal(registry.isUserOnlyTool('example__change'), true);
+  const output = await registry.callUserOnlyTool('example__change', { amount: 1 });
+  assert.deepEqual(output, { content: [{ type: 'text', text: 'done' }] });
+  assert.deepEqual(called, { amount: 1 });
+  await registry.close();
+});

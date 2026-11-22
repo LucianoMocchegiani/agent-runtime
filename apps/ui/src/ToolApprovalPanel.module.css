@@ -1,0 +1,35 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 8px 0 16px;
+}
+.heading { margin: 0; color: var(--text); font-size: 14px; }
+.card { padding: 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--tool-bubble); }
+.toolName { color: var(--accent); overflow-wrap: anywhere; }
+.card p { color: var(--text-muted); font-size: 13px; }
+.arguments {
+  max-height: 220px;
+  overflow: auto;
+  padding: 10px;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.18);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12px/1.5 ui-monospace, monospace;
+}
+.actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.actions button {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+}
+.actions button:first-child { color: var(--accent); border-color: var(--accent); }
+.actions button:disabled { opacity: 0.6; cursor: wait; }
+.actions button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.error { color: var(--error-text); font-size: 13px; }

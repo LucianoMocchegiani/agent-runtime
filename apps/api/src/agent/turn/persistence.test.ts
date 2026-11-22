@@ -68,3 +68,52 @@ test('persists step text when final text is absent', async () => {
     content: 'Step answer.',
   }]);
 });
+
+test('persists userOnly calls as pending and does not expose the sentinel result', async () => {
+  const saved: unknown[] = [];
+  await persistAgentTurn(
+    saveMessageSpy(saved),
+    'conversation-1',
+    'user-1',
+    undefined,
+    [{
+      toolCalls: [{ toolName: 'mcp__change', input: { value: 42 } }],
+      toolResults: [{ output: { userOnlyApproval: true, message: 'not executed' } }],
+    }],
+    new Set(['mcp__change']),
+  );
+
+  assert.deepEqual(saved, [{
+    conversationId: 'conversation-1',
+    userId: 'user-1',
+    role: 'tool',
+    toolName: 'mcp__change',
+    toolArgs: { value: 42 },
+    toolResult: { state: 'approval_pending' },
+    content: 'Esperando confirmación para ejecutar mcp__change.',
+  }]);
+});
+
+test('does not interpret an ordinary tool result as a confirmation request', async () => {
+  const saved: unknown[] = [];
+  await persistAgentTurn(
+    saveMessageSpy(saved),
+    'conversation-1',
+    'user-1',
+    undefined,
+    [{
+      toolCalls: [{ toolName: 'mcp__read', input: {} }],
+      toolResults: [{ output: { userOnlyApproval: true } }],
+    }],
+  );
+
+  assert.deepEqual(saved, [{
+    conversationId: 'conversation-1',
+    userId: 'user-1',
+    role: 'tool',
+    toolName: 'mcp__read',
+    toolArgs: {},
+    toolResult: { userOnlyApproval: true },
+    content: 'mcp__read → {"userOnlyApproval":true}',
+  }]);
+});

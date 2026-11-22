@@ -17,6 +17,7 @@ export class AgentToolNameConflictError extends Error {
 export function buildAgentTools(
   mcpTools: Record<string, Tool>,
   context: AgentToolContext,
+  userOnlyToolNames: ReadonlySet<string> = new Set(),
 ): Record<string, Tool> {
   const agentTools = {
     ...buildConversationTools(context),
@@ -29,5 +30,22 @@ export function buildAgentTools(
     throw new AgentToolNameConflictError();
   }
 
-  return { ...mcpTools, ...agentTools };
+  const preparedMcpTools = Object.fromEntries(
+    Object.entries(mcpTools).map(([name, rawTool]) => {
+      if (!context.confirmUserOnlyTools || !userOnlyToolNames.has(name)) {
+        return [name, rawTool];
+      }
+      const tool = rawTool as Tool & { execute?: (input: unknown) => unknown };
+      if (!tool.execute) return [name, tool];
+      return [name, {
+        ...tool,
+        execute: async () => ({
+          userOnlyApproval: true,
+          message: 'La acción requiere confirmación explícita del usuario y todavía no fue ejecutada.',
+        }),
+      } as Tool];
+    }),
+  );
+
+  return { ...preparedMcpTools, ...agentTools };
 }
