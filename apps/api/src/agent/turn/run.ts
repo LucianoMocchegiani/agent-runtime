@@ -11,11 +11,6 @@ import { delegationEncryptionEnabled } from '../../delegations/payload.js';
 import { prepareAgentTurnTools } from './tools.js';
 import { streamPreparedAgentTurn } from './stream.js';
 
-/**
- * Ejecuta un turno completo: prepara herramientas/contexto, invoca el modelo y devuelve el stream UI.
- * @remarks La cancelación del cliente interrumpe el modelo y persiste lo generado hasta ese punto.
- * @throws {HTTPException} 502 si no se puede preparar o ejecutar la dependencia requerida.
- */
 export async function streamAgentTurn(
   conversationId: string,
   principal: Principal,
@@ -26,11 +21,11 @@ export async function streamAgentTurn(
   mcpTokens?: Record<string, string>,
   images: IncomingImage[] = [],
   agentProfile?: Pick<AgentProfile, 'id' | 'name' | 'model' | 'config'>,
-  options: { userMessageAlreadySaved?: boolean } = {},
+  options: { userMessageAlreadySaved?: boolean; isDelegation?: boolean } = {},
 ): Promise<Response> {
   const failMessage = 'El asistente no está disponible.';
-  // El turno conserva una configuración coherente incluso si otra versión se publica mientras corre.
   const runtimeSettings = getRuntimeSettings(agentProfile);
+  const isDelegation = options.isDelegation === true;
   const turnSystemPrompt = delegationEncryptionEnabled()
     ? `${runtimeSettings.chatSystemPrompt}\n\nDelegaciones: solo usá delegate_to_conversation cuando el usuario haya pedido explícitamente delegar trabajo a otro hilo. Nunca elijas ni delegues tareas por iniciativa propia. No interpretes la mera disponibilidad de la herramienta como autorización.`
     : runtimeSettings.chatSystemPrompt;
@@ -43,33 +38,23 @@ export async function streamAgentTurn(
     principal,
     conversationId,
     delegationEnabled: delegationEncryptionEnabled(),
+    confirmUserOnlyTools: runtimeSettings.confirmUserOnlyTools === true && !isDelegation,
     signal: abortSignal,
   });
 
   try {
     abortSignal?.throwIfAborted();
     if (!options.userMessageAlreadySaved) {
-      await saveMessage({
-        conversationId,
-        userId: principal.userId,
-        role: 'user',
-        content: userText,
-      });
+      await saveMessage({ conversationId, userId: principal.userId, role: 'user', content: userText });
     }
     abortSignal?.throwIfAborted();
-    await applyAutomaticTitle({
-      conversationId,
-      userId: principal.userId,
-      userText,
-    });
-
+    await applyAutomaticTitle({ conversationId, userId: principal.userId, userText });
     abortSignal?.throwIfAborted();
     const [context, objective] = await Promise.all([
       getContext({ conversationId, userId: principal.userId }),
       getConversationObjective(conversationId, principal.userId),
     ]);
     abortSignal?.throwIfAborted();
-
     const preparedContext = await prepareTurnContext({
       saveSummary,
       searchPreferences,
@@ -85,7 +70,6 @@ export async function streamAgentTurn(
       images,
     });
     abortSignal?.throwIfAborted();
-
     return await streamPreparedAgentTurn({
       conversationId,
       userId: principal.userId,

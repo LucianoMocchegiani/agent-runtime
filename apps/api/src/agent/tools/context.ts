@@ -7,4 +7,5 @@ export type AgentToolContext = {
   accessToken: string;
   mcpTokens?: Record<string, string>;
   delegationEnabled: boolean;
+  confirmUserOnlyTools: boolean;
 };

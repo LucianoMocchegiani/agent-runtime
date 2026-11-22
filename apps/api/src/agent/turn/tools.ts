@@ -8,7 +8,6 @@ import { AgentToolNameConflictError, buildAgentTools } from '../tools/index.js';
 
 const failMessage = 'El asistente no está disponible.';
 
-/** Conecta los servidores MCP y reúne las herramientas disponibles para un turno. */
 export async function prepareAgentTurnTools(params: {
   mcpConfig: McpConfig;
   accessToken: string;
@@ -16,10 +15,10 @@ export async function prepareAgentTurnTools(params: {
   principal: Principal;
   conversationId: string;
   delegationEnabled: boolean;
+  confirmUserOnlyTools: boolean;
   signal?: AbortSignal;
 }): Promise<{ registry: McpRegistry; tools: Record<string, Tool> }> {
-  const { mcpConfig, accessToken, mcpTokens, principal, conversationId, delegationEnabled, signal } = params;
-
+  const { mcpConfig, accessToken, mcpTokens, principal, conversationId, delegationEnabled, confirmUserOnlyTools, signal } = params;
   const effectiveMcpTokens = { ...mcpTokens };
   for (const [name, mcp] of Object.entries(mcpConfig)) {
     if (!mcp.oauth) continue;
@@ -45,14 +44,13 @@ export async function prepareAgentTurnTools(params: {
       accessToken,
       mcpTokens: effectiveMcpTokens,
       delegationEnabled,
-    });
+      confirmUserOnlyTools,
+    }, registry.userOnlyToolNames());
     return { registry, tools };
   } catch (error) {
     await registry.close().catch(() => undefined);
     if (signal?.aborted) signal.throwIfAborted();
-    if (!(error instanceof AgentToolNameConflictError)) {
-      console.error(error);
-    }
+    if (!(error instanceof AgentToolNameConflictError)) console.error(error);
     throw new HTTPException(502, { message: failMessage });
   }
 }
