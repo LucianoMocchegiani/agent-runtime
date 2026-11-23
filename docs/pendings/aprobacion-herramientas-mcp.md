@@ -18,5 +18,6 @@ El límite es que Runtime no ofrece actualmente una configuración para seleccio
 3. Definir y documentar la prioridad entre la configuración explícita de Runtime y `_meta["chat/userOnly"]`, incluyendo el comportamiento cuando el nombre de herramienta cambia o el servidor no está disponible.
 4. Añadir pruebas para selección por servidor/herramienta, herramientas que desaparecen o cambian de nombre, y la compatibilidad con herramientas marcadas por metadata.
 5. Evaluar la reanudación automática del turno del modelo después de confirmar y ejecutar una herramienta. En la implementación actual, el resultado queda guardado en el historial, pero el modelo no continúa automáticamente para redactar una respuesta.
+6. Implementar una UI nativa de confirmación en el chat para aprobar o rechazar la ejecución de herramientas que requieran aprobación.
 
 Estos puntos son trabajo futuro; no están incluidos en el flujo actual de aprobación.
